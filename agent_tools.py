@@ -5,7 +5,6 @@ import asyncio
 from providers import PROVIDER_MAP, Providers
 from log_in_manager import AsyncLoginManager
 from utils import BaseProvider
-from langchain_core.documents import Document
 from playwright.async_api import (
     async_playwright,
     Page,
@@ -13,7 +12,7 @@ from playwright.async_api import (
 )
 
 
-async def scrape_products(products: list[str]) -> list[Document]:
+async def scrape_products(products: list[str]) -> list[str]:
     """
     Perform web scraping for each product in the given list. Every product is scraped off
     each provider's website.
@@ -23,8 +22,8 @@ async def scrape_products(products: list[str]) -> list[Document]:
             A list of product names or keywords to search for.
 
     Returns:
-        list[Document]:
-            A list of scrape results, where each element is a `Document` object containing 
+        list[str]:
+            A list of scrape results, where each element is a formatted `str` containing 
             the scraped information for a product.
     """
     
@@ -52,14 +51,16 @@ async def scrape_products(products: list[str]) -> list[Document]:
             )
         )
 
-    return web_search_results_list
+    web_search_results_str = "\n\n".join([result for result in web_search_results_list])
+
+    return web_search_results_str
 
   
 async def __scrape_website(
         provider_enum: Providers,
         page: Page,
         products: list[str],
-        result_list: list[Document]
+        result_list: list[str]
     ) -> None | str:
     """
     Perform web actions on the given provider's website to gather informations 
@@ -76,8 +77,8 @@ async def __scrape_website(
         products (list[str]):
             A list containig all the products to be searched on the website.
             
-        result_list (list[Document]):
-            A list that will contain the scraping's results as `Document` objects.
+        result_list (list[str]):
+            A list that will contain the scraping's results as strings.
 
     Returns:
         None | str
@@ -106,13 +107,10 @@ async def __scrape_website(
             found = await __wait_for_any_selector(page, provider.result_container)
             if not found:
                 result_list.append(
-                    Document(
-                        page_content=await __format_block(
-                            provider=provider,
-                            lines=[f"Nessun risultato trovato per '{item}'."] 
-                        ),
-                        metadata={"source": page.url}
-                    )   
+                    await __format_block(
+                        provider=provider,
+                        lines=[f"Nessun risultato trovato per '{item}'."] 
+                    )  
                 )
                 # let's check the next item...
                 continue
@@ -146,15 +144,10 @@ async def __scrape_website(
             provider.price_classes
         )
 
-        final_result = await __format_block(
-            provider,
-            [product_name, product_availability, f"Prezzo: {product_price}"]
-        )
-
         result_list.append(
-            Document(
-                page_content=final_result,
-                metadata={"source": page.url}
+            await __format_block(
+                provider,
+                [product_name, product_availability, f"Prezzo: {product_price}"]
             )
         )
 
