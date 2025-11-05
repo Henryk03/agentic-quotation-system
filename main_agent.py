@@ -112,7 +112,7 @@ async def classify_request(state: MessagesState) -> Literal["question", "end"]:
         case "command":
             return "end"
         case _:
-            return "command"
+            return "end"
 
 
 
