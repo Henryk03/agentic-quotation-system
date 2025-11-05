@@ -16,7 +16,7 @@ response_model = ChatGoogleGenerativeAI(
 )
 
 classifier_model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite",
+    model="gemini-2.5-flash",
     temperature=0
 )
 
@@ -30,11 +30,14 @@ async def scrape_items_or_respond(state: MessagesState):
 
     system_message = SystemMessage(
         content=(
-            "You are an assistant that helps the user "
-            "preparing quotations, scraping the requesting "
-            "items off the web. Always respond in Italian "
-            "and never include words into the tool call with "
-            "what may appear to be a product code in your web search."
+            "You are an assistant that helps the user prepare quotations "
+            "by searching for and collecting the requested items from the web.\n"
+            "When you identify a product code (even if it consists only of numbers), "
+            "do not add, modify, or append anything to it - reproduce it exactly as it "
+            "appears, without articles, extra words, or unnecessary punctuation.\n"
+            "If the user writes item names in the plural form, convert them to singular "
+            "form before processing or searching for them.\n"
+            "All responses must be written in Italian."
         )
     )
 
@@ -54,10 +57,9 @@ async def generate_answer(state: MessagesState):
     scraped_info = state["messages"][2]
 
     prompt = (
-        "Use the following scraped informations to answer the "
-        "question. If you cannot extract the required informations "
-        "to answer, just say that the scraped items do not contain "
-        "enough elements to answer.\n"
+        "Use the following scraped information to answer the question.\n"
+        "If you cannot extract the required information to answer, simply "
+        "say that the scraped items do not contain enough elements to answer.\n\n"
         f"Question: {question}\n"
         f"Scraped informations: {scraped_info}\n"
     )
@@ -75,21 +77,42 @@ async def classify_request(state: MessagesState) -> Literal["question", "end"]:
     prompt = (
         "You are a classifier of user requests.\n"
         f"Here is the user request: '{request}'.\n"
-        "If the request contains a question mark or it seems like "
-        "a question, classify it as 'question', otherwise as 'command'."
+        "Classify the request strictly as one of:\n"
+        "- 'question': the user is asking for information about one or more items, "
+        "e.g. price, availability, features, comparisons, instructions, or the text "
+        "contains an interrogative word/phrase (e.g. 'how', 'what', 'where', 'when', "
+        "'why', 'who', 'which', 'quanto', 'dove', 'perché', 'quanto costa', 'che prezzo') "
+        "OR the sentence uses a question structure even if there is no question mark "
+        "(e.g. verbs like 'costare', 'avere', 'funzionare', 'posso', 'puoi', 'come faccio').\n"
+        "- 'command': the user is giving an instruction to perform a task such as "
+        "searching, scraping, or listing products, without asking for information.\n"
+        "Important rules:\n"
+        "1. Treat numeric tokens (e.g. '14000') as part of the utterance — DO NOT assume "
+        "that a numeric token alone makes the request a command. If an interrogative word "
+        "or question-like verb co-occurs with numbers, classify as 'question'.\n"
+        "2. If the request contains a clear imperative verb (e.g. 'find', 'scrape', 'show me', "
+        "'cerca', 'mostrami'), classify as 'command'.\n"
+        "3. If uncertain, err on the side of 'command'.\n"
+        "Return only one word exactly: 'question' or 'command'.\n"
     )
 
+    # the response is a pydantic object
     response = await classifier_model.with_structured_output(
         ClassifyRequest
     ).ainvoke(
         [{"role": "user", "content": prompt}]
     )
 
-    match response:
+    request_class = getattr(response, "request_class", None)
+    print(request_class)
+
+    match request_class:
         case "question":
             return "question"
         case "command":
             return "end"
+        case _:
+            return "command"
 
 
 
