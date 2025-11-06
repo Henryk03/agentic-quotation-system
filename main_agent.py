@@ -45,7 +45,7 @@ async def scrape_items_or_respond(state: MessagesState):
     )
 
     messages = [system_message] + state["messages"]
-    
+
     response = await response_model.bind_tools(
         [scrape_products]
     ).ainvoke(
@@ -69,11 +69,17 @@ async def __is_question(message: str) -> bool:
             "- contains a question mark (?).\n"
             "- starts with interrogative words (who, what, when, where, why, how).\n"
             "- asks for information, comparison, clarification or availability.\n"
-            "- could also contain a command, but it's still asking you something about one or more products.\n"
+            "- could also contain BOTH an action request AND a question about the result(s) of that "
+            "action (e.g. the scraped product availability, price, etc.).\n\n"
             "A **command** typically:\n"
             "- is an instruction or request to perform an action (like 'find', 'search', 'show').\n"
             "- contains lists, product codes, or directives.\n\n"
-            "You must respond only with one of these two labels: 'question' or 'command'."
+            "You must respond only with one of these two labels:\n"
+            "- 'question'\n" 
+            "- 'command'\n\n"
+            "IMPORTANT:\n"
+            "If the request contains BOTH a command AND a question (e.g. find X and tell me...) "
+            "ALWAYS label it as 'question'."
         )
     )
 
