@@ -36,12 +36,16 @@ async def scrape_items_or_respond(state: MessagesState):
             "made only of numbers (e.g. '14000'), or a mix of letters, numbers and symbols "
             "(e.g. 'A.B1 23', 'XW-200') - handle it exactly as written — do not modify, translate, "
             "or add words to it.\n\nIf the user writes item names in the plural form, convert them "
-            "to singular form before processing or searching for them.\n\n"
+            "to singular form before processing or searching for them (do not mention this skill of "
+            "yours to the user, it is only to be able to use the scraping tool correctly).\n"
+            "If the tool raises an exception, explain clearly what happened to the user and "
+            "how to solve the problem.\n\n"
             "All responses MUST be written in Italian."
         )
     )
 
     messages = [system_message] + state["messages"]
+    
     response = await response_model.bind_tools(
         [scrape_products]
     ).ainvoke(
@@ -62,12 +66,13 @@ async def __is_question(message: str) -> bool:
             "You are a message intent classifier.\n"
             "Your task is to determine whether a user message is a question or a command.\n\n"
             "A **question** typically:\n"
-            "- contains a question mark (?)\n"
-            "- starts with interrogative words (who, what, when, where, why, how)\n"
-            "- asks for information, comparison, clarification or availability.\n\n"
+            "- contains a question mark (?).\n"
+            "- starts with interrogative words (who, what, when, where, why, how).\n"
+            "- asks for information, comparison, clarification or availability.\n"
+            "- could also contain a command, but it's still asking you something about one or more products.\n"
             "A **command** typically:\n"
-            "- is an instruction or request to perform an action (like 'find', 'search', 'show')\n"
-            "- contains lists, product codes, or directives\n\n"
+            "- is an instruction or request to perform an action (like 'find', 'search', 'show').\n"
+            "- contains lists, product codes, or directives.\n\n"
             "You must respond only with one of these two labels: 'question' or 'command'."
         )
     )
@@ -143,11 +148,14 @@ async def main():
 
     while True:
 
+        print(f"{"=" * 34} User Message {"=" * 34}\n")
         user_input = input().strip().lower()
-
-        # print(f"La richiesta e' una domanda: {await __is_question(user_input)}")
+        print("\n")
 
         if user_input == "stop":
+            print(f"{"=" * 34} System Message {"=" * 34}\n")
+            print("Terminando l'esecuzione...")
+            print("\n")
             break
 
         async for chunk in graph.astream(
@@ -158,7 +166,16 @@ async def main():
             }
         ):
             for _, update in chunk.items():
-                update["messages"][-1].pretty_print()
+
+                response = update["messages"][-1].content
+
+                if isinstance(response, list):
+                    print(f"{"=" * 34} Ai Message {"=" * 34}\n")
+                    print(response[0].get("text"))
+                    print("\n")
+                else:
+                    update["messages"][-1].pretty_print()
+                    print("\n")
 
         # response = await graph.ainvoke(
         #     {"messages": [{"role": "user", "content": user_input}]}

@@ -2,6 +2,7 @@
 import re
 import asyncio
 import platform
+from exceptions import LoginFailedException
 from utils import BaseProvider
 from typing import Optional, Callable
 from re import Pattern
@@ -16,12 +17,18 @@ from playwright.async_api import (
 )
 
 
-LOG_IN_STATES_DIR = Path("./logins")                # directory with all the providers' provider states
-LOG_IN_STATES_DIR.mkdir(exist_ok=True)              # with exit_ok true it does not throw an exception if the directory already exists
+LOG_IN_STATES_DIR = Path("./logins")
+LOG_IN_STATES_DIR.mkdir(exist_ok=True)
 
 
 class AsyncLoginManager:
-    """Class to manage asynchronous log-in actions in websites"""
+    """
+    Class to manage asynchronous log-in actions in websites
+    
+    Attributes:
+        apw (Playwright):
+            An asynchronous playwright context manager.
+    """
 
 
     # mutex semaphore for managing asyncronous manual log-ins
@@ -35,7 +42,7 @@ class AsyncLoginManager:
     @staticmethod
     def __state_path(provider: BaseProvider) -> Path:
         """
-        Return the `Path` to the provider's provider state file.
+        Return the `Path` to the given provider's state file.
 
         Args:
             provider (Providers):
@@ -59,7 +66,7 @@ class AsyncLoginManager:
         Args:
             headless (bool):
                 Boolean value that specifies whether the 
-                interaction with the browser is headless or not
+                interaction with the browser is headless or not.
 
         Returns:
             Browser
@@ -133,7 +140,7 @@ class AsyncLoginManager:
             else:
                 return True
 
-        except:
+        except: 
             return True
 
 
@@ -173,13 +180,32 @@ class AsyncLoginManager:
         """
 
         async def check_tag(tag: str) -> list[ElementHandle]:
-            """"""
+            """
+            Check all the tags equal to the given tag and whose attribute(s) 
+            satisfy the regular expression.
+
+            Args:
+                tag (str):
+                    A HTML tag.
+
+            Returns:
+                list[ElementHandle]:
+                    A list containing all the tags whose attribute(s)
+                    satisfy the regex.
+            """
 
             matches = []
             elements = await webpage.query_selector_all(tag)
 
             async def check_elem(element: ElementHandle) -> Optional[ElementHandle]:
-                """"""
+                """
+                Check if the given element contains any attribute that
+                satisfy the regular expression.
+
+                Returns:
+                    - `None` if the element's attribute(s) don't satisfy the regex.
+                    - `ElementHandle` otherwise.
+                """
 
                 attributes = await element.evaluate(
                     "(node) => {"
@@ -198,6 +224,7 @@ class AsyncLoginManager:
                 return None
         
             if not early_end:
+                # long execution
                 results = await asyncio.gather(
                     *(check_elem(e) for e in elements)
                 )
@@ -208,6 +235,7 @@ class AsyncLoginManager:
 
                 return matches
             else:
+                # short execution
                 tasks = [
                     asyncio.create_task(check_elem(e))
                     for e in elements
@@ -250,15 +278,11 @@ class AsyncLoginManager:
          
         - There is not an existing state for the website.
         - The already existing state is expired.
-        - No `auto_login_func` was provided.
+        - The given provider does not have an auto login function.
 
         Args:
             provider (Providers):
-                The provider whose website require a log-in.
-
-            auto_login_func (Optional[Callable[[Providers, Page], None]]):
-                A function used to automatically logging-in into the provider's
-                website. Default is `None`.
+                The provider for whom a log-in is required.
 
         Returns:
             BrowserContext
@@ -268,15 +292,15 @@ class AsyncLoginManager:
 
         if not state_path.exists():
             return await self.__manual_login(provider, state_path)
-        
+
         browser = await self.__launch_browser(headless=True)
         context = await browser.new_context(storage_state=state_path)
         page = await context.new_page()
 
         await page.goto(provider.url)
-        await AsyncLoginManager.__close_popup(page)
+        await AsyncLoginManager.__close_popup(provider, page)
 
-        if await AsyncLoginManager.__is_logged_in(page):
+        if await AsyncLoginManager.__is_logged_in(provider, page):
             return context
         
         # the `auto_login` is used when the context is present, but expired
@@ -291,7 +315,7 @@ class AsyncLoginManager:
                 await provider.auto_login(page)
                 await page.wait_for_load_state("networkidle")
 
-                if await self.__is_logged_in(page):
+                if await self.__is_logged_in(provider, page):
                     # ensure the new context
                     await context.storage_state(path=state_path)
                     return context
@@ -324,9 +348,12 @@ class AsyncLoginManager:
                 provider's website state file.
 
         Returns:
-            BrowserContext | str
-            - `BrowserContext` if nothing went wrong during the log-in.
-            - `str` with an error message if the log-in failed.
+            BrowserContext:
+                If nothing went wrong during the log-in.
+        
+        Raises:
+            LoginFailedException:
+                If the log-in fails for any reason.
         """
 
         async with self._manual_login_lock:
@@ -335,9 +362,10 @@ class AsyncLoginManager:
             page = await context.new_page()
 
             await page.goto(provider.url)
-            await AsyncLoginManager.__close_popup(page)
+            await AsyncLoginManager.__close_popup(provider, page)
 
             if await AsyncLoginManager.__wait_until_logged_in(
+                provider=provider,
                 page=page,
                 check_func=AsyncLoginManager.__is_logged_in,
                 timeout=30000
@@ -351,18 +379,24 @@ class AsyncLoginManager:
                 await context.close()
                 await browser.close()
 
-                return "Log-in failed."
+                raise LoginFailedException(provider)
 
 
     @staticmethod
-    async def __is_logged_in(page: Page) -> bool:
+    async def __is_logged_in(
+        provider: BaseProvider,
+        page: Page
+        ) -> bool:
         """
         Check if the user is logged-in into the website in
         the given webpage.
 
         Args:
+            provider (BaseProvider):
+                A provider of professional items.
+
             page (Page):
-                The webpage of a website.
+                A page at the given provider's website.
 
         Returns:
             bool
@@ -376,13 +410,9 @@ class AsyncLoginManager:
                 re.IGNORECASE
             )
 
-            logout_selectors = [
-                "a"
-            ]
-
             results = await AsyncLoginManager.__find_elements_with_attr_pattern(
                 page,
-                logout_selectors,
+                provider.logout_selectors,
                 logout_texts,
                 early_end=True
             )
@@ -391,7 +421,7 @@ class AsyncLoginManager:
                 return False
             else:
                 return True
-        except Exception as e:
+        except:
             pass
 
         return False
@@ -399,19 +429,48 @@ class AsyncLoginManager:
 
     @staticmethod
     async def __wait_until_logged_in(
+        provider: BaseProvider,
         page: Page,
-        check_func: Callable[[Page], bool],
+        check_func: Callable[[BaseProvider, Page], bool],
         timeout: Optional[float] = 15000,
         interval: Optional[float] = 500
         ) -> bool:
-        """"""
+        """
+        Wait until the user is logged-in into the given
+        provider's website.
 
-        # we start to record the time passed (in
-        # seconds) since the beginning of the `while` loop
+        Args:
+            provider (BaseProvider):
+                A provider for whom a log-in is required.
+
+            page (Page):
+                A page at the given provider's website.
+
+            check_func (Callable[[BaseProvider, Page], bool]):
+                A function used to check if the user is logged-in
+                into the website.
+
+            timeout (Optional[float]):
+                The time given (in milliseconds) to the user to 
+                fulfill the log-in. Default is 15ms.
+
+            interval (Optional[float]):
+                The time (in milliseconds) between one check
+                and another. Default is 0.5ms.
+
+        Returns:
+            bool:
+            - `True` if the log-in has been successfully fulfilled 
+                within the timeout.
+            - `False` otherwise.
+        """
+
+        # we start to record the time passed
+        # since the beginning of the `while` loop
         start = asyncio.get_event_loop().time()
 
         while True:
-            if await check_func(page):
+            if await check_func(provider, page):
                 return True
             
             if (asyncio.get_event_loop().time() - start) * 1000 > timeout:
@@ -422,14 +481,20 @@ class AsyncLoginManager:
 
 
     @staticmethod
-    async def __close_popup(page: Page) -> None:
+    async def __close_popup(
+        provider: BaseProvider,
+        page: Page
+        ) -> None:
         """
         Close all pop-ups related to cookies and advertising in a webpage. 
         By default all the cookies are rejected if possible, otherwise they are accepted.
 
         Args:
+            provider (BaseProvider):
+                A provider of professional items.
+
             page (Page):
-                A webpage that could contain one or more pop-ups.
+                A page at the given provider's website.
 
         Returns:
             None
@@ -449,15 +514,7 @@ class AsyncLoginManager:
             re.IGNORECASE
         )
 
-        # if a website uses another kind of selector,
-        # please add it into this list
-        selectors = [
-            "button", 
-            "i.btn-close-popup",
-            "a#eu-privacy-close"
-        ]
-
-        for sel in selectors:
+        for sel in provider.popup_selectors:
             try:
                 elements = page.locator(sel)
                 count = await elements.count()

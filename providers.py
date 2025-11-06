@@ -13,6 +13,8 @@ class GruppoComet(BaseProvider):
             provider_name = "gruppocomet",
             provider_url = "https://gruppocomet.it/simevignuda",
             result_container = [".result-block-v2"],
+            popup_selectors = ["button.iubenda-cs-close-btn", "a#eu-privacy-close"],
+            logout_selectors = ["a"],
             title_classes = [".result-title"], 
             availability_classes = [".disp-no", ".disp-ok"],
             price_classes = [".result-price"]

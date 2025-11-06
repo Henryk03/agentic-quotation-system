@@ -12,7 +12,7 @@ from playwright.async_api import (
 )
 
 
-async def scrape_products(products: list[str]) -> list[str]:
+async def scrape_products(products: list[str]) -> str:
     """
     Perform web scraping for each product in the given list. Every product is scraped off
     each provider's website.
@@ -22,9 +22,8 @@ async def scrape_products(products: list[str]) -> list[str]:
             A list of product names or keywords to search for.
 
     Returns:
-        list[str]:
-            A list of scrape results, where each element is a formatted `str` containing 
-            the scraped information for a product.
+        str:
+            A formatted string containing the scraped information for each product.
     """
     
     web_search_results_list = []
