@@ -1,8 +1,9 @@
 
+import asyncio
 import requests
 from pydantic import BaseModel, Field
 from enum import Enum
-from typing import List, Literal
+from typing import TypedDict, Literal, Any, TypeAlias
 from playwright.async_api import Page
 
 # # list containing the html tags (followed by
@@ -32,12 +33,61 @@ from playwright.async_api import Page
     # ]
 
 
+class AvailabilityDict(TypedDict):
+    """"""
+
+    available: list[str]
+    not_available: list[str]
+
+
+class SafeAsyncList:
+    """
+    ADT for a thread-safe asynchronous list.
+    """
+
+
+    def __init__(self):
+        self._list = []
+        self._lock = asyncio.Lock()
+
+
+    async def add(self, item: Any) -> None:
+        """
+        Safely append an item to the list.
+
+        This method ensures that only one coroutine at a 
+        time can modify the underlying list, preventing race
+        conditions or data corruption.
+
+        Args:
+            item (Any):
+                A generic item of any type to be inserted into
+                the underlying list.
+        """
+
+        async with self._lock:
+            self._list.append(item)
+
+
+    async def get_all(self) -> list:
+        """
+        Return a deep copy of the list.
+
+        The returned list represents the current state of the 
+        internal data. Since it is a copy, modifications to the
+        returned list do not affect the internal storage.
+        """
+
+        return list(self._list)
+
+
 class Providers(Enum):
     """
-    Enum for the providers of professional items
+    Enum for the providers of professional or commercial items
     """
 
     GRUPPOCOMET = "gruppocomet"
+    COMET = "comet"
 
 
 class BaseProvider:
@@ -55,16 +105,18 @@ class BaseProvider:
             self,
             provider_name: str,
             provider_url: str,
-            result_container: List[str],
-            popup_selectors: List[str],
-            logout_selectors: List[str],
-            title_classes: List[str],
-            availability_classes: List[str],
-            price_classes: List[str]
+            login_required: bool,
+            result_container: list[str],
+            popup_selectors: list[str],
+            logout_selectors: list[str],
+            title_classes: list[str],
+            availability_classes: AvailabilityDict,
+            price_classes: list[str]
         ):
 
         self.name = provider_name
         self.url = provider_url
+        self.login_required = login_required
         self.result_container = result_container
         self.popup_selectors = popup_selectors
         self.logout_selectors = logout_selectors

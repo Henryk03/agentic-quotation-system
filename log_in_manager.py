@@ -290,17 +290,30 @@ class AsyncLoginManager:
 
         state_path = AsyncLoginManager.__state_path(provider)
 
-        if not state_path.exists():
-            return await self.__manual_login(provider, state_path)
+        state_path_exists = state_path.exists()
+        login_required = provider.login_required
 
+        # manual log-in if state path is absent and log-in is required
+        if not state_path_exists and login_required:
+            return await self.__manual_login(provider, state_path)
+        
+        # otherwise...
         browser = await self.__launch_browser(headless=True)
-        context = await browser.new_context(storage_state=state_path)
+        context = await browser.new_context(
+            storage_state=state_path if state_path_exists else None
+        )
         page = await context.new_page()
 
         await page.goto(provider.url)
         await AsyncLoginManager.__close_popup(provider, page)
 
-        if await AsyncLoginManager.__is_logged_in(provider, page):
+        if not state_path_exists:
+            await context.storage_state(path=state_path)
+
+        logged_in = await AsyncLoginManager.__is_logged_in(provider, page)
+        
+        if logged_in or not login_required:
+            await page.close()
             return context
         
         # the `auto_login` is used when the context is present, but expired
@@ -404,6 +417,9 @@ class AsyncLoginManager:
             - `False` otherwise.
         """
 
+        # if not provider.login_required:
+        #     return False
+
         try:
             logout_texts = re.compile(
                 r"(?:log|sign)[-\s]?out",
@@ -452,11 +468,11 @@ class AsyncLoginManager:
 
             timeout (Optional[float]):
                 The time given (in milliseconds) to the user to 
-                fulfill the log-in. Default is 15ms.
+                fulfill the log-in. Default is 15000 ms.
 
             interval (Optional[float]):
                 The time (in milliseconds) between one check
-                and another. Default is 0.5ms.
+                and another. Default is 500 ms.
 
         Returns:
             bool:

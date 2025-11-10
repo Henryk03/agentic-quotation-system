@@ -1,9 +1,7 @@
 
 import asyncio
-
-from typing import Literal
 from utils import ClassifyRequest
-from agent_tools import scrape_products
+from agent_tools import search_products
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
@@ -47,7 +45,7 @@ async def scrape_items_or_respond(state: MessagesState):
     messages = [system_message] + state["messages"]
 
     response = await response_model.bind_tools(
-        [scrape_products]
+        [search_products]
     ).ainvoke(
         messages
     )
@@ -132,7 +130,7 @@ async def generate_answer(state: MessagesState):
 workflow = StateGraph(MessagesState)
 
 workflow.add_node("scrape_items_or_respond", scrape_items_or_respond)
-workflow.add_node("scrape_tool", ToolNode([scrape_products]))
+workflow.add_node("search_tool", ToolNode([search_products]))
 workflow.add_node("generate_answer", generate_answer)
 
 workflow.add_edge(START, "scrape_items_or_respond")
@@ -140,10 +138,10 @@ workflow.add_edge(START, "scrape_items_or_respond")
 workflow.add_conditional_edges(
     "scrape_items_or_respond",
     tools_condition,
-    {"tools": "scrape_tool", END: END}
+    {"tools": "search_tool", END: END}
 )
 
-workflow.add_edge("scrape_tool", "generate_answer")
+workflow.add_edge("search_tool", "generate_answer")
 workflow.add_edge("generate_answer", END)
 
 graph = workflow.compile()

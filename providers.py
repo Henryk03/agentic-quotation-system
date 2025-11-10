@@ -12,11 +12,18 @@ class GruppoComet(BaseProvider):
         super().__init__(
             provider_name = "gruppocomet",
             provider_url = "https://gruppocomet.it/simevignuda",
+            login_required = True,
             result_container = [".result-block-v2"],
-            popup_selectors = ["button.iubenda-cs-close-btn", "a#eu-privacy-close"],
+            popup_selectors = [
+                "button.iubenda-cs-close-btn",
+                "a#eu-privacy-close"
+            ],
             logout_selectors = ["a"],
             title_classes = [".result-title"], 
-            availability_classes = [".disp-no", ".disp-ok"],
+            availability_classes = {
+                "available": [".disp-ok"], 
+                "not_available": [".disp-no"]
+            },
             price_classes = [".result-price"]
         )
 
@@ -51,7 +58,33 @@ class GruppoComet(BaseProvider):
             return False
         
 
+class Comet(BaseProvider):
+
+    def __init__(self):
+        super().__init__(
+            provider_name = "comet",
+            provider_url = "https://comet.it",
+            login_required = False,
+            result_container = [".c-cd-prodotto"],
+            popup_selectors = [
+                "button.iubenda-cs-reject-btn",
+                "i.btn-close-popup"
+            ],
+            logout_selectors = [],
+            title_classes = [".c-cd-prodotto__titolo"], 
+            availability_classes = {
+                "available": [".c-btn-primary"], 
+                "not_available": [".text-h5-semibold"]
+            },
+            price_classes = [".c-cd-prodotto__prezzo-finale"]
+        )
+
+    async def auto_login(self, page):
+        return await super().auto_login(page)
+        
+
 
 PROVIDER_MAP = {
-    Providers.GRUPPOCOMET: GruppoComet
+    Providers.GRUPPOCOMET: GruppoComet,
+    Providers.COMET: Comet
 }
