@@ -108,12 +108,12 @@ async def __scrape_website(
 
             found = await __wait_for_any_selector(page, provider.result_container)
             if not found:
-                await result_list.add(
-                    await __format_block(
-                        provider,
-                        [f"Nessun risultato trovato per '{item}'."] 
-                    )  
+                formatted_block = await __format_block(
+                    provider,
+                    [f"Nessun risultato trovato per '{item}'."] 
                 )
+                await result_list.add(formatted_block)
+
                 # let's check the next item...
                 continue
 
@@ -146,17 +146,16 @@ async def __scrape_website(
             provider.price_classes
         )
 
-        await result_list.add(
-            await __format_block(
-                provider,
-                [
-                    product_name,
-                    product_availability,
-                    "\n",
-                    f"Prezzo: {product_price}"
-                ]
-            )
+        formatted_block = await __format_block(
+            provider,
+            [
+                product_name,
+                product_availability,
+                product_price
+            ]            
         )
+
+        await result_list.add(formatted_block)
 
 
 async def __get_provider(provider_enum: Providers) -> BaseProvider:
@@ -305,7 +304,7 @@ async def __select_all_text(
                 if text:
                     texts.append(text)
 
-    return "\n".join(texts)
+    return ", ".join(texts)
 
 
 async def __format_block(
@@ -314,6 +313,9 @@ async def __format_block(
     ):
     """"""
 
-    header = f"{'=' * 20} {provider.name.upper()} {'=' * 20}"
-    footer = "=" * (len(provider.name) + 42)
-    return "\n".join([header, *lines, footer])
+    return " | ".join(
+        [
+            f"{provider.name.upper()}",
+            *lines
+        ]
+    )

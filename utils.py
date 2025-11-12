@@ -140,8 +140,11 @@ class BaseProvider:
         try:
             response = requests.head(url)
             return response.status_code < 400      
-        except requests.RequestException:
+        except requests.RequestException:       # invalid URL
             return False
+        except requests.exceptions.SSLError:    # expired certificate
+            return True
+
         
 
     async def has_auto_login(self) -> bool:

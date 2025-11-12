@@ -6,45 +6,91 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.checkpoint.memory import InMemorySaver
 
 
-response_model = ChatGoogleGenerativeAI(
+llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     temperature=0.5
 )
 
-classifier_model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash-lite",
-    temperature=0.5
-)
 
-
-async def scrape_items_or_respond(state: MessagesState):
+async def agent_node(state: MessagesState):
     """
     Call the model to generate a response based on the current state.
     Given the request, it will decide to scrape the asked products
-    using the scraping tool, or simply respond to the user.
+    using the scraping tool, or simply respond to the user. If the
+    tool is used, then the agent could:
+
+    * Answer the user's question using the tool's returned informations.
+    * Simply return the results from the tool as they are.
     """
 
     system_message = SystemMessage(
         content=(
             "You are an assistant that helps the user prepare quotations "
-            "by searching for and collecting the requested items from the web.\n"
-            "When you identify a product code - that can appear in various formats, sometimes "
-            "made only of numbers (e.g. '14000'), or a mix of letters, numbers and symbols "
-            "(e.g. 'A.B1 23', 'XW-200') - handle it exactly as written — do not modify, translate, "
-            "or add words to it.\n\nIf the user writes item names in the plural form, convert them "
-            "to singular form before processing or searching for them (do not mention this skill of "
-            "yours to the user, it is only to be able to use the scraping tool correctly).\n"
-            "If the tool raises an exception, explain clearly what happened to the user and "
-            "how to solve the problem.\n\n"
+            "by searching for and collecting the requested items from the "
+            "web.\nWhen you identify a product code - that can appear in "
+            "various formats, sometimes made only of numbers (e.g. '14000'), "
+            "or a mix of letters, numbers and symbols (e.g. 'A.B1 23', 'XW-200') "
+            "- handle it exactly as written — do not modify, translate, "
+            "or add words to it. If the user mentions both a product name and "
+            "a product code in the same request (e.g., 'switch 14000' or 'switch "
+            "with code 14000'), prioritize the code over the name. In such cases, "
+            "use only the product code (e.g., 14000) to identify or search the item, "
+            "and ignore the descriptive word (e.g., 'switch'). Furthermore, ignore "
+            "filler words like 'with' and 'and' in product descriptions. Focus only "
+            "on meaningful identifiers, codes, or specifications. For example, in "
+            "'Mac Mini with M4 and 512GB of storage', extract only 'M4' and '512GB', "
+            "or in 'Mac Mini with M4 Pro and 24GB of RAM', extract 'M4 Pro' and '24GB' "
+            "only (do NOT include words like 'storage' or 'ram')."
+            "\n\n"
+            "If the user writes item names in the plural form, convert them to singular "
+            "form before processing or searching for them (do NOT mention this skill of "
+            "yours to the user, it is only to be able to use the scraping tool correctly)."
+            "\nIf the tool raises an exception, explain clearly what happened to the user "
+            "and how to solve the problem."
+            "\n\n"
             "All responses MUST be written in Italian."
+            "\n\n"
+            "Before answering the user's request, analyze it to determine whether "
+            "the user message is a question or a command about one or more products."
+            "\n\n"
+            "A **question** typically:\n"
+            "- Contains a question mark (?).\n"
+            "- Starts with interrogative words (who, what, when, where, why, how).\n"
+            "- Asks for information, comparison, clarification or availability.\n"
+            "- Could also contain BOTH an action request AND a question about the "
+            "result(s) of that action (e.g. the scraped product availability, price, "
+            "etc.)."
+            "\n\n"
+            "A **command** typically:\n"
+            "- Is an instruction or request to perform an action (like 'find', 'search', "
+            "'show').\n"
+            "- Contains lists, product codes, or directives."
+            "\n\n"
+            "IMPORTANT:\n"
+            "- If the request contains BOTH a command AND a question (e.g. find X and tell "
+            "me...) ALWAYS consider it a question.\n"
+            "- If the user's message is a question, use the scraped informations to give a "
+            "clear and concise answer. If the informations are not enough to answer, then "
+            "say it explicitly.\n"
+            "- If the user's message is a command or a list/sequence of product "
+            "names/codes, format the scraped information as a readable product card. "
+            "Include all available details returned by the tool, such as provider, price, "
+            "specifications, or any other data — do NOT omit or remove any information. "
+            "If no information or results are found, clearly notify the user that nothing "
+            "was retrieved."
+            "\n\n"
+            "Before performing a web search using the tool, check whether the item has already "
+            "been searched for previously. If the item was already retrieved or exists in the "
+            "current context, do not perform another search for it."
         )
     )
 
     messages = [system_message] + state["messages"]
 
-    response = await response_model.bind_tools(
+    response = await llm.bind_tools(
         [search_products]
     ).ainvoke(
         messages
@@ -53,98 +99,23 @@ async def scrape_items_or_respond(state: MessagesState):
     return {"messages": [response]}
 
 
-async def __is_question(message: str) -> bool:
-    """
-    Analyze the given message and return `True` if it is
-    is a question, `False` otherwise.
-    """
-
-    system_message = SystemMessage(
-        content=(
-            "You are a message intent classifier.\n"
-            "Your task is to determine whether a user message is a question or a command.\n\n"
-            "A **question** typically:\n"
-            "- contains a question mark (?).\n"
-            "- starts with interrogative words (who, what, when, where, why, how).\n"
-            "- asks for information, comparison, clarification or availability.\n"
-            "- could also contain BOTH an action request AND a question about the result(s) of that "
-            "action (e.g. the scraped product availability, price, etc.).\n\n"
-            "A **command** typically:\n"
-            "- is an instruction or request to perform an action (like 'find', 'search', 'show').\n"
-            "- contains lists, product codes, or directives.\n\n"
-            "You must respond only with one of these two labels:\n"
-            "- 'question'\n" 
-            "- 'command'\n\n"
-            "IMPORTANT:\n"
-            "If the request contains BOTH a command AND a question (e.g. find X and tell me...) "
-            "ALWAYS label it as 'question'."
-        )
-    )
-
-    response = await classifier_model.with_structured_output(
-        ClassifyRequest
-    ).ainvoke(
-        [system_message, {"role": "user", "content": message}]
-    )
-
-    result = getattr(response, "request_class", None)
-
-    return str(result).strip().lower() == "question"
-
-
-async def generate_answer(state: MessagesState):
-    """
-    Interpret the user's message and generate a response based
-    on the user's request.
-    """
-
-    request = state["messages"][0].content
-    scraped_info = state["messages"][-1].content
-
-    if await __is_question(request):
-        instructions = (
-            "The user's message is a question. Use the scraped informations "
-            "to give a clear and concise answer. If the informations are not "
-            "enough to answer, then say it explicitly."
-        )
-    else:
-        instructions = (
-            "The user's message is a command or a list/sequence of products. "
-            "Show the scraped informations as they are - without modifing, rewriting "
-            "or summarizing them. If there is nothing or no result has been found, "
-            "notify it to the user."
-        )
-
-    prompt = (
-        f"{instructions}\n\n"
-        f"User message: {request}\n"
-        f"Scraped information:\n{scraped_info}\n"
-    )
-
-    response = await response_model.ainvoke([{"role": "user", "content": prompt}])
-
-    return {"messages": [response]}
-
-
 # graph assembly
 workflow = StateGraph(MessagesState)
 
-workflow.add_node("scrape_items_or_respond", scrape_items_or_respond)
+workflow.add_node("agent", agent_node)
 workflow.add_node("search_tool", ToolNode([search_products]))
-workflow.add_node("generate_answer", generate_answer)
 
-workflow.add_edge(START, "scrape_items_or_respond")
+workflow.add_edge(START, "agent")
 
 workflow.add_conditional_edges(
-    "scrape_items_or_respond",
+    "agent",
     tools_condition,
     {"tools": "search_tool", END: END}
 )
 
-workflow.add_edge("search_tool", "generate_answer")
-workflow.add_edge("generate_answer", END)
+workflow.add_edge("search_tool", "agent")
 
-graph = workflow.compile()
+graph = workflow.compile(checkpointer=InMemorySaver())  # short-term memory
 
 
 
@@ -167,6 +138,9 @@ async def main():
                 "messages": [
                     {"role": "user", "content": user_input}
                 ]
+            },
+            {
+                "configurable": {"thread_id": 1}
             }
         ):
             for _, update in chunk.items():
