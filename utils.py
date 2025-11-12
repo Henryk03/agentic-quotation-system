@@ -1,9 +1,8 @@
 
 import asyncio
 import requests
-from pydantic import BaseModel, Field
 from enum import Enum
-from typing import TypedDict, Literal, Any, TypeAlias
+from typing import TypedDict, Any
 from playwright.async_api import Page
 
 # # list containing the html tags (followed by
@@ -170,17 +169,3 @@ class BaseProvider:
 
         print(f"Manual log-in required for {self.name}.")
         return False
-    
-
-class ClassifyRequest(BaseModel):
-    """
-    Classify user's requests into 'question' or 'command'.
-    """
-
-    request_class: Literal["question", "command"] = Field(
-        description=(
-            "Request class: 'question' if it's a question "
-            "about one or more items; 'command' if it's a "
-            "simple scraping request."
-        )
-    )
