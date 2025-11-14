@@ -55,50 +55,46 @@ workflow.add_conditional_edges(
 
 workflow.add_edge("search_tool", "agent")
 
-graph = workflow.compile(checkpointer=InMemorySaver())  # short-term memory
+# checkpointer = InMemorySaver()
+
+graph = workflow.compile()
 
 
 
-async def main():
+# async def main():
 
-    while True:
+#     while True:
 
-        print(f"{"=" * 34} User Message {"=" * 34}\n")
-        user_input = input().strip().lower()
-        print("\n")
+#         print(f"{"=" * 34} User Message {"=" * 34}\n")
+#         user_input = input().strip().lower()
+#         print("\n")
 
-        if user_input == "stop":
-            print(f"{"=" * 34} System Message {"=" * 34}\n")
-            print("Terminando l'esecuzione...")
-            print("\n")
-            break
+#         if user_input == "stop":
+#             print(f"{"=" * 34} System Message {"=" * 34}\n")
+#             print("Terminando l'esecuzione...")
+#             print("\n")
+#             break
 
-        async for chunk in graph.astream(
-            {
-                "messages": [
-                    {"role": "user", "content": user_input}
-                ]
-            },
-            {
-                "configurable": {"thread_id": 1}
-            }
-        ):
-            for _, update in chunk.items():
+#         async for chunk in graph.astream(
+#             {
+#                 "messages": [
+#                     {"role": "user", "content": user_input}
+#                 ]
+#             },
+#             {
+#                 "configurable": {"thread_id": 1}
+#             }
+#         ):
+#             for _, update in chunk.items():
 
-                response = update["messages"][-1].content
+#                 response = update["messages"][-1].content
 
-                if isinstance(response, list):
-                    print(f"{"=" * 34} Ai Message {"=" * 34}\n")
-                    print(response[0].get("text"))
-                    print("\n")
-                else:
-                    update["messages"][-1].pretty_print()
-                    print("\n")
+#                 if isinstance(response, list):
+#                     print(f"{"=" * 34} Ai Message {"=" * 34}\n")
+#                     print(response[0].get("text"))
+#                     print("\n")
+#                 else:
+#                     update["messages"][-1].pretty_print()
+#                     print("\n")
 
-        # response = await graph.ainvoke(
-        #     {"messages": [{"role": "user", "content": user_input}]}
-        # )
-
-        # print(response)
-
-asyncio.run(main())
+# asyncio.run(main())
