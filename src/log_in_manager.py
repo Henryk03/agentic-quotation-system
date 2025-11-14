@@ -17,7 +17,7 @@ from playwright.async_api import (
 )
 
 
-LOG_IN_STATES_DIR = Path("./logins")
+LOG_IN_STATES_DIR = Path("../logins")
 LOG_IN_STATES_DIR.mkdir(exist_ok=True)
 
 

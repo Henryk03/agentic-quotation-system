@@ -210,4 +210,7 @@ __marimo__/
 .DS_Store
 
 # private folders
-src/logins/
+logins/
+
+# other folders
+.langgraph_api/
