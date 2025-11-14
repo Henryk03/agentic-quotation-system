@@ -159,7 +159,22 @@ async def __scrape_website(
 
 
 async def __get_provider(provider_enum: Providers) -> BaseProvider:
-    """"""
+    """
+    Retrieve the `BaseProvider` subclass associated with the given
+    provider enum.
+
+    Args:
+        provider_enum (Providers):
+            The enum value identifying the provider.
+
+    Returns:
+        BaseProvider:
+            An instance of the provider class.
+
+    Raises:
+        ValueError:
+            If the provider enum is not supported.
+    """
 
     provider_class = PROVIDER_MAP.get(provider_enum)
 
@@ -194,7 +209,25 @@ async def __wait_for_any_selector(
         selectors: list[str] | AvailabilityDict,
         timeout: float = 2000
     ) -> str | None:
-    """"""
+    """
+    Wait for the first selector to appear on the page.
+
+    Args:
+        page (Page):
+            The Playwright page to search on.
+
+        selectors (list[str] | AvailabilityDict):
+            CSS selectors or an AvailabilityDict of selectors.
+
+        timeout (float, optional):
+            Maximum time to wait for each selector in milliseconds.
+            Default is 2000 ms.
+
+    Returns:
+        str | None:
+            The first selector that becomes visible, or None if
+            none are found within the timeout.
+    """
 
     selectors = await __normalize_selectors(selectors)
 
@@ -218,7 +251,25 @@ async def __wait_for_all_selectors(
         selectors: list[str] | AvailabilityDict,
         timeout: float = 2000
     ) -> None:
-    """"""
+    """
+    Wait for all specified selectors to appear on the page.
+
+    Args:
+        page (Page):
+            The Playwright page to search on.
+
+        selectors (list[str] | AvailabilityDict):
+            CSS selectors or an AvailabilityDict of selectors.
+
+        timeout (float, optional):
+            Maximum time to wait for each selector in milliseconds.
+            Default is 2000 ms.
+
+    Returns:
+        bool:
+            True if all selectors became visible within the timeout,
+            False otherwise.
+    """
 
     selectors = await __normalize_selectors(selectors)
 
@@ -239,7 +290,23 @@ async def __select_text(
         tag: bs4.element.Tag,
         selectors: list[str] | AvailabilityDict
     ) -> str:
-    """"""
+    """
+    Extract text content from the first element matching any of the
+    provided selectors.
+
+    Args:
+        tag (bs4.element.Tag):
+            The BeautifulSoup tag to search within.
+
+        selectors (list[str] | AvailabilityDict):
+            A list of CSS selectors or an AvailabilityDict containing
+            'available' and 'not_available' lists.
+
+    Returns:
+        str:
+            The text of the first matching element, stripped of whitespace,
+            or "N/A" if no element matches.
+    """
 
     selectors = await __normalize_selectors(selectors)
     
@@ -311,7 +378,23 @@ async def __format_block(
         provider: Providers,
         lines: list[str]
     ):
-    """"""
+    """
+    Format a block of text with the provider name followed by
+    a list of content lines.
+
+    Args:
+        provider (Providers):
+            The provider whose name will appear at the start of 
+            the block.
+
+        lines (list[str]):
+            A list of strings to include after the provider name.
+
+    Returns:
+        str:
+            A single string with the provider name in uppercase,
+            followed by the lines joined with " | ".
+    """
 
     return " | ".join(
         [

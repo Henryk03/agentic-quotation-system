@@ -5,35 +5,19 @@ from enum import Enum
 from typing import TypedDict, Any
 from playwright.async_api import Page
 
-# # list containing the html tags (followed by
-    # # their class(es) or id(s)) whose role is to show 
-    # # informations about an item
-    # result_containers = [
-    #     ".result-block-v2"
-    # ]
-
-    # # list containing the html classes for
-    # # the search of the product name (title)
-    # title_classes = [
-    #     ".result-title"
-    # ]
-
-    # # list containing the classes that mark
-    # # the product availability status
-    # availability_classes = [
-    #     ".disp-no",
-    #     ".disp-ok"
-    # ]
-
-    # # list containing the classes that
-    # # that mark the price tag
-    # price_classes = [
-    #     ".result-price"
-    # ]
-
 
 class AvailabilityDict(TypedDict):
-    """"""
+    """
+    Dictionary specifying the CSS selectors used to identify product
+    availability on a provider's website.
+
+    Attributes:
+        available (list[str]):
+            List of selectors corresponding to products that are in stock.
+
+        not_available (list[str]):
+            List of selectors corresponding to products that are out of stock.
+    """
 
     available: list[str]
     not_available: list[str]
@@ -91,11 +75,40 @@ class Providers(Enum):
 
 class BaseProvider:
     """
-    Base class for provider data and optional log-in logic
+    Base class representing a provider and its optional login logic.
 
     Attributes:
-        name:
-        url:
+        name (str):
+            The provider's name.
+
+        url (str):
+            The URL of the provider's website.
+
+        login_required (bool):
+            Indicates whether authentication is required to browse
+            the provider's site.
+
+        result_container (list[str]):
+            HTML selectors identifying the container of search results.
+
+        popup_selectors (list[str]):
+            HTML selectors used to detect and close popup elements.
+
+        logout_selectors (list[str]):
+            HTML selectors for buttons or links used to perform logout.
+
+        title_classes (list[str]):
+            CSS classes specifying the title element within a search result.
+
+        availability_classes (AvailabilityDict):
+            CSS classes or selectors used to detect product availability.
+
+        price_classes (list[str]):
+            CSS classes used to extract the product's price.
+
+    Raises:
+        ValueError:
+            If the provider's website is not reachable.
         
     """
 
@@ -134,7 +147,20 @@ class BaseProvider:
 
     @staticmethod
     def __is_valid_url(url: str) -> bool:
-        """"""
+        """
+        Check whether the given URL is reachable.
+
+        The URL is considered valid if:
+
+        - An HTTP HEAD request responds with a status code < 400.
+        - The request fails due to an SSL error (e.g. expired certificate),
+          which is interpreted as “reachable but with SSL issues”.
+
+        Returns:
+            bool:
+                True if the URL is reachable or returns an SSL-related error.
+                False if the URL is invalid or unreachable.
+        """
 
         try:
             response = requests.head(url)
@@ -147,25 +173,36 @@ class BaseProvider:
         
 
     async def has_auto_login(self) -> bool:
-        """"""
+        """
+        Determine whether the current `BaseProvider` instance provides
+        its own implementation of the `auto_login` method. This is true
+        only if the subclass overrides the default `BaseProvider.auto_login`
+        implementation.
+
+        Returns:
+            bool:
+                True if the provider defines a custom `auto_login` method,
+                False otherwise.
+        """
 
         return self.auto_login.__func__ is not BaseProvider.auto_login
         
     
     async def auto_login(self, page: Page) -> bool:
         """
-        Default automatic log-in function that does nothing.
-        Override this method for each provider, subclass of `BaseProvider`.
+        Default automatic login implementation, which performs no action.
+        Subclasses of `BaseProvider` should override this method to
+        implement provider-specific authentication logic.
 
         Args:
             page (Page):
-                The webpage of the provider.
+                The page instance already navigated to the provider's
+                login area.
 
         Returns:
-            bool
-            - `True` if the log-in was successful.
-            - `False` otherwise.
+            bool:
+                True if the login procedure succeeds,
+                False otherwise.
         """
 
-        print(f"Manual log-in required for {self.name}.")
         return False

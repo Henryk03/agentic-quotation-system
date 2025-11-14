@@ -23,7 +23,7 @@ LOG_IN_STATES_DIR.mkdir(exist_ok=True)
 
 class AsyncLoginManager:
     """
-    Class to manage asynchronous log-in actions in websites
+    Class to manage asynchronous login actions in websites
     
     Attributes:
         apw (Playwright):
@@ -31,7 +31,7 @@ class AsyncLoginManager:
     """
 
 
-    # mutex semaphore for managing asyncronous manual log-ins
+    # mutex semaphore for managing asyncronous manual logins
     _manual_login_lock = asyncio.Lock()
 
 
@@ -282,7 +282,7 @@ class AsyncLoginManager:
 
         Args:
             provider (Providers):
-                The provider for whom a log-in is required.
+                The provider for whom a login is required.
 
         Returns:
             BrowserContext
@@ -293,11 +293,13 @@ class AsyncLoginManager:
         state_path_exists = state_path.exists()
         login_required = provider.login_required
 
-        # manual log-in if state path is absent and log-in is required
+        # manual login if state path is absent and login is required
         if not state_path_exists and login_required:
-            return await self.__manual_login(provider, state_path)
+            await self.__manual_login(provider, state_path)
+
+        # let's update its value to see if the manual login succeeded
+        state_path_exists = state_path.exists()
         
-        # otherwise...
         browser = await self.__launch_browser(headless=True)
         context = await browser.new_context(
             storage_state=state_path if state_path_exists else None
@@ -346,27 +348,28 @@ class AsyncLoginManager:
             self,
             provider: BaseProvider,
             state_path: Path
-        ) -> BrowserContext | str:
+        ) -> None:
         """
-        Launch a non-headless browser to manually logging-in
-        into the provider's website and returns a `BrowserContext`
-        istance.
+        Open a non-headless browser so the user can manually perform
+        the authentication on the provider's website. When the login is
+        completed, the method ensures that a valid browser context is
+        created and ready to be used for navigating the provider's site,
+        storing its authenticated state in the given path.
 
         Args:
             provider (Provider):
-                The provider whose website require a log-in.
+                The provider whose website requires manual authentication.
 
             state_path (Path):
-                The path to the directory containig the given
-                provider's website state file.
+                Path where the authenticated browser state should be saved.
 
         Returns:
-            BrowserContext:
-                If nothing went wrong during the log-in.
+            None
         
         Raises:
             LoginFailedException:
-                If the log-in fails for any reason.
+                Raised if the login cannot be completed or the context
+                cannot be initialized correctly.
         """
 
         async with self._manual_login_lock:
@@ -385,8 +388,8 @@ class AsyncLoginManager:
             ):
                 await context.storage_state(path=state_path)
                 await page.close()
-
-                return context
+                await context.close()
+                await browser.close()
             else:
                 await page.close()
                 await context.close()
@@ -457,7 +460,7 @@ class AsyncLoginManager:
 
         Args:
             provider (BaseProvider):
-                A provider for whom a log-in is required.
+                A provider for whom a login is required.
 
             page (Page):
                 A page at the given provider's website.
@@ -468,7 +471,7 @@ class AsyncLoginManager:
 
             timeout (Optional[float]):
                 The time given (in milliseconds) to the user to 
-                fulfill the log-in. Default is 15000 ms.
+                fulfill the login. Default is 15000 ms.
 
             interval (Optional[float]):
                 The time (in milliseconds) between one check
@@ -476,7 +479,7 @@ class AsyncLoginManager:
 
         Returns:
             bool:
-            - `True` if the log-in has been successfully fulfilled 
+            - `True` if the login has been successfully fulfilled 
                 within the timeout.
             - `False` otherwise.
         """
