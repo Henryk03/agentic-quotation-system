@@ -1,7 +1,6 @@
 
 import asyncio
 import requests
-from enum import Enum
 from typing import TypedDict, Any
 from playwright.async_api import Page
 
@@ -62,15 +61,6 @@ class SafeAsyncList:
         """
 
         return list(self._list)
-
-
-class Providers(Enum):
-    """
-    Enum for the providers of professional or commercial items
-    """
-
-    GRUPPOCOMET = "gruppocomet"
-    COMET = "comet"
 
 
 class BaseProvider:

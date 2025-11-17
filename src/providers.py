@@ -1,9 +1,20 @@
 
 import os
 import re
+from enum import Enum
 from dotenv import load_dotenv
 from pathlib import Path
 from utils import BaseProvider, Providers
+
+
+class Providers(Enum):
+    """
+    Enum for the providers of professional or commercial items
+    """
+
+    GRUPPOCOMET = "gruppocomet"
+    COMET = "comet"
+    AMAZON = "amazon"
 
 
 class GruppoComet(BaseProvider):
@@ -86,5 +97,6 @@ class Comet(BaseProvider):
 
 PROVIDER_MAP = {
     Providers.GRUPPOCOMET: GruppoComet,
-    Providers.COMET: Comet
+    Providers.COMET: Comet,
+    Providers.AMAZON: None
 }

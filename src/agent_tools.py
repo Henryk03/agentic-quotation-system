@@ -34,15 +34,20 @@ async def search_products(products: list[str]) -> str:
         provider_page = []
 
         for provider in Providers:
+            provider_class = await __get_provider(provider)
+
+            if not provider_class:
+                pass
+
             context = await login_manager.ensure_context(
-                await __get_provider(provider)
+                provider_class
             )
             provider_page.append(
                 (provider, await context.new_page())
             )
 
         await asyncio.gather(
-            *(__scrape_website(
+            *(__search_in_website(
                 provider, 
                 page,
                 products, 
@@ -57,7 +62,7 @@ async def search_products(products: list[str]) -> str:
     return web_search_results_str
 
   
-async def __scrape_website(
+async def __search_in_website(
         provider_enum: Providers,
         page: Page,
         products: list[str],
@@ -156,6 +161,12 @@ async def __scrape_website(
         )
 
         await result_list.add(formatted_block)
+
+
+async def __search_with_computer_use():
+    """"""
+
+    pass
 
 
 async def __get_provider(provider_enum: Providers) -> BaseProvider:
