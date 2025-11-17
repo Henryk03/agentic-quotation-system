@@ -6,7 +6,7 @@ description = "An agentic system to support the preparation of quotations by sea
 authors = [
     {name = "Enrico F. Contessi", email = "enricocontessi03@gmail.com"}
 ]
-requires-python = ">=3.11,<4.0"
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "langchain>=1.0.0",
     "langgraph>=1.0.0",
