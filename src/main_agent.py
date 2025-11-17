@@ -11,7 +11,10 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
-    temperature=0.5
+    temperature=0.5,
+    max_tokens=2048
+).with_config(
+    {"tags": ["nostream"]}
 )
 
 
@@ -55,9 +58,9 @@ workflow.add_conditional_edges(
 
 workflow.add_edge("search_tool", "agent")
 
-# checkpointer = InMemorySaver()
+checkpointer = InMemorySaver()
 
-graph = workflow.compile()
+graph = workflow.compile(checkpointer)
 
 
 

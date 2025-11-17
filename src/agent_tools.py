@@ -2,7 +2,7 @@
 import re
 import bs4
 import asyncio
-from providers import PROVIDER_MAP, Providers
+from providers import PROVIDER_MAP
 from log_in_manager import AsyncLoginManager
 from utils import BaseProvider, SafeAsyncList, AvailabilityDict
 from playwright.async_api import (
@@ -33,14 +33,16 @@ async def search_products(products: list[str]) -> str:
         login_manager = AsyncLoginManager(apw)
         provider_page = []
 
-        for provider in Providers:
-            provider_class = await __get_provider(provider)
+        for provider in PROVIDER_MAP.values():
 
-            if not provider_class:
+            # if there is not any `BaseProvider` subclass
+            # for the given provider, let's use Google
+            # computer use
+            if not provider:
                 pass
 
             context = await login_manager.ensure_context(
-                provider_class
+                provider
             )
             provider_page.append(
                 (provider, await context.new_page())
@@ -63,7 +65,7 @@ async def search_products(products: list[str]) -> str:
 
   
 async def __search_in_website(
-        provider_enum: Providers,
+        provider: BaseProvider,
         page: Page,
         products: list[str],
         result_list: SafeAsyncList
@@ -74,7 +76,7 @@ async def __search_in_website(
     `result_list`.
 
     Args:
-        provider (Providers):
+        provider (BaseProvider):
             A provider for the products.
 
         page (Page):
@@ -91,8 +93,6 @@ async def __search_in_website(
         - `None` if no problem was encountered during the execution.
         - `str` with the error message if the something went wrong.
     """
-
-    provider = await __get_provider(provider_enum)
 
     await page.goto(provider.url)
     await page.wait_for_load_state("load")
@@ -166,33 +166,7 @@ async def __search_in_website(
 async def __search_with_computer_use():
     """"""
 
-    pass
-
-
-async def __get_provider(provider_enum: Providers) -> BaseProvider:
-    """
-    Retrieve the `BaseProvider` subclass associated with the given
-    provider enum.
-
-    Args:
-        provider_enum (Providers):
-            The enum value identifying the provider.
-
-    Returns:
-        BaseProvider:
-            An instance of the provider class.
-
-    Raises:
-        ValueError:
-            If the provider enum is not supported.
-    """
-
-    provider_class = PROVIDER_MAP.get(provider_enum)
-
-    if not provider_class:
-        raise ValueError(f"Provider {provider_enum.name} not supported.")
-
-    return provider_class() 
+    pass 
 
 
 async def __normalize_selectors(
@@ -386,7 +360,7 @@ async def __select_all_text(
 
 
 async def __format_block(
-        provider: Providers,
+        provider: BaseProvider,
         lines: list[str]
     ):
     """
@@ -394,7 +368,7 @@ async def __format_block(
     a list of content lines.
 
     Args:
-        provider (Providers):
+        provider (BaseProvide):
             The provider whose name will appear at the start of 
             the block.
 
