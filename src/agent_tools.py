@@ -386,4 +386,4 @@ async def __format_block(
             f"{provider.name.upper()}",
             *lines
         ]
-    )
+    ) + "\n\n"

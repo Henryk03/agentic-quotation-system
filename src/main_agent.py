@@ -58,9 +58,9 @@ workflow.add_conditional_edges(
 
 workflow.add_edge("search_tool", "agent")
 
-checkpointer = InMemorySaver()
+# checkpointer = InMemorySaver()
 
-graph = workflow.compile(checkpointer)
+graph = workflow.compile()
 
 
 

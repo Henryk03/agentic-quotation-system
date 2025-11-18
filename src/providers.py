@@ -81,11 +81,11 @@ class Comet(BaseProvider):
 
     async def auto_login(self, page):
         return await super().auto_login(page)
-        
 
 
-PROVIDER_MAP = {
-    BaseProvider.GRUPPOCOMET: GruppoComet,
-    BaseProvider.COMET: Comet,
-    # Providers.AMAZON: None
+
+PROVIDER_MAP: dict[str, BaseProvider | None] = {
+    "GRUPPOCOMET": GruppoComet(),
+    "COMET": Comet(),
+    # "AMAZON": None
 }
