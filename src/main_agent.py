@@ -6,15 +6,11 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.memory import MemorySaver
 
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.5,
-    max_tokens=2048
-).with_config(
-    {"tags": ["nostream"]}
+    model="gemini-2.5-flash"
 )
 
 
@@ -58,9 +54,7 @@ workflow.add_conditional_edges(
 
 workflow.add_edge("search_tool", "agent")
 
-# checkpointer = InMemorySaver()
-
-graph = workflow.compile()
+graph = workflow.compile(checkpointer=MemorySaver())
 
 
 

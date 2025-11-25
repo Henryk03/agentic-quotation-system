@@ -1,7 +1,8 @@
 
 import asyncio
 import requests
-from typing import TypedDict, Any
+from pydantic import BaseModel
+from typing import TypedDict, Any, Optional
 from playwright.async_api import Page
 
 
@@ -196,3 +197,50 @@ class BaseProvider:
         """
 
         return False
+    
+
+class ChatMessage(BaseModel):
+    """
+    Represents a single message within a chat conversation.
+
+    Attributes:
+        role (str):
+            The role of the message sender (e.g. "user", "assistant", "system").
+
+        content (str):
+            The textual content of the message.
+    """
+
+    role: str
+    content: str
+
+
+class ChatCompletionRequest(BaseModel):
+    """
+    Defines the request payload for generating a chat completion.
+
+    Attributes:
+        model (str):
+            The identifier of the model to be used for the completion.
+
+        messages (list[ChatMessage]):
+            The ordered list of messages forming the conversation context.
+
+        max_tokens (Optional[int]): 
+            The maximum number of tokens the model is allowed to generate 
+            in the response.
+
+        temperature (Optional[float]):
+            Controls randomness in the output; higher values produce more 
+            diverse responses.
+
+        stream (Optional[bool]):
+            When set to True, the response is returned as a stream of partial 
+            messages.
+    """
+
+    model: str = "gemini-2.5-flash"
+    messages: list[ChatMessage]
+    max_tokens: Optional[int] = 512
+    temperature: Optional[float] = 0.5
+    stream: Optional[bool] = True
