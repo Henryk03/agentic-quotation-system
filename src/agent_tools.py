@@ -2,7 +2,6 @@
 import re
 import bs4
 import asyncio
-import providers
 from log_in_manager import AsyncLoginManager
 from utils import BaseProvider, SafeAsyncList, AvailabilityDict
 from playwright.async_api import (
@@ -25,6 +24,10 @@ async def search_products(products: list[str]) -> str:
             A formatted string containing the information found 
             for each product.
     """
+
+    # this import is necessary in order to have the registry
+    # populated by the subclasses of `BaseProvider`
+    import providers
     
     web_search_results_list = SafeAsyncList()
 

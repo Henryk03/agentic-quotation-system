@@ -1,6 +1,7 @@
 
 import os
 import re
+from getpass import getpass
 from dotenv import load_dotenv
 from pathlib import Path
 from utils import BaseProvider
@@ -40,19 +41,29 @@ class GruppoComet(BaseProvider):
             env_path = Path(__file__).parent / ".env"
             load_dotenv(dotenv_path=env_path)
 
-            await page.locator(
-                "input[name='username']"
-            ).fill(
-                os.getenv("GRUPPOCOMET_USERNAME")
-            )
+            username = os.getenv("GRUPPOCOMET_USERNAME")
+            password = os.getenv("GRUPPOCOMET_PASSWORD")
 
-            await page.locator(
-                "input[name='password']"
-            ).fill(
-                os.getenv("GRUPPOCOMET_PASSWORD")
-            )
+            if not username:
+                username = input("Inserisci lo username per Gruppo Comet: ")
+            if not password:
+                password = getpass("Inserisci la password per Gruppo Comet: ")
 
+            env_path.touch(600, exist_ok=True)
+
+            with open(env_path, "r+") as f:
+                lines = f.read().splitlines()
+                keys = {line.split("=", 1)[0] for line in lines if "=" in line}
+
+                if "GRUPPOCOMET_USERNAME" not in keys:
+                    f.write(f"GRUPPOCOMET_USERNAME={username}\n")
+                if "GRUPPOCOMET_PASSWORD" not in keys:
+                    f.write(f"GRUPPOCOMET_PASSWORD={password}\n")
+
+            await page.locator("input[name='username']").fill(username)
+            await page.locator("input[name='password']").fill(password)
             await page.keyboard.press("Enter")
+
             return True
         except:
             return False
