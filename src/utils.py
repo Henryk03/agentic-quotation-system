@@ -67,6 +67,8 @@ class SafeAsyncList:
 class BaseProvider:
     """
     Base class representing a provider and its optional login logic.
+    Each subclass is automatically registered, and the registry stores 
+    ready-to-use instances.
 
     Attributes:
         name (str):
@@ -103,6 +105,9 @@ class BaseProvider:
         
     """
 
+    
+    registry: dict[str, "BaseProvider"] = {}
+
 
     def __init__(
             self,
@@ -134,6 +139,13 @@ class BaseProvider:
                     "Please, fix the error by providing a valid URL."
                 )
             )
+
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+
+        name = cls.__name__.upper()
+        BaseProvider.registry[name] = cls()
         
 
     @staticmethod

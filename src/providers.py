@@ -78,14 +78,3 @@ class Comet(BaseProvider):
             },
             price_classes = [".c-cd-prodotto__prezzo-finale"]
         )
-
-    async def auto_login(self, page):
-        return await super().auto_login(page)
-
-
-
-PROVIDER_MAP: dict[str, BaseProvider | None] = {
-    "GRUPPOCOMET": GruppoComet(),
-    "COMET": Comet(),
-    # "AMAZON": None
-}

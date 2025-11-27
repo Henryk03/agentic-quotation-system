@@ -2,7 +2,7 @@
 import re
 import bs4
 import asyncio
-from providers import PROVIDER_MAP
+import providers
 from log_in_manager import AsyncLoginManager
 from utils import BaseProvider, SafeAsyncList, AvailabilityDict
 from playwright.async_api import (
@@ -14,8 +14,7 @@ from playwright.async_api import (
 
 async def search_products(products: list[str]) -> str:
     """
-    Perform web scraping for each product in the given list. Every product is scraped off
-    each provider's website.
+    Perform web search for each product in the given list.
 
     Args:
         products (list[str]):
@@ -23,7 +22,8 @@ async def search_products(products: list[str]) -> str:
 
     Returns:
         str:
-            A formatted string containing the scraped information for each product.
+            A formatted string containing the information found 
+            for each product.
     """
     
     web_search_results_list = SafeAsyncList()
@@ -33,13 +33,7 @@ async def search_products(products: list[str]) -> str:
         login_manager = AsyncLoginManager(apw)
         provider_page = []
 
-        for provider in PROVIDER_MAP.values():
-
-            # if there is not any `BaseProvider` subclass
-            # for the given provider, let's use Google
-            # computer use
-            if not provider:
-                pass
+        for provider in BaseProvider.registry.values():
 
             context = await login_manager.ensure_context(
                 provider
@@ -163,10 +157,10 @@ async def __search_in_website(
         await result_list.add(formatted_block)
 
 
-async def __search_with_computer_use():
+async def search_products_with_computer_use():
     """"""
 
-    pass 
+    pass
 
 
 async def __normalize_selectors(
