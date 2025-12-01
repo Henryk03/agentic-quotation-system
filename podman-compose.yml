@@ -1,0 +1,24 @@
+
+services:
+  agent-backend:
+    build:
+      context: .
+      dockerfile: podman/backend/Containerfile
+
+    image: agent-backend:0.0.1
+
+    ports:
+      - 8080:8080
+
+    # these two options are for testing purposes
+    stdin_open: true
+    tty: true
+
+    volumes:
+      - ./logins:/agent_app/logins
+
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+
+    # podman compose do not need `-it` to run interactively
+    command: python src/main_agent.py

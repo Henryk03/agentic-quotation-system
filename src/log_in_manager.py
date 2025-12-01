@@ -328,15 +328,20 @@ class AsyncLoginManager:
                 return await self.__manual_login(provider, state_path)
             
             try:
+                print("Proviamo l'auto-login.")
                 await provider.auto_login(page)
                 await page.wait_for_load_state("networkidle")
 
                 if await self.__is_logged_in(provider, page):
+                    print("L'auto-login e' andato tutto bene.")
                     # ensure the new context
                     await context.storage_state(path=state_path)
                     return context
-            except:
+            except Exception as e:
+                print(f"Eccezione : {e}")
                 pass
+
+        print("Fallback")
 
         # manual fallback
         await page.close()
@@ -426,7 +431,7 @@ class AsyncLoginManager:
 
         try:
             logout_texts = re.compile(
-                r"(?:log|sign)[-\s]?out",
+                r"(?:log|sign)[- ]?out",
                 re.IGNORECASE
             )
 

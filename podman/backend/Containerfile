@@ -1,0 +1,11 @@
+
+FROM python:3.13-slim-bookworm
+
+WORKDIR /agent_app
+
+COPY src/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt && python3 -m playwright install --with-deps
+
+COPY src ./src
+
+CMD ["python3", "src/agent_api.py"]

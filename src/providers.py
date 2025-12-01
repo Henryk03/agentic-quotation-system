@@ -45,13 +45,17 @@ class GruppoComet(BaseProvider):
             password = os.getenv("GRUPPOCOMET_PASSWORD")
 
             if not username:
+                print(f"{"=" * 34} Auto-login Message {"=" * 34}\n")
                 username = input("Inserisci lo username per Gruppo Comet: ")
             if not password:
                 password = getpass("Inserisci la password per Gruppo Comet: ")
 
-            env_path.touch(600, exist_ok=True)
+            print("\n")
 
-            with open(env_path, "r+") as f:
+            env_path.touch(0o700, exist_ok=True)
+
+            with open(env_path, "a+") as f:
+                print("Gruppocomet_autologin: sono dentro il file .env.")
                 lines = f.read().splitlines()
                 keys = {line.split("=", 1)[0] for line in lines if "=" in line}
 

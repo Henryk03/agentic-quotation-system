@@ -1,4 +1,6 @@
 
+import asyncio
+import uvicorn
 from fastapi import FastAPI
 from utils import ChatCompletionRequest, ChatMessage
 from main_agent import graph
@@ -55,3 +57,14 @@ async def chat_completions(request: ChatCompletionRequest):
             }
   ]
 }
+
+
+async def main():
+    config = uvicorn.Config("agent_api:app", host="127.0.0.1", port=8080)
+    server = uvicorn.Server(config)
+
+    await server.serve()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
