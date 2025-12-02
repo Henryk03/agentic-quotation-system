@@ -2,7 +2,7 @@
 import re
 import asyncio
 import platform
-from exceptions import LoginFailedException
+from exceptions import LoginFailedException, ManualFallbackException
 from utils import BaseProvider
 from typing import Optional, Callable
 from re import Pattern
@@ -19,7 +19,7 @@ from playwright.async_api import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOG_IN_STATES_DIR = PROJECT_ROOT / "logins"
-LOG_IN_STATES_DIR.mkdir(exist_ok=True)
+LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
 
 
 class AsyncLoginManager:
@@ -54,32 +54,6 @@ class AsyncLoginManager:
         """
 
         return LOG_IN_STATES_DIR / f"{provider.name.lower()}_state.json"
-
-
-    async def __launch_browser(self, headless: bool) -> Browser:
-        """
-        Return a `Browser` istance according to the working OS:
-
-        * macOS: Safari
-        * Linux: Firefox
-        * Windows: Google Chrome
-
-        Args:
-            headless (bool):
-                Boolean value that specifies whether the 
-                interaction with the browser is headless or not.
-
-        Returns:
-            Browser
-        """
-
-        match platform.system().lower():
-            case "darwin":
-                return await self.apw.webkit.launch(headless=headless)
-            case "linux":
-                return await self.apw.firefox.launch(headless=headless)
-            case "windows":
-                return await self.apw.chromium.launch(headless=headless)
 
 
     @staticmethod
@@ -249,12 +223,18 @@ class AsyncLoginManager:
                     )
                     
                     for t in done:
-                        result = t.result()
+                        try:
+                            result = t.result()
+                        except:
+                            result = None
+
                         if result:
                             matches.append(result)
 
                             for p in pending:
                                 p.cancel()
+
+                            await asyncio.gather(*pending, return_exceptions=True)
 
                             return matches
     
@@ -291,63 +271,58 @@ class AsyncLoginManager:
 
         state_path = AsyncLoginManager.__state_path(provider)
 
-        state_path_exists = state_path.exists()
-        login_required = provider.login_required
-
-        # manual login if state path is absent and login is required
-        if not state_path_exists and login_required:
+        # manual login if `state_path`` is absent AND login is required
+        if not state_path.exists() and provider.login_required:
             await self.__manual_login(provider, state_path)
 
-        # let's update its value to see if the manual login succeeded
-        state_path_exists = state_path.exists()
+        browser = None
+        context = None
+        page = None
         
-        browser = await self.__launch_browser(headless=True)
-        context = await browser.new_context(
-            storage_state=state_path if state_path_exists else None
-        )
-        page = await context.new_page()
-
-        await page.goto(provider.url)
-        await AsyncLoginManager.__close_popup(provider, page)
-
-        if not state_path_exists:
-            await context.storage_state(path=state_path)
-
-        logged_in = await AsyncLoginManager.__is_logged_in(provider, page)
-        
-        if logged_in or not login_required:
-            await page.close()
-            return context
-        
-        # the `auto_login` is used when the context is present, but expired
-        if await provider.has_auto_login():
-            if await self.detect_captcha(page):
-                await page.close()
-                await context.close()
-                await browser.close()
-                return await self.__manual_login(provider, state_path)
+        try:
+            browser, context, page = await self.__prepare_context(provider, state_path)
+            logged_in = await AsyncLoginManager.__is_logged_in(provider, page)
             
-            try:
-                print("Proviamo l'auto-login.")
-                await provider.auto_login(page)
-                await page.wait_for_load_state("networkidle")
+            if logged_in or not provider.login_required:
+                await page.close()
+                return context
+            
+            # the `auto_login` is used when the context is present, but expired
+            if await provider.has_auto_login():
+                if await self.detect_captcha(page):
+                    raise ManualFallbackException(
+                        provider,
+                        "Captcha detected. Proceeding with manual login."
+                    )
+                
+                try:
+                    await provider.auto_login(page)
+                    await page.wait_for_load_state("networkidle")
 
-                if await self.__is_logged_in(provider, page):
-                    print("L'auto-login e' andato tutto bene.")
-                    # ensure the new context
-                    await context.storage_state(path=state_path)
-                    return context
-            except Exception as e:
-                print(f"Eccezione : {e}")
+                    if await self.__is_logged_in(provider, page):
+                        # ensure the new context
+                        await context.storage_state(path=state_path)
+                        return context
+                except:
+                    pass
+
+            raise ManualFallbackException(provider)
+        
+        except ManualFallbackException:
+            if page:
+                await page.close()
+            if context:
+                await context.close()
+            if browser:
+                await browser.close()
+
+            try:
+                await self.__manual_login(provider, state_path)
+                _, context, _ = await self.__prepare_context(provider, state_path)
+            except:
                 pass
 
-        print("Fallback")
-
-        # manual fallback
-        await page.close()
-        await context.close()
-        await browser.close()
-        return await self.__manual_login(provider, state_path)
+            return context
         
 
     async def __manual_login(
@@ -379,7 +354,7 @@ class AsyncLoginManager:
         """
 
         async with self._manual_login_lock:
-            browser = await self.__launch_browser(headless=False)
+            browser = await self.apw.chromium.launch(headless=False)
             context = await browser.new_context()
             page = await context.new_page()
 
@@ -450,6 +425,51 @@ class AsyncLoginManager:
             pass
 
         return False
+    
+
+    async def __prepare_context(
+            self,
+            provider: BaseProvider,
+            state_path: Path
+    ) -> tuple[Browser, BrowserContext, Page]:
+        """
+        Create and initialize a new browser context for the given provider.
+
+        This method launches a new Chromium browser instance, loads the
+        provider's website, applies an existing authentication state if
+        available, and saves the state for future sessions if it does not
+        already exist. It also automatically closes any initial pop-ups
+        that may appear after navigation.
+
+        Args:
+            provider (BaseProvider):
+                The provider whose website should be opened.
+
+            state_path (Path):
+                Path to the file containing the stored browser state
+                (cookies, local storage, etc.).
+
+        Returns:
+            tuple[Browser, BrowserContext, Page]:
+                A tuple containing the created browser instance,
+                the initialized browser context, and the opened page.
+        """
+
+        state_path_exists = state_path.exists()
+
+        browser = await self.apw.chromium.launch(headless=True)
+        context = await browser.new_context(
+            storage_state=state_path if state_path_exists else None
+        )
+        page = await context.new_page()
+
+        await page.goto(provider.url)
+        await AsyncLoginManager.__close_popup(provider, page)
+
+        if not state_path_exists:
+            await context.storage_state(path=state_path)
+
+        return browser, context, page
     
 
     @staticmethod

@@ -7,6 +7,9 @@ services:
 
     image: agent-backend:0.0.1
 
+    secrets:
+      - autologin-env
+
     ports:
       - 8080:8080
 
@@ -19,6 +22,11 @@ services:
 
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # - DISPLAY=:99
 
     # podman compose do not need `-it` to run interactively
     command: python src/main_agent.py
+
+secrets:
+  autologin-env:
+    external: true

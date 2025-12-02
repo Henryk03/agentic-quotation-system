@@ -4,8 +4,9 @@ FROM python:3.13-slim-bookworm
 WORKDIR /agent_app
 
 COPY src/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && python3 -m playwright install --with-deps
-
 COPY src ./src
+
+RUN apt update && apt install -y xvfb
+RUN pip install --no-cache-dir -r requirements.txt && python3 -m playwright install --with-deps chromium
 
 CMD ["python3", "src/agent_api.py"]

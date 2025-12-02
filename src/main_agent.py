@@ -95,4 +95,6 @@ async def main():
                     update["messages"][-1].pretty_print()
                     print("\n")
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    asyncio.run(main())

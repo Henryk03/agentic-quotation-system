@@ -2,7 +2,7 @@
 import os
 import re
 from getpass import getpass
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 from pathlib import Path
 from utils import BaseProvider
 
@@ -38,31 +38,10 @@ class GruppoComet(BaseProvider):
         try:
             await page.get_by_role("link", name=login_texts).click()
 
-            env_path = Path(__file__).parent / ".env"
-            load_dotenv(dotenv_path=env_path)
+            credentials = dotenv_values("/run/secrets/autologin-env")
 
-            username = os.getenv("GRUPPOCOMET_USERNAME")
-            password = os.getenv("GRUPPOCOMET_PASSWORD")
-
-            if not username:
-                print(f"{"=" * 34} Auto-login Message {"=" * 34}\n")
-                username = input("Inserisci lo username per Gruppo Comet: ")
-            if not password:
-                password = getpass("Inserisci la password per Gruppo Comet: ")
-
-            print("\n")
-
-            env_path.touch(0o700, exist_ok=True)
-
-            with open(env_path, "a+") as f:
-                print("Gruppocomet_autologin: sono dentro il file .env.")
-                lines = f.read().splitlines()
-                keys = {line.split("=", 1)[0] for line in lines if "=" in line}
-
-                if "GRUPPOCOMET_USERNAME" not in keys:
-                    f.write(f"GRUPPOCOMET_USERNAME={username}\n")
-                if "GRUPPOCOMET_PASSWORD" not in keys:
-                    f.write(f"GRUPPOCOMET_PASSWORD={password}\n")
+            username = credentials["GRUPPOCOMET_USERNAME"]
+            password = credentials["GRUPPOCOMET_PASSWORD"]
 
             await page.locator("input[name='username']").fill(username)
             await page.locator("input[name='password']").fill(password)
