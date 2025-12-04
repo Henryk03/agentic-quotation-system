@@ -60,7 +60,7 @@ async def chat_completions(request: ChatCompletionRequest):
 
 
 async def main():
-    config = uvicorn.Config("agent_api:app", host="127.0.0.1", port=8080)
+    config = uvicorn.Config("agent_api:app", host="0.0.0.0", port=8080)
     server = uvicorn.Server(config)
 
     await server.serve()

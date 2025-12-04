@@ -13,19 +13,28 @@ services:
     ports:
       - 8080:8080
 
-    # these two options are for testing purposes
-    stdin_open: true
-    tty: true
-
     volumes:
       - ./logins:/agent_app/logins
 
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      # - DISPLAY=:99
 
-    # podman compose do not need `-it` to run interactively
-    command: python src/main_agent.py
+    command: python src/agent_api.py
+
+  agent-frontend:
+    build:
+      context: .
+      dockerfile: podman/frontend/Containerfile
+
+    image: agent-frontend:0.0.1
+
+    ports:
+      - 8501:8501
+
+    depends_on:
+      - agent-backend
+
+    command: streamlit run ui/agent_ui.py
 
 secrets:
   autologin-env:
