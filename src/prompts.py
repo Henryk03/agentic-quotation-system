@@ -1,4 +1,8 @@
 
+import providers
+from utils import BaseProvider
+
+
 """Default prompts used by the agent"""
 
 
@@ -18,7 +22,15 @@ SYSTEM_PROMPT = (
     "on meaningful identifiers, codes, or specifications. For example, in "
     "'Mac Mini with M4 and 512GB of storage', extract only 'M4' and '512GB', "
     "or in 'Mac Mini with M4 Pro and 24GB of RAM', extract 'M4 Pro' and '24GB' "
-    "only (do NOT include words like 'storage' or 'ram')."
+    "only (do NOT include words like 'storage' or 'ram').\n"
+    "Determine whether the user wants to search for items on a specific website. "
+    "If the website mentioned by the user is included in the supported providers: "
+    f"{BaseProvider.registry.keys()}, then use the `supported_website_search` tool. "
+    "If the website is not in the supported list, use the "
+    "`search_products_with_computer_use` tool to perform a general search on the "
+    "user-specified site.\n"
+    "If the user does not specify a website, perform the search on the supported "
+    "integrated websites using `supported_website_search`."
     "\n\n"
     "If the user writes item names in the plural form, convert them to singular "
     "form before processing or searching for them (NEVER mention this skill of "
@@ -84,4 +96,11 @@ SYSTEM_PROMPT = (
     "Additionally, never omit or truncate the results of items that were not found, "
     "and always assist the user in comparing the requested items whenever the user asks "
     "for a comparison, providing clear, structured and helpful insights."
+)
+
+
+USER_PROMPT = (
+    "Search all the following products:\n"
+    "{products_list}\n\n"
+    "Perform the search on the following website: {website}"
 )

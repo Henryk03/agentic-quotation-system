@@ -1,7 +1,6 @@
 
 import re
 import asyncio
-import platform
 from exceptions import LoginFailedException, ManualFallbackException
 from utils import BaseProvider
 from typing import Optional, Callable
@@ -21,8 +20,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 LOG_IN_STATES_DIR = PROJECT_ROOT / "logins"
 LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
 
+SCREEN_WIDTH = 1440
+SCREEN_HEIGHT = 900
 
-class AsyncLoginManager:
+
+class AsyncBrowserContextMaganer:
     """
     Class to manage asynchronous login actions in websites
     
@@ -54,6 +56,28 @@ class AsyncLoginManager:
         """
 
         return LOG_IN_STATES_DIR / f"{provider.name.lower()}_state.json"
+    
+
+    @staticmethod
+    async def close_page_resources(page: Page) -> None:
+        """
+        Clean up Playwright resources associated with the given page.
+
+        This function attempts to close the page, its browser context,
+        and the underlying browser instance. Any errors encountered during 
+        the cleanup process are silently ignored to ensure that resource 
+        disposal does not interrupt the caller's execution flow.
+        """
+
+        try:
+            context = page.context
+            browser = context.browser
+
+            await page.close()
+            await context.close()
+            await browser.close()
+        except:
+            pass
 
 
     @staticmethod
@@ -103,7 +127,7 @@ class AsyncLoginManager:
                 "li"
             ]
 
-            results = await AsyncLoginManager.__find_elements_with_attr_pattern(
+            results = await AsyncBrowserContextMaganer.__find_elements_with_attr_pattern(
                 page,
                 tag_texts,
                 captcha_text,
@@ -247,8 +271,95 @@ class AsyncLoginManager:
 
         return tag_results
 
-        
-    async def ensure_context(
+
+    async def create_browser_context(
+        self,
+        *,
+        headless: bool,
+        storage_state: Optional[Path] = None,
+        start_url: Optional[str] = None
+        ) -> tuple[Browser, BrowserContext, Page]:
+        """
+        Create a new browser, context, and page.
+
+        Args:
+            headless (bool):
+                Whether to launch the browser in headless mode.
+
+            storage_state (Optional[Path]):
+                Path to existing storage state to load.
+
+            start_url (Optional[str]):
+                URL to navigate to immediately after page creation.
+
+        Returns:
+            tuple[Browser, BrowserContext, Page]:
+                The browser, its context, and the page.
+        """
+
+        browser = await self.apw.chromium.launch(headless=headless)
+        context = await browser.new_context(
+            storage_state=(
+                storage_state if storage_state and storage_state.exists() else None
+            ),
+            viewport={
+                "width": SCREEN_WIDTH,
+                "height": SCREEN_HEIGHT
+            }
+        )
+        page = await context.new_page()
+
+        if start_url:
+            await page.goto(start_url)
+
+        return browser, context, page
+    
+
+    async def __prepare_provider_context(
+            self,
+            *,
+            headless: bool = True,
+            provider: BaseProvider,
+            state_path: Path
+        ) -> tuple[Browser, BrowserContext, Page]:
+        """
+        Create and initialize a new browser context for the given provider.
+
+        This method launches a new Chromium browser instance, loads the
+        provider's website, applies an existing authentication state if
+        available, and saves the state for future sessions if it does not
+        already exist. It also automatically closes any initial pop-ups
+        that may appear after navigation.
+
+        Args:
+            provider (BaseProvider):
+                The provider whose website should be opened.
+
+            state_path (Path):
+                Path to the file containing the stored browser state
+                (cookies, local storage, etc.).
+
+        Returns:
+            tuple[Browser, BrowserContext, Page]:
+                A tuple containing the created browser instance,
+                the initialized browser context, and the opened page.
+        """
+
+        browser, context, page = await self.create_browser_context(
+            headless=headless,
+            storage_state=state_path,
+            start_url=provider.url
+        )
+
+        await AsyncBrowserContextMaganer.__close_popup(
+            provider,
+            page
+        )
+
+        return browser, context, page
+
+
+    async def ensure_provider_context(
             self,
             provider: BaseProvider
         ) -> BrowserContext:
@@ -269,19 +380,29 @@ class AsyncLoginManager:
             BrowserContext
         """
 
-        state_path = AsyncLoginManager.__state_path(provider)
+        state_path = AsyncBrowserContextMaganer.__state_path(provider)
 
         # manual login if `state_path`` is absent AND login is required
         if not state_path.exists() and provider.login_required:
-            await self.__manual_login(provider, state_path)
+            try:
+                await self.__manual_login(provider, state_path)
+            except:
+                raise LoginFailedException(provider)
 
         browser = None
         context = None
         page = None
         
         try:
-            browser, context, page = await self.__prepare_context(provider, state_path)
-            logged_in = await AsyncLoginManager.__is_logged_in(provider, page)
+            browser, context, page = await self.__prepare_provider_context(
+                provider=provider,
+                state_path=state_path
+            )
+
+            logged_in = await AsyncBrowserContextMaganer.__is_logged_in(
+                provider,
+                page
+            ) 
             
             if logged_in or not provider.login_required:
                 await page.close()
@@ -318,12 +439,16 @@ class AsyncLoginManager:
 
             try:
                 await self.__manual_login(provider, state_path)
-                _, context, _ = await self.__prepare_context(provider, state_path)
+                _, context, _ = await self.__prepare_provider_context(
+                    headless=True,
+                    provider=provider,
+                    state_path=state_path
+                )
             except:
-                pass
+                raise LoginFailedException(provider)
 
             return context
-        
+
 
     async def __manual_login(
             self,
@@ -354,27 +479,22 @@ class AsyncLoginManager:
         """
 
         async with self._manual_login_lock:
-            browser = await self.apw.chromium.launch(headless=False)
-            context = await browser.new_context()
-            page = await context.new_page()
+            _, context, page = await self.__prepare_provider_context(
+                headless=False,
+                provider=provider,
+                state_path=state_path
+            )
 
-            await page.goto(provider.url)
-            await AsyncLoginManager.__close_popup(provider, page)
-
-            if await AsyncLoginManager.__wait_until_logged_in(
+            if await AsyncBrowserContextMaganer.__wait_until_logged_in(
                 provider=provider,
                 page=page,
-                check_func=AsyncLoginManager.__is_logged_in,
+                check_func=AsyncBrowserContextMaganer.__is_logged_in,
                 timeout=30000
             ):
                 await context.storage_state(path=state_path)
-                await page.close()
-                await context.close()
-                await browser.close()
+                await self.close_page_resources(page)
             else:
-                await page.close()
-                await context.close()
-                await browser.close()
+                await self.close_page_resources(page)
 
                 raise LoginFailedException(provider)
 
@@ -410,7 +530,7 @@ class AsyncLoginManager:
                 re.IGNORECASE
             )
 
-            results = await AsyncLoginManager.__find_elements_with_attr_pattern(
+            results = await AsyncBrowserContextMaganer.__find_elements_with_attr_pattern(
                 page,
                 provider.logout_selectors,
                 logout_texts,
@@ -425,51 +545,6 @@ class AsyncLoginManager:
             pass
 
         return False
-    
-
-    async def __prepare_context(
-            self,
-            provider: BaseProvider,
-            state_path: Path
-    ) -> tuple[Browser, BrowserContext, Page]:
-        """
-        Create and initialize a new browser context for the given provider.
-
-        This method launches a new Chromium browser instance, loads the
-        provider's website, applies an existing authentication state if
-        available, and saves the state for future sessions if it does not
-        already exist. It also automatically closes any initial pop-ups
-        that may appear after navigation.
-
-        Args:
-            provider (BaseProvider):
-                The provider whose website should be opened.
-
-            state_path (Path):
-                Path to the file containing the stored browser state
-                (cookies, local storage, etc.).
-
-        Returns:
-            tuple[Browser, BrowserContext, Page]:
-                A tuple containing the created browser instance,
-                the initialized browser context, and the opened page.
-        """
-
-        state_path_exists = state_path.exists()
-
-        browser = await self.apw.chromium.launch(headless=True)
-        context = await browser.new_context(
-            storage_state=state_path if state_path_exists else None
-        )
-        page = await context.new_page()
-
-        await page.goto(provider.url)
-        await AsyncLoginManager.__close_popup(provider, page)
-
-        if not state_path_exists:
-            await context.storage_state(path=state_path)
-
-        return browser, context, page
     
 
     @staticmethod

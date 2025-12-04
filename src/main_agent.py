@@ -1,7 +1,7 @@
 
 import asyncio
 from prompts import SYSTEM_PROMPT
-from agent_tools import search_products
+from agent_tools import search_products, search_products_with_computer_use
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
@@ -43,17 +43,31 @@ async def agent_node(state: MessagesState):
 workflow = StateGraph(MessagesState)
 
 workflow.add_node("agent", agent_node)
-workflow.add_node("search_tool", ToolNode([search_products]))
+
+workflow.add_node(
+    "supported_website_search",
+    ToolNode([search_products])
+)
+
+# workflow.add_node(
+#     "user_specified_website_seach",
+#     ToolNode([search_products_with_computer_use])
+# )
 
 workflow.add_edge(START, "agent")
 
 workflow.add_conditional_edges(
     "agent",
     tools_condition,
-    {"tools": "search_tool", END: END}
+    {
+        "tools": "supported_website_search", 
+        # "tools": "user_specified_website_seach",
+        END: END
+    }
 )
 
-workflow.add_edge("search_tool", "agent")
+workflow.add_edge("supported_website_search", "agent")
+# workflow.add_edge("user_specified_website_seach", "agent")
 
 graph = workflow.compile(checkpointer=InMemorySaver())
 
