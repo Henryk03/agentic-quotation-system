@@ -20,7 +20,10 @@ async def websocket_chat(ws: WebSocket):
     """"""
 
     await manager.connect(ws)
-    session_id = str(uuid.uuid4())
+    session_id = ws.query_params.get("session")
+
+    if session_id is None:
+        session_id = str(uuid.uuid4())
 
     try:
         while True:
@@ -30,10 +33,6 @@ async def websocket_chat(ws: WebSocket):
                     timeout=30
                 )
 
-                if user_message == "__client_ping__":
-                    ws.send("__server_pong__")
-                    continue
-
                 assistant_reply = await run_agent(
                     user_message,
                     session_id
@@ -42,12 +41,6 @@ async def websocket_chat(ws: WebSocket):
                 await ws.send_text(assistant_reply)
 
             except asyncio.TimeoutError:
-                try:
-                    await ws.send("__server_ping__")
-
-                except Exception:
-                    break
-
                 continue
 
     except WebSocketDisconnect:

@@ -1,8 +1,8 @@
-
 import streamlit as st
 import nest_asyncio
 import asyncio
 import websockets
+import uuid
 from typing import Optional
 
 
@@ -24,63 +24,6 @@ st.caption("Streamlit chatbot powered by Google Gemini")
 
 
 # ==========================
-#     Utility functions
-# ==========================
-
-async def get_ws():
-    """
-    Crea WS se non esiste, altrimenti riusa quello esistente.
-    """
-
-    if st.session_state.ws is None:
-        st.session_state.ws = await websockets.connect(
-            uri=st.session_state.ws_uri,
-            ping_interval=None,
-            ping_timeout=None,
-            close_timeout=None
-        )
-
-    return st.session_state.ws
-
-
-async def send_message(message: str) -> str:
-    """
-    Invia un messaggio e riceve risposta, gestendo ping/pong.
-    """
-
-    ws = await get_ws()
-    await ws.send(message)
-
-    while True:
-        response = await ws.recv()
-
-        # keep-alive from server
-        if response == "__server_ping__":
-            ws.send("__client_pong__")
-            continue
-
-        # server's ping response
-        if response == "__server_pong__":
-            continue
-
-        return response
-    
-
-async def send_ping():
-    """"""
-
-    ws = await get_ws()
-
-    while True:
-        if ws:
-            try:
-                await asyncio.sleep(5)
-                await ws.send("__client_ping__")
-            except:
-                break
-
-
-# ==========================
 #       Session state
 # ==========================
 
@@ -90,16 +33,19 @@ if "messages" not in st.session_state:
 if "ws" not in st.session_state:
     st.session_state.ws = None
 
+if "ws_keepalive_task" not in st.session_state:
+    st.session_state.ws_keepalive_task = None
+
 if "loop" not in st.session_state:
     st.session_state.loop = asyncio.new_event_loop()
     asyncio.set_event_loop(st.session_state.loop)
 
+# sessione persistente lato client (rimane finché non chiudi il browser)
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
 if "ws_uri" not in st.session_state:
     st.session_state.ws_uri = "ws://agent-backend:8080/ws/chat"
-
-if "ping_task_started" not in st.session_state:
-    st.session_state.loop.create_task(send_ping())
-    st.session_state.ping_task_started = True
 
 
 # ==========================
@@ -114,6 +60,8 @@ with st.sidebar:
         st.session_state.ws_uri
     )
 
+    st.write("Session ID:", st.session_state.session_id)
+
     if st.button("🧹 Clear chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -126,6 +74,71 @@ with st.sidebar:
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
+
+
+# ==========================
+#     Utility functions
+# ==========================
+
+async def keepalive(ws, interval=10):
+    while True:
+        await asyncio.sleep(interval)
+        if ws.close_code is not None:
+            break
+        try:
+            await ws.ping()
+        except:
+            break
+
+
+async def connect_ws():
+    """Connette la WebSocket con retry."""
+    url = f"{st.session_state.ws_uri}?session={st.session_state.session_id}"
+
+    while True:
+        try:
+            ws = await websockets.connect(
+                uri=url,
+                ping_interval=None,
+                ping_timeout=None,
+                close_timeout=None
+            )
+            return ws
+        except:
+            await asyncio.sleep(2)
+
+
+async def get_ws():
+    """Ritorna una WS attiva, altrimenti la ricrea."""
+    ws = st.session_state.ws
+
+    if ws is None or ws.close_code is not None:
+        ws = await connect_ws()
+        st.session_state.ws = ws
+
+        st.session_state.ws_keepalive_task = asyncio.create_task(
+            keepalive(ws, interval=30)
+        )
+
+    return ws
+
+
+async def send_message(message: str) -> str:
+    """Invia un messaggio con retry automatico."""
+
+    for _ in range(2):
+        ws = await get_ws()
+
+        try:
+            await ws.send(message)
+            response = await ws.recv()
+            return response
+
+        except:
+            st.session_state.ws = None
+            await asyncio.sleep(0.5)
+
+    raise RuntimeError("Impossibile comunicare con il server WebSocket.")
 
 
 # ==========================
