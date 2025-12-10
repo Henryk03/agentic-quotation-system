@@ -72,6 +72,31 @@ workflow.add_edge("supported_website_search", "agent")
 graph = workflow.compile(checkpointer=InMemorySaver())
 
 
+async def run_agent(
+        message: str,
+        session_id: str
+    ):
+    """"""
+
+    response = await graph.ainvoke(
+        {
+            "messages": [
+                {"role": "user", "content": message}
+            ]
+        },
+        {
+            "configurable": {"thread_id": session_id}
+        }
+    )
+
+    response_content = response["messages"][-1].content
+
+    if isinstance(response_content, list):
+        return response_content[0]["text"]
+    
+    return response_content
+
+
 
 async def main():
 

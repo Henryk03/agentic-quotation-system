@@ -6,6 +6,7 @@ from typing import TypedDict, Any, Optional
 from playwright.async_api import Page
 from google.genai import types
 from google.genai.types import Candidate
+from fastapi import WebSocket
 
 
 class AvailabilityDict(TypedDict):
@@ -213,6 +214,26 @@ class BaseProvider:
         return False
     
 
+class ConnectionManager:
+    """"""
+
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+
+    async def connect(self, websocket: WebSocket):
+        """"""
+
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+
+    def disconnect(self, websocket: WebSocket):
+        """"""
+        
+        self.active_connections.remove(websocket)
+    
+
 class ChatMessage(BaseModel):
     """
     Represents a single message within a chat conversation.
@@ -376,6 +397,3 @@ async def get_function_responses(
         )
 
     return function_responses
-
-
-# =================================================

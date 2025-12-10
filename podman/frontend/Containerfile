@@ -9,4 +9,4 @@ COPY ui ./ui
 RUN apt update
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python3", "ui/agent_ui.py"]
+CMD ["streamlit", "run", "ui/agent_ui.py"]

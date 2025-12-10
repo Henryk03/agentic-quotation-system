@@ -1,3 +1,5 @@
 
 streamlit==1.52.0
 requests==2.32.5
+websockets==15.0.1
+nest_asyncio==1.6.0
