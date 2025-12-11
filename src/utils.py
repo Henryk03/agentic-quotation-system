@@ -1,7 +1,9 @@
 
 import asyncio
 import requests
-from pydantic import BaseModel
+import time
+import uuid
+from logging import Logger
 from typing import TypedDict, Any, Optional
 from playwright.async_api import Page
 from google.genai import types
@@ -217,68 +219,162 @@ class BaseProvider:
 class ConnectionManager:
     """"""
 
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
+    def __init__(
+            self, 
+            logger: Logger
+        ):
 
+        self.logger = logger
+        self.active_connections: dict[WebSocket, dict[str, float]] = {}
 
-    async def connect(self, websocket: WebSocket):
+    
+    def get_active(self) -> list[WebSocket]:
         """"""
 
-        await websocket.accept()
-        self.active_connections.append(websocket)
+        return list(self.active_connections.keys())
 
 
-    def disconnect(self, websocket: WebSocket):
+    def get_expired(
+            self,
+            max_inactive: int = 3600,
+            max_age: int = 86400
+        ) -> list[WebSocket]:
         """"""
-        
-        self.active_connections.remove(websocket)
+
+        now = round(time.time(), 1)
+        expired = []
+
+        for ws, meta in self.active_connections.items():
+            inactive = now - meta["last_active"]
+            age = now - meta["connected_at"]
+
+            conn_id = self.get_connection_id(ws)
+
+            expired_for_inactivity = inactive >= max_inactive
+            expired_for_age = age >= max_age
+            
+            if  expired_for_inactivity or expired_for_age:
+                reason = "inactivity" if expired_for_inactivity else "age"
+
+                self.logger.info(
+                    f"connection {conn_id} expired for {reason}: "
+                    f"inactive for {inactive}s and {age}s old"
+                )
+
+                expired.append(ws)
+
+        return expired
     
 
-class ChatMessage(BaseModel):
-    """
-    Represents a single message within a chat conversation.
+    def get_connection_id(
+            self, 
+            websocket: WebSocket
+        ) -> str:
+        """"""
 
-    Attributes:
-        role (str):
-            The role of the message sender (e.g. "user", "assistant", "system").
-
-        content (str):
-            The textual content of the message.
-    """
-
-    role: str
-    content: str
+        if websocket in self.get_active():
+            return self.active_connections[websocket]["connection_id"]
 
 
-class ChatCompletionRequest(BaseModel):
-    """
-    Defines the request payload for generating a chat completion.
+    async def connect(
+            self, 
+            websocket: WebSocket
+        ) -> None:
+        """"""
 
-    Attributes:
-        model (str):
-            The identifier of the model to be used for the completion.
+        client = websocket.client
+        path = websocket.url.path
 
-        messages (list[ChatMessage]):
-            The ordered list of messages forming the conversation context.
+        try:
+            await websocket.accept()
+        except: 
+            self.logger.exception(
+                f"connection refused: failed to accept websocket from {client.host}"
+            )
 
-        max_tokens (Optional[int]): 
-            The maximum number of tokens the model is allowed to generate 
-            in the response.
+        self.logger.info(
+            f"connection accepted from {client.host}:{client.port} on {path}"
+        )
+        ts = round(time.time(), 1)
 
-        temperature (Optional[float]):
-            Controls randomness in the output; higher values produce more 
-            diverse responses.
+        self.active_connections[websocket] = {
+            "connected_at": ts,
+            "last_active": ts,
+            "connection_id": uuid.uuid4().hex
+        }
 
-        stream (Optional[bool]):
-            When set to True, the response is returned as a stream of partial 
-            messages.
-    """
+        self.logger.info(
+            f"currently active connections: {len(self.get_active())}"
+        )
 
-    model: str = "gemini-2.5-flash"
-    messages: list[ChatMessage]
-    max_tokens: Optional[int] = 512
-    temperature: Optional[float] = 0.5
-    stream: Optional[bool] = True
+
+    async def disconnect(
+            self, 
+            websocket: WebSocket,
+            code: int = 1000,
+            reason: Optional[str] = None
+        ) -> None:
+        """"""
+        
+        if websocket in self.get_active():
+            conn_id = self.get_connection_id(websocket)
+
+            try:
+                await websocket.close(code, reason)
+            except:
+                self.logger.warning(
+                    f"unable to close connection {conn_id}"
+                )
+
+            del self.active_connections[websocket]
+
+            self.logger.info(
+                f"successfully closed connection {conn_id}"
+            )
+            self.logger.info(
+                f"currently active connections: {len(self.get_active())}"
+            )
+
+
+    def update_activity(
+            self, 
+            websocket: WebSocket
+        ) -> None:
+        """"""
+
+        if websocket in self.active_connections:
+            self.active_connections[websocket]["last_active"] = round(
+                time.time(),
+                1
+            )
+
+            self.logger.info(
+                f"updated activity for connection {self.get_connection_id(websocket)}"
+            )
+    
+
+    async def remove_expired_connections(
+        self,
+        max_inactive: int = 3600,
+        max_age: int = 86400
+        ) -> None:
+        """"""
+
+        while True:
+            await asyncio.sleep(60)
+
+            expired_list = self.get_expired(max_inactive, max_age)
+
+            for ws in expired_list:
+                try: 
+                    await self.disconnect(
+                        ws, 
+                        code=1001, 
+                        reason="Session expired due to inactivity or age"
+                    )
+
+                except:
+                    pass
 
 
 # =================================================

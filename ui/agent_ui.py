@@ -1,9 +1,11 @@
+
 import streamlit as st
 import nest_asyncio
 import asyncio
 import websockets
 import uuid
 from typing import Optional
+from websockets import ClientConnection
 
 
 nest_asyncio.apply()
@@ -40,9 +42,8 @@ if "loop" not in st.session_state:
     st.session_state.loop = asyncio.new_event_loop()
     asyncio.set_event_loop(st.session_state.loop)
 
-# sessione persistente lato client (rimane finché non chiudi il browser)
 if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
+    st.session_state.session_id = str(uuid.uuid4().hex)
 
 if "ws_uri" not in st.session_state:
     st.session_state.ws_uri = "ws://agent-backend:8080/ws/chat"
@@ -80,19 +81,27 @@ for message in st.session_state.messages:
 #     Utility functions
 # ==========================
 
-async def keepalive(ws, interval=10):
+async def keepalive(
+        ws: ClientConnection,
+        interval: int = 30
+    ) -> None:
+    """"""
+
     while True:
         await asyncio.sleep(interval)
+
         if ws.close_code is not None:
             break
+
         try:
             await ws.ping()
         except:
             break
 
 
-async def connect_ws():
+async def connect_ws() -> ClientConnection:
     """Connette la WebSocket con retry."""
+
     url = f"{st.session_state.ws_uri}?session={st.session_state.session_id}"
 
     while True:
@@ -108,8 +117,9 @@ async def connect_ws():
             await asyncio.sleep(2)
 
 
-async def get_ws():
+async def get_ws() -> ClientConnection:
     """Ritorna una WS attiva, altrimenti la ricrea."""
+
     ws = st.session_state.ws
 
     if ws is None or ws.close_code is not None:

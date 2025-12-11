@@ -1,7 +1,8 @@
 
-import uuid
 import uvicorn
 import asyncio
+import logging
+from contextlib import asynccontextmanager
 from utils import ConnectionManager
 from main_agent import run_agent
 from fastapi import (
@@ -11,19 +12,62 @@ from fastapi import (
 )
 
 
-app = FastAPI()
-manager = ConnectionManager()
+LOGGER_FORMAT = "%(levelname)s:     %(message)s"
+
+logging.basicConfig(level=logging.INFO, format=LOGGER_FORMAT)
+logger = logging.getLogger("agent-server")
+
+manager = ConnectionManager(logger)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """"""
+
+    MAX_INACTIVE_SECONDS = 2 * 60
+
+    logger.info("starting server...")
+    cleanup_task = asyncio.create_task(
+        manager.remove_expired_connections(
+            max_inactive=MAX_INACTIVE_SECONDS
+        )
+    )
+
+    yield
+
+    logger.info("server shutting down...")
+    cleanup_task.cancel()
+
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    for ws in manager.get_active():
+        try:
+            await manager.disconnect(
+                ws,
+                code=1001,
+                reason="server shutdown"
+            )
+            
+        except:
+            pass
+
+        manager.disconnect(ws)
+
+    logger.info("shutdown complete")
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.websocket("/ws/chat")
-async def websocket_chat(ws: WebSocket):
+async def websocket_chat(ws: WebSocket) -> None:
     """"""
 
     await manager.connect(ws)
     session_id = ws.query_params.get("session")
-
-    if session_id is None:
-        session_id = str(uuid.uuid4())
 
     try:
         while True:
@@ -32,6 +76,8 @@ async def websocket_chat(ws: WebSocket):
                     ws.receive_text(),
                     timeout=30
                 )
+
+                manager.update_activity(ws)
 
                 assistant_reply = await run_agent(
                     user_message,
@@ -44,21 +90,22 @@ async def websocket_chat(ws: WebSocket):
                 continue
 
     except WebSocketDisconnect:
-        manager.disconnect(ws)
+        pass
 
     except Exception as e:
-        print(f"WebSocket error: {e}")
-        manager.disconnect(ws)
+        logger.error(f"websocket error: {e}")
 
 
 async def main():
     config = uvicorn.Config(
         "ws_agent_server:app",
         host="0.0.0.0",
-        port=8080
+        port=8080,
+        log_config=None,
+        log_level="critical"
     )
-    server = uvicorn.Server(config)
 
+    server = uvicorn.Server(config)
     await server.serve()
 
 
