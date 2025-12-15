@@ -5,11 +5,7 @@ import logging
 from contextlib import asynccontextmanager
 from utils import ConnectionManager
 from main_agent import run_agent
-from fastapi import (
-    WebSocket,
-    WebSocketDisconnect,
-    FastAPI
-)
+from fastapi import WebSocket, FastAPI
 
 
 LOGGER_FORMAT = "%(levelname)s:     %(message)s"
@@ -24,24 +20,11 @@ manager = ConnectionManager(logger)
 async def lifespan(app: FastAPI):
     """"""
 
-    MAX_INACTIVE_SECONDS = 2 * 60
-
-    logger.info("starting server...")
-    cleanup_task = asyncio.create_task(
-        manager.remove_expired_connections(
-            max_inactive=MAX_INACTIVE_SECONDS
-        )
-    )
+    logger.info("server started")
 
     yield
 
     logger.info("server shutting down...")
-    cleanup_task.cancel()
-
-    try:
-        await cleanup_task
-    except asyncio.CancelledError:
-        pass
 
     for ws in manager.get_active():
         try:
@@ -53,8 +36,6 @@ async def lifespan(app: FastAPI):
             
         except:
             pass
-
-        manager.disconnect(ws)
 
     logger.info("shutdown complete")
 
@@ -72,28 +53,38 @@ async def websocket_chat(ws: WebSocket) -> None:
     try:
         while True:
             try:
-                user_message = await asyncio.wait_for(
-                    ws.receive_text(),
+                message = await asyncio.wait_for(
+                    ws.receive(),
                     timeout=30
                 )
 
-                manager.update_activity(ws)
+                message_type = message.get("type")
 
-                assistant_reply = await run_agent(
-                    user_message,
-                    session_id
-                )
+                if message_type == "websocket.receive":
+                    if "text" in message:
+                        user_message = message["text"]
 
-                await ws.send_text(assistant_reply)
+                        assistant_reply = await run_agent(
+                            user_message,
+                            session_id
+                        )
+
+                        await ws.send_text(assistant_reply)
+
+                    else:
+                        pass
+
+                elif message_type == "websocket.disconnect":
+                    break
 
             except asyncio.TimeoutError:
                 continue
 
-    except WebSocketDisconnect:
-        pass
-
     except Exception as e:
         logger.error(f"websocket error: {e}")
+    
+    finally:
+        await manager.disconnect(ws)
 
 
 async def main():

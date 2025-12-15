@@ -35,8 +35,8 @@ if "messages" not in st.session_state:
 if "ws" not in st.session_state:
     st.session_state.ws = None
 
-if "ws_keepalive_task" not in st.session_state:
-    st.session_state.ws_keepalive_task = None
+# if "ws_keepalive_task" not in st.session_state:
+#     st.session_state.ws_keepalive_task = None
 
 if "loop" not in st.session_state:
     st.session_state.loop = asyncio.new_event_loop()
@@ -81,38 +81,17 @@ for message in st.session_state.messages:
 #     Utility functions
 # ==========================
 
-async def keepalive(
-        ws: ClientConnection,
-        interval: int = 30
-    ) -> None:
-    """"""
-
-    while True:
-        await asyncio.sleep(interval)
-
-        if ws.close_code is not None:
-            break
-
-        try:
-            await ws.ping()
-        except:
-            break
-
 
 async def connect_ws() -> ClientConnection:
     """Connette la WebSocket con retry."""
 
     url = f"{st.session_state.ws_uri}?session={st.session_state.session_id}"
 
-    while True:
+    for _ in range(2):
         try:
-            ws = await websockets.connect(
-                uri=url,
-                ping_interval=None,
-                ping_timeout=None,
-                close_timeout=None
-            )
+            ws = await websockets.connect(url)
             return ws
+        
         except:
             await asyncio.sleep(2)
 
@@ -125,10 +104,6 @@ async def get_ws() -> ClientConnection:
     if ws is None or ws.close_code is not None:
         ws = await connect_ws()
         st.session_state.ws = ws
-
-        st.session_state.ws_keepalive_task = asyncio.create_task(
-            keepalive(ws, interval=30)
-        )
 
     return ws
 
@@ -148,7 +123,7 @@ async def send_message(message: str) -> str:
             st.session_state.ws = None
             await asyncio.sleep(0.5)
 
-    raise RuntimeError("Impossibile comunicare con il server WebSocket.")
+    raise RuntimeError("Impossibile comunicare con il server.")
 
 
 # ==========================
@@ -169,7 +144,7 @@ if prompt:
 
     with st.chat_message("assistant"):
         placeholder = st.empty()
-        placeholder.markdown("Thinking…")
+        placeholder.markdown("Thinking...")
 
         try:
             answer = st.session_state.loop.run_until_complete(

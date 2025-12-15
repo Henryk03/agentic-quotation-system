@@ -8,6 +8,6 @@ COPY src ./src
 
 RUN apt update
 RUN pip install --no-cache-dir -r requirements.txt
-RUN python3 -m playwright install --with-deps chromium
+# RUN python3 -m playwright install --with-deps chromium
 
 CMD ["python3", "src/ws_agent_server.py"]

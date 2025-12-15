@@ -9,6 +9,7 @@ from playwright.async_api import Page
 from google.genai import types
 from google.genai.types import Candidate
 from fastapi import WebSocket
+from fastapi.websockets import WebSocketState
 
 
 class AvailabilityDict(TypedDict):
@@ -225,55 +226,26 @@ class ConnectionManager:
         ):
 
         self.logger = logger
-        self.active_connections: dict[WebSocket, dict[str, float]] = {}
+        self.active_connections: dict[str, WebSocket] = {}
 
     
     def get_active(self) -> list[WebSocket]:
         """"""
 
-        return list(self.active_connections.keys())
-
-
-    def get_expired(
-            self,
-            max_inactive: int = 3600,
-            max_age: int = 86400
-        ) -> list[WebSocket]:
-        """"""
-
-        now = round(time.time(), 1)
-        expired = []
-
-        for ws, meta in self.active_connections.items():
-            inactive = now - meta["last_active"]
-            age = now - meta["connected_at"]
-
-            conn_id = self.get_connection_id(ws)
-
-            expired_for_inactivity = inactive >= max_inactive
-            expired_for_age = age >= max_age
-            
-            if  expired_for_inactivity or expired_for_age:
-                reason = "inactivity" if expired_for_inactivity else "age"
-
-                self.logger.info(
-                    f"connection {conn_id} expired for {reason}: "
-                    f"inactive for {inactive}s and {age}s old"
-                )
-
-                expired.append(ws)
-
-        return expired
+        return list(self.active_connections.values())
     
 
     def get_connection_id(
             self, 
             websocket: WebSocket
-        ) -> str:
+        ) -> Optional[str]:
         """"""
 
-        if websocket in self.get_active():
-            return self.active_connections[websocket]["connection_id"]
+        for conn_id, ws in self.active_connections.items():
+            if ws is websocket:
+                return conn_id
+            
+        return None
 
 
     async def connect(
@@ -283,7 +255,6 @@ class ConnectionManager:
         """"""
 
         client = websocket.client
-        path = websocket.url.path
 
         try:
             await websocket.accept()
@@ -292,16 +263,14 @@ class ConnectionManager:
                 f"connection refused: failed to accept websocket from {client.host}"
             )
 
-        self.logger.info(
-            f"connection accepted from {client.host}:{client.port} on {path}"
-        )
-        ts = round(time.time(), 1)
+            return None
+        
+        conn_id = str(uuid.uuid4().hex)
+        self.active_connections[conn_id] = websocket
 
-        self.active_connections[websocket] = {
-            "connected_at": ts,
-            "last_active": ts,
-            "connection_id": uuid.uuid4().hex
-        }
+        self.logger.info(
+            f"connection {conn_id} accepted from {client.host}:{client.port}"
+        )
 
         self.logger.info(
             f"currently active connections: {len(self.get_active())}"
@@ -316,65 +285,31 @@ class ConnectionManager:
         ) -> None:
         """"""
         
-        if websocket in self.get_active():
-            conn_id = self.get_connection_id(websocket)
+        conn_id = self.get_connection_id(websocket)
 
+        if websocket.client_state != WebSocketState.DISCONNECTED:
             try:
                 await websocket.close(code, reason)
+
+                self.logger.info(
+                    f"connection {conn_id} successfully closed"
+                )
             except:
-                self.logger.warning(
-                    f"unable to close connection {conn_id}"
+                self.logger.info(
+                    f"connection {conn_id} failed to close"
                 )
 
-            del self.active_connections[websocket]
-
+        else:
             self.logger.info(
-                f"successfully closed connection {conn_id}"
+                f"connection {conn_id} already closed"
             )
-            self.logger.info(
-                f"currently active connections: {len(self.get_active())}"
-            )
+            
+        if conn_id in self.active_connections:
+            del self.active_connections[conn_id]
 
-
-    def update_activity(
-            self, 
-            websocket: WebSocket
-        ) -> None:
-        """"""
-
-        if websocket in self.active_connections:
-            self.active_connections[websocket]["last_active"] = round(
-                time.time(),
-                1
-            )
-
-            self.logger.info(
-                f"updated activity for connection {self.get_connection_id(websocket)}"
-            )
-    
-
-    async def remove_expired_connections(
-        self,
-        max_inactive: int = 3600,
-        max_age: int = 86400
-        ) -> None:
-        """"""
-
-        while True:
-            await asyncio.sleep(60)
-
-            expired_list = self.get_expired(max_inactive, max_age)
-
-            for ws in expired_list:
-                try: 
-                    await self.disconnect(
-                        ws, 
-                        code=1001, 
-                        reason="Session expired due to inactivity or age"
-                    )
-
-                except:
-                    pass
+        self.logger.info(
+            f"currently active connections: {len(self.get_active())}"
+        )
 
 
 # =================================================
