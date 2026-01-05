@@ -1,6 +1,5 @@
 
 from utils import BaseProvider
-from typing import Optional
 
 
 class LoginFailedException(Exception):
@@ -36,14 +35,14 @@ class ManualFallbackException(Exception):
         provider (BaseProvider):
             The provider for which the login failed.
 
-        message (Optional[str]):
+        message (str | None):
             Optional custom error message.
     """
 
     def __init__(
             self,
             provider: BaseProvider,
-            message: Optional[str] = None
+            message: str | None = None
         ):
         self.provider = provider
 

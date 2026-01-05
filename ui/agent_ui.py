@@ -35,9 +35,6 @@ if "messages" not in st.session_state:
 if "ws" not in st.session_state:
     st.session_state.ws = None
 
-# if "ws_keepalive_task" not in st.session_state:
-#     st.session_state.ws_keepalive_task = None
-
 if "loop" not in st.session_state:
     st.session_state.loop = asyncio.new_event_loop()
     asyncio.set_event_loop(st.session_state.loop)

@@ -2,11 +2,11 @@
 import re
 import bs4
 import asyncio
-from log_in_manager import AsyncBrowserContextMaganer
 from google import genai
 from google.genai import types
 from prompts import USER_PROMPT
 from google.genai.types import Content, Part
+from utils.browser.login_manager import AsyncBrowserContextMaganer
 from utils import (
     BaseProvider,
     SafeAsyncList,

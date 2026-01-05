@@ -1,11 +1,13 @@
 
 import re
 import asyncio
-from exceptions import LoginFailedException, ManualFallbackException
 from utils import BaseProvider
-from typing import Optional, Callable
-from re import Pattern
+from typing import Callable
 from pathlib import Path
+from ..common.exceptions import (
+    LoginFailedException,
+    ManualFallbackException
+)
 from playwright.async_api import (
     Playwright, 
     Browser, 
@@ -147,8 +149,8 @@ class AsyncBrowserContextMaganer:
     async def __find_elements_with_attr_pattern(
             webpage: Page,
             html_tags: list[str], 
-            regex: Pattern[str],
-            early_end: Optional[bool] = False
+            regex: re.Pattern[str],
+            early_end: bool | None = False
         ) -> list[ElementHandle]:
         """
         Finds all attributes of the HTML tags given in the list that match
@@ -166,7 +168,7 @@ class AsyncBrowserContextMaganer:
             regex (Pattern[str]):
                 The pattern used to filter the html tags.
 
-            early_end (Optional[bool]):
+            early_end (bool | None):
                 A boolean value that specifies whether the execution
                 must stop right after the first tag is inserted into
                 the result list. Default is `False`.
@@ -196,7 +198,7 @@ class AsyncBrowserContextMaganer:
             matches = []
             elements = await webpage.query_selector_all(tag)
 
-            async def check_elem(element: ElementHandle) -> Optional[ElementHandle]:
+            async def check_elem(element: ElementHandle) -> ElementHandle | None:
                 """
                 Check if the given element contains any attribute that
                 satisfy the regular expression.
@@ -276,8 +278,8 @@ class AsyncBrowserContextMaganer:
         self,
         *,
         headless: bool,
-        storage_state: Optional[Path] = None,
-        start_url: Optional[str] = None
+        storage_state: Path | None = None,
+        start_url: str | None = None
         ) -> tuple[Browser, BrowserContext, Page]:
         """
         Create a new browser, context, and page.
@@ -286,10 +288,10 @@ class AsyncBrowserContextMaganer:
             headless (bool):
                 Whether to launch the browser in headless mode.
 
-            storage_state (Optional[Path]):
+            storage_state (Path | None):
                 Path to existing storage state to load.
 
-            start_url (Optional[str]):
+            start_url (str | None):
                 URL to navigate to immediately after page creation.
 
         Returns:
@@ -552,8 +554,8 @@ class AsyncBrowserContextMaganer:
         provider: BaseProvider,
         page: Page,
         check_func: Callable[[BaseProvider, Page], bool],
-        timeout: Optional[float] = 15000,
-        interval: Optional[float] = 500
+        timeout: float | None = 15000,
+        interval: float | None = 500
         ) -> bool:
         """
         Wait until the user is logged-in into the given
@@ -570,11 +572,11 @@ class AsyncBrowserContextMaganer:
                 A function used to check if the user is logged-in
                 into the website.
 
-            timeout (Optional[float]):
+            timeout (float | None):
                 The time given (in milliseconds) to the user to 
                 fulfill the login. Default is 15000 ms.
 
-            interval (Optional[float]):
+            interval (float | None):
                 The time (in milliseconds) between one check
                 and another. Default is 500 ms.
 

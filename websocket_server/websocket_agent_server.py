@@ -8,23 +8,24 @@ from main_agent import run_agent
 from fastapi import WebSocket, FastAPI
 
 
-LOGGER_FORMAT = "%(levelname)s:     %(message)s"
-
-logging.basicConfig(level=logging.INFO, format=LOGGER_FORMAT)
 logger = logging.getLogger("agent-server")
-
-manager = ConnectionManager(logger)
+LOGGER_FORMAT = "%(levelname)s:     %(message)s"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """"""
 
+    logging.basicConfig(level=logging.INFO, format=LOGGER_FORMAT)
     logger.info("server started")
+
+    app.state.manager = ConnectionManager(logger)
 
     yield
 
     logger.info("server shutting down...")
+
+    manager = app.state.manager
 
     for ws in manager.get_active():
         try:
@@ -46,6 +47,8 @@ app = FastAPI(lifespan=lifespan)
 @app.websocket("/ws/chat")
 async def websocket_chat(ws: WebSocket) -> None:
     """"""
+
+    manager: ConnectionManager = app.state.manager
 
     await manager.connect(ws)
     session_id = ws.query_params.get("session")
