@@ -2,10 +2,11 @@
 import uvicorn
 import asyncio
 import logging
-from contextlib import asynccontextmanager
-from utils import ConnectionManager
-from main_agent import run_agent
+from src.main_agent import run_agent
 from fastapi import WebSocket, FastAPI
+from contextlib import asynccontextmanager
+from utils.browser.connection_manager import ConnectionManager
+from utils.provider.base_provider import BaseProvider
 
 
 logger = logging.getLogger("agent-server")
@@ -44,6 +45,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+async def notify_ui_login_event(
+        websocket: WebSocket,
+        payload: dict
+    ) -> None:
+    """"""
+
+    await websocket.send_json(payload)
+
+
 @app.websocket("/ws/chat")
 async def websocket_chat(ws: WebSocket) -> None:
     """"""
@@ -69,7 +79,8 @@ async def websocket_chat(ws: WebSocket) -> None:
 
                         assistant_reply = await run_agent(
                             user_message,
-                            session_id
+                            session_id,
+                            on_login_required=lambda p: notify_ui_login_required(ws, p)
                         )
 
                         await ws.send_text(assistant_reply)

@@ -74,18 +74,22 @@ graph = workflow.compile(checkpointer=InMemorySaver())
 
 async def run_agent(
         message: str,
-        session_id: str
+        session_id: str,
+        on_login_required: callable | None = None
     ):
     """"""
 
     response = await graph.ainvoke(
-        {
+        input={
             "messages": [
                 {"role": "user", "content": message}
             ]
         },
-        {
-            "configurable": {"thread_id": session_id}
+        config={
+            "configurable": {
+                "thread_id": session_id,
+                "on_login_required": on_login_required
+            }
         }
     )
 

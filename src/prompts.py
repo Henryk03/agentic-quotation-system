@@ -1,6 +1,6 @@
 
-import providers
-from utils import BaseProvider
+import utils.provider.providers
+from utils.provider.base_provider import BaseProvider
 
 
 """Default prompts used by the agent"""

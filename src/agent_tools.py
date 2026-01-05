@@ -6,11 +6,11 @@ from google import genai
 from google.genai import types
 from prompts import USER_PROMPT
 from google.genai.types import Content, Part
+from langgraph.prebuilt.tool_node import ToolRuntime
+from utils.provider.base_provider import BaseProvider
 from utils.browser.login_manager import AsyncBrowserContextMaganer
-from utils import (
-    BaseProvider,
-    SafeAsyncList,
-    AvailabilityDict,
+from utils.common.lists import SafeAsyncList
+from utils.computer_use.functions import (
     execute_function_calls,
     get_function_responses
 )
@@ -21,7 +21,10 @@ from playwright.async_api import (
 )
 
 
-async def search_products(products: list[str]) -> str:
+async def search_products(
+        products: list[str],
+        tool_runtime: ToolRuntime
+    ) -> str:
     """
     Perform web search for each product in the given list.
 
@@ -37,7 +40,7 @@ async def search_products(products: list[str]) -> str:
 
     # this import is necessary in order to have the registry
     # populated by the subclasses of `BaseProvider`
-    import providers
+    from utils.provider import providers
     
     web_search_results_list = SafeAsyncList()
 
@@ -48,8 +51,15 @@ async def search_products(products: list[str]) -> str:
 
         for provider in BaseProvider.registry.values():
 
+            on_login_required = tool_runtime.config.get(
+                "configurable", {}
+            ).get(
+                "on_login_required"
+            )
+
             context = await browser_context_manager.ensure_provider_context(
-                provider
+                provider,
+                on_login_required
             )
             provider_page.append(
                 (provider, await context.new_page())
@@ -277,7 +287,7 @@ async def search_products_with_computer_use(
 
 
 async def __normalize_selectors(
-        selectors: list[str] | AvailabilityDict
+        selectors: list[str] | dict
     ) -> list[str]:
     """
     Normalize the input selectors into a single list.
@@ -298,7 +308,7 @@ async def __normalize_selectors(
 
 async def __wait_for_any_selector(
         page: Page,
-        selectors: list[str] | AvailabilityDict,
+        selectors: list[str] | dict,
         timeout: float = 2000
     ) -> str | None:
     """
@@ -340,7 +350,7 @@ async def __wait_for_any_selector(
 
 async def __wait_for_all_selectors(
         page: Page,
-        selectors: list[str] | AvailabilityDict,
+        selectors: list[str] | dict,
         timeout: float = 2000
     ) -> None:
     """
@@ -380,7 +390,7 @@ async def __wait_for_all_selectors(
 
 async def __select_text(
         tag: bs4.element.Tag,
-        selectors: list[str] | AvailabilityDict
+        selectors: list[str] | dict
     ) -> str:
     """
     Extract text content from the first element matching any of the
@@ -412,7 +422,7 @@ async def __select_text(
 
 async def __select_all_text(
         tag: bs4.element.Tag,
-        selectors: list[str] | AvailabilityDict
+        selectors: list[str] | dict
     ) -> str:
     """
     Extract and concatenate text content from all elements matching

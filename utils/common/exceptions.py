@@ -1,5 +1,5 @@
 
-from utils import BaseProvider
+from ..provider.base_provider import BaseProvider
 
 
 class LoginFailedException(Exception):

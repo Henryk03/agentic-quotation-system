@@ -1,10 +1,10 @@
 
 import re
 import asyncio
-from utils import BaseProvider
 from typing import Callable
 from pathlib import Path
-from ..common.exceptions import (
+from utils.provider.base_provider import BaseProvider
+from utils.common.exceptions import (
     LoginFailedException,
     ManualFallbackException
 )
@@ -363,7 +363,8 @@ class AsyncBrowserContextMaganer:
 
     async def ensure_provider_context(
             self,
-            provider: BaseProvider
+            provider: BaseProvider,
+            on_login_required: callable | None = None
         ) -> BrowserContext:
         """
         Return an instanse of `BrowserContext` to be used to navigate the 
@@ -378,6 +379,9 @@ class AsyncBrowserContextMaganer:
             provider (Providers):
                 The provider for whom a login is required.
 
+            on_login_required ():
+                ...
+
         Returns:
             BrowserContext
         """
@@ -387,7 +391,11 @@ class AsyncBrowserContextMaganer:
         # manual login if `state_path`` is absent AND login is required
         if not state_path.exists() and provider.login_required:
             try:
-                await self.__manual_login(provider, state_path)
+                await self.__manual_login(
+                    provider,
+                    state_path,
+                    on_login_required
+                )
             except:
                 raise LoginFailedException(provider)
 
@@ -440,7 +448,11 @@ class AsyncBrowserContextMaganer:
                 await browser.close()
 
             try:
-                await self.__manual_login(provider, state_path)
+                await self.__manual_login(
+                    provider,
+                    state_path,
+                    on_login_required
+                )
                 _, context, _ = await self.__prepare_provider_context(
                     headless=True,
                     provider=provider,
@@ -455,7 +467,8 @@ class AsyncBrowserContextMaganer:
     async def __manual_login(
             self,
             provider: BaseProvider,
-            state_path: Path
+            state_path: Path,
+            on_login_required: callable | None = None
         ) -> None:
         """
         Open a non-headless browser so the user can manually perform
@@ -481,24 +494,32 @@ class AsyncBrowserContextMaganer:
         """
 
         async with self._manual_login_lock:
-            _, context, page = await self.__prepare_provider_context(
-                headless=False,
-                provider=provider,
-                state_path=state_path
-            )
+            if on_login_required:
+                await on_login_required(provider)
 
-            if await AsyncBrowserContextMaganer.__wait_until_logged_in(
-                provider=provider,
-                page=page,
-                check_func=AsyncBrowserContextMaganer.__is_logged_in,
-                timeout=30000
-            ):
-                await context.storage_state(path=state_path)
-                await self.close_page_resources(page)
+                while not state_path.exists():
+                    await asyncio.sleep(0.5)
+
+                return
             else:
-                await self.close_page_resources(page)
+                _, context, page = await self.__prepare_provider_context(
+                    headless=False,
+                    provider=provider,
+                    state_path=state_path
+                )
 
-                raise LoginFailedException(provider)
+                if await AsyncBrowserContextMaganer.__wait_until_logged_in(
+                    provider=provider,
+                    page=page,
+                    check_func=AsyncBrowserContextMaganer.__is_logged_in,
+                    timeout=30000
+                ):
+                    await context.storage_state(path=state_path)
+                    await self.close_page_resources(page)
+                else:
+                    await self.close_page_resources(page)
+
+                    raise LoginFailedException(provider)
 
 
     @staticmethod

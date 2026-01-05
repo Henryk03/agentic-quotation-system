@@ -1,7 +1,7 @@
 
 import re
 from dotenv import dotenv_values
-from utils import BaseProvider
+from utils.provider.base_provider import BaseProvider
 
 
 class GruppoComet(BaseProvider):
