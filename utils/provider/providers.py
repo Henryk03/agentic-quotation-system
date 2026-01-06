@@ -25,28 +25,28 @@ class GruppoComet(BaseProvider):
             price_classes = [".result-price"]
         )
 
-    async def auto_login(self, page):
+    # async def auto_login(self, page):
 
-        login_texts = re.compile(
-            "accedi",
-            re.IGNORECASE
-        )
+    #     login_texts = re.compile(
+    #         "accedi",
+    #         re.IGNORECASE
+    #     )
 
-        try:
-            await page.get_by_role("link", name=login_texts).click()
+    #     try:
+    #         await page.get_by_role("link", name=login_texts).click()
 
-            credentials = dotenv_values("/run/secrets/autologin-env")
+    #         credentials = dotenv_values("/run/secrets/autologin-env")
 
-            username = credentials["GRUPPOCOMET_USERNAME"]
-            password = credentials["GRUPPOCOMET_PASSWORD"]
+    #         username = credentials["GRUPPOCOMET_USERNAME"]
+    #         password = credentials["GRUPPOCOMET_PASSWORD"]
 
-            await page.locator("input[name='username']").fill(username)
-            await page.locator("input[name='password']").fill(password)
-            await page.keyboard.press("Enter")
+    #         await page.locator("input[name='username']").fill(username)
+    #         await page.locator("input[name='password']").fill(password)
+    #         await page.keyboard.press("Enter")
 
-            return True
-        except:
-            return False
+    #         return True
+    #     except:
+    #         return False
         
 
 class Comet(BaseProvider):

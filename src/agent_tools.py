@@ -4,7 +4,7 @@ import bs4
 import asyncio
 from google import genai
 from google.genai import types
-from prompts import USER_PROMPT
+from src.prompts import USER_PROMPT
 from google.genai.types import Content, Part
 from langgraph.prebuilt.tool_node import ToolRuntime
 from utils.provider.base_provider import BaseProvider

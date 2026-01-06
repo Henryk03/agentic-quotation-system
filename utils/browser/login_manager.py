@@ -18,12 +18,12 @@ from playwright.async_api import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
 LOG_IN_STATES_DIR = PROJECT_ROOT / "logins"
 LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
 
-SCREEN_WIDTH = 1440
-SCREEN_HEIGHT = 900
+SCREEN_WIDTH: int = 1440
+SCREEN_HEIGHT: int = 900
 
 
 class AsyncBrowserContextMaganer:
@@ -37,7 +37,7 @@ class AsyncBrowserContextMaganer:
 
 
     # mutex semaphore for managing asyncronous manual logins
-    _manual_login_lock = asyncio.Lock()
+    _manual_login_lock: asyncio.Lock = asyncio.Lock()
 
 
     def __init__(self, playwright: Playwright):
@@ -342,7 +342,7 @@ class AsyncBrowserContextMaganer:
                 (cookies, local storage, etc.).
 
         Returns:
-            tuple[Browser, BrowserContext, Page]:
+            tuple ([Browser, BrowserContext, Page]):
                 A tuple containing the created browser instance,
                 the initialized browser context, and the opened page.
         """
@@ -364,7 +364,7 @@ class AsyncBrowserContextMaganer:
     async def ensure_provider_context(
             self,
             provider: BaseProvider,
-            on_login_required: callable | None = None
+            on_login_required: Callable | None = None
         ) -> BrowserContext:
         """
         Return an instanse of `BrowserContext` to be used to navigate the 
@@ -386,10 +386,10 @@ class AsyncBrowserContextMaganer:
             BrowserContext
         """
 
-        state_path = AsyncBrowserContextMaganer.__state_path(provider)
+        state_path: Path = AsyncBrowserContextMaganer.__state_path(provider)
 
         # manual login if `state_path`` is absent AND login is required
-        if not state_path.exists() and provider.login_required:
+        if (not state_path.exists() and provider.login_required):
             try:
                 await self.__manual_login(
                     provider,
@@ -399,9 +399,9 @@ class AsyncBrowserContextMaganer:
             except:
                 raise LoginFailedException(provider)
 
-        browser = None
-        context = None
-        page = None
+        browser: Browser = None
+        context: BrowserContext = None
+        page: Page = None
         
         try:
             browser, context, page = await self.__prepare_provider_context(
@@ -440,19 +440,19 @@ class AsyncBrowserContextMaganer:
             raise ManualFallbackException(provider)
         
         except ManualFallbackException:
-            if page:
-                await page.close()
-            if context:
-                await context.close()
-            if browser:
-                await browser.close()
+            if page: await page.close()
+            if context: await context.close()
+            if browser: await browser.close()
 
             try:
+                # notify UI
                 await self.__manual_login(
                     provider,
                     state_path,
                     on_login_required
                 )
+
+                # headless retry
                 _, context, _ = await self.__prepare_provider_context(
                     headless=True,
                     provider=provider,
@@ -468,7 +468,7 @@ class AsyncBrowserContextMaganer:
             self,
             provider: BaseProvider,
             state_path: Path,
-            on_login_required: callable | None = None
+            on_login_required: Callable | None = None
         ) -> None:
         """
         Open a non-headless browser so the user can manually perform
@@ -495,7 +495,11 @@ class AsyncBrowserContextMaganer:
 
         async with self._manual_login_lock:
             if on_login_required:
-                await on_login_required(provider)
+                await on_login_required({
+                    "event": "LOGIN_REQUIRED",
+                    "provider": provider.name,
+                    "url": provider.url
+                })
 
                 while not state_path.exists():
                     await asyncio.sleep(0.5)
@@ -515,8 +519,21 @@ class AsyncBrowserContextMaganer:
                     timeout=30000
                 ):
                     await context.storage_state(path=state_path)
+
+                    # notify the UI that the login was successfull
+                    await on_login_required({
+                        "event": "LOGIN_COMPLETED", 
+                        "provider": provider.name
+                    })
+
                     await self.close_page_resources(page)
                 else:
+                    # notify the UI that the login was failed
+                    await on_login_required({
+                        "event": "LOGIN_FAILED",
+                        "provider": provider.name
+                    })
+
                     await self.close_page_resources(page)
 
                     raise LoginFailedException(provider)

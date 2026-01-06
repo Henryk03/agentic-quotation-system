@@ -1,7 +1,8 @@
 
 import asyncio
-from prompts import SYSTEM_PROMPT
-from agent_tools import search_products, search_products_with_computer_use
+from src.prompts import SYSTEM_PROMPT
+from typing import Callable
+from src.agent_tools import search_products, search_products_with_computer_use
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
@@ -75,7 +76,7 @@ graph = workflow.compile(checkpointer=InMemorySaver())
 async def run_agent(
         message: str,
         session_id: str,
-        on_login_required: callable | None = None
+        on_login_required: Callable | None = None
     ):
     """"""
 

@@ -1,14 +1,10 @@
 
 import streamlit as st
-import nest_asyncio
 import asyncio
 import websockets
 import uuid
 from typing import Optional
 from websockets import ClientConnection
-
-
-nest_asyncio.apply()
 
 
 # ==========================

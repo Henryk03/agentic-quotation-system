@@ -80,7 +80,7 @@ async def websocket_chat(ws: WebSocket) -> None:
                         assistant_reply = await run_agent(
                             user_message,
                             session_id,
-                            on_login_required=lambda p: notify_ui_login_required(ws, p)
+                            on_login_required=lambda event: notify_ui_login_event(ws, event)
                         )
 
                         await ws.send_text(assistant_reply)
