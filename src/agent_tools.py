@@ -6,7 +6,6 @@ from google import genai
 from google.genai import types
 from src.prompts import USER_PROMPT
 from google.genai.types import Content, Part
-from langgraph.prebuilt.tool_node import ToolRuntime
 from utils.provider.base_provider import BaseProvider
 from utils.browser.login_manager import AsyncBrowserContextMaganer
 from utils.common.lists import SafeAsyncList
@@ -22,8 +21,7 @@ from playwright.async_api import (
 
 
 async def search_products(
-        products: list[str],
-        tool_runtime: ToolRuntime
+        products: list[str]
     ) -> str:
     """
     Perform web search for each product in the given list.
@@ -50,16 +48,8 @@ async def search_products(
         provider_page = []
 
         for provider in BaseProvider.registry.values():
-
-            on_login_required = tool_runtime.config.get(
-                "configurable", {}
-            ).get(
-                "on_login_required"
-            )
-
             context = await browser_context_manager.ensure_provider_context(
-                provider,
-                on_login_required
+                provider
             )
             provider_page.append(
                 (provider, await context.new_page())

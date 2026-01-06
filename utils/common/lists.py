@@ -29,3 +29,15 @@ class SafeAsyncList:
 
         async with self._lock:
             self._list.append(item)
+
+
+    async def get_all(self) -> list:
+        """
+        Return a deep copy of the list.
+
+        The returned list represents the current state of the 
+        internal data. Since it is a copy, modifications to the
+        returned list do not affect the internal storage.
+        """
+
+        return list(self._list)

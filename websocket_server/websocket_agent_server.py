@@ -45,15 +45,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-async def notify_ui_login_event(
-        websocket: WebSocket,
-        payload: dict
-    ) -> None:
-    """"""
-
-    await websocket.send_json(payload)
-
-
 @app.websocket("/ws/chat")
 async def websocket_chat(ws: WebSocket) -> None:
     """"""
@@ -79,8 +70,7 @@ async def websocket_chat(ws: WebSocket) -> None:
 
                         assistant_reply = await run_agent(
                             user_message,
-                            session_id,
-                            on_login_required=lambda event: notify_ui_login_event(ws, event)
+                            session_id
                         )
 
                         await ws.send_text(assistant_reply)
@@ -103,7 +93,7 @@ async def websocket_chat(ws: WebSocket) -> None:
 
 async def main():
     config = uvicorn.Config(
-        "ws_agent_server:app",
+        "websocket_server.websocket_agent_server:app",
         host="0.0.0.0",
         port=8080,
         log_config=None,

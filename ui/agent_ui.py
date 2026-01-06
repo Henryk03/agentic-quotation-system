@@ -39,7 +39,7 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4().hex)
 
 if "ws_uri" not in st.session_state:
-    st.session_state.ws_uri = "ws://agent-backend:8080/ws/chat"
+    st.session_state.ws_uri = "ws://0.0.0.0:8080/ws/chat"
 
 
 # ==========================
@@ -73,7 +73,6 @@ for message in st.session_state.messages:
 # ==========================
 #     Utility functions
 # ==========================
-
 
 async def connect_ws() -> ClientConnection:
     """Connette la WebSocket con retry."""

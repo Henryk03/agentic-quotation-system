@@ -75,8 +75,7 @@ graph = workflow.compile(checkpointer=InMemorySaver())
 
 async def run_agent(
         message: str,
-        session_id: str,
-        on_login_required: Callable | None = None
+        session_id: str
     ):
     """"""
 
@@ -87,12 +86,11 @@ async def run_agent(
             ]
         },
         config={
-            "configurable": {
-                "thread_id": session_id,
-                "on_login_required": on_login_required
-            }
+            "configurable": {"thread_id": session_id}
         }
     )
+
+    print(response)
 
     response_content = response["messages"][-1].content
 
@@ -104,6 +102,20 @@ async def run_agent(
 
 
 async def main():
+    """
+    Entry point used only for local testing and debugging.
+
+    This function allows running the agent interactively from the terminal,
+    without starting the full backend or frontend services. It is intended
+    to quickly test the agent's behavior, prompts, and tool execution in an
+    isolated environment.
+
+    The function is meant to be executed as a module, for example:
+
+        python3 -m src.main_agent
+
+    and should not be used in production or as part of the deployed system.
+    """
 
     while True:
 
@@ -128,6 +140,10 @@ async def main():
             }
         ):
             for _, update in chunk.items():
+
+                print(f"{"=" * 34} Message Format {"=" * 34}\n")
+                print(update)
+                print("\n")
 
                 response = update["messages"][-1].content
 
