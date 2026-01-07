@@ -1,9 +1,10 @@
 
 import re
 import asyncio
-from utils.provider.base_provider import BaseProvider
-from typing import Callable
 from pathlib import Path
+from typing import Callable
+from utils.provider.base_provider import BaseProvider
+from utils.browser.login_strategy import LoginStrategy
 from utils.common.exceptions import (
     LoginFailedException,
     ManualFallbackException
@@ -18,7 +19,7 @@ from playwright.async_api import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 LOG_IN_STATES_DIR = PROJECT_ROOT / "logins"
 LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
 
@@ -363,7 +364,8 @@ class AsyncBrowserContextMaganer:
 
     async def ensure_provider_context(
             self,
-            provider: BaseProvider
+            provider: BaseProvider,
+            login_strategy: LoginStrategy = LoginStrategy.AUTO
         ) -> BrowserContext:
         """
         Return an instanse of `BrowserContext` to be used to navigate the 
@@ -384,18 +386,18 @@ class AsyncBrowserContextMaganer:
 
         state_path = AsyncBrowserContextMaganer.__state_path(provider)
 
-        # manual login if `state_path`` is absent AND login is required
-        if not state_path.exists() and provider.login_required:
-            try:
-                await self.__manual_login(provider, state_path)
-            except:
-                raise LoginFailedException(provider)
-
         browser = None
         context = None
         page = None
         
         try:
+            # manual login if `state_path`` is absent AND login is required
+            if not state_path.exists() and provider.login_required:
+                try:
+                    raise ManualFallbackException(provider)
+                except:
+                    raise LoginFailedException(provider)
+
             browser, context, page = await self.__prepare_provider_context(
                 provider=provider,
                 state_path=state_path
@@ -431,7 +433,7 @@ class AsyncBrowserContextMaganer:
 
             raise ManualFallbackException(provider)
         
-        except ManualFallbackException:
+        except ManualFallbackException as mfe:
             if page:
                 await page.close()
             if context:
@@ -439,7 +441,12 @@ class AsyncBrowserContextMaganer:
             if browser:
                 await browser.close()
 
+            # login via streamlit (UI)
+            if login_strategy == LoginStrategy.MANUAL_EXTERNAL:
+                raise mfe
+
             try:
+                # login via chromium tab (CLI)
                 await self.__manual_login(provider, state_path)
                 _, context, _ = await self.__prepare_provider_context(
                     headless=True,

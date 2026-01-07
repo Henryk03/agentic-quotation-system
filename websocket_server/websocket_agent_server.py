@@ -2,11 +2,11 @@
 import uvicorn
 import asyncio
 import logging
-from src.main_agent import run_agent
+from src.main_agent import run_agent_with_events
 from fastapi import WebSocket, FastAPI
 from contextlib import asynccontextmanager
-from utils.browser.connection_manager import ConnectionManager
-from utils.provider.base_provider import BaseProvider
+#from utils.server.messages_handler import handle_message
+from utils.server.connection_manager import ConnectionManager
 
 
 logger = logging.getLogger("agent-server")
@@ -64,22 +64,31 @@ async def websocket_chat(ws: WebSocket) -> None:
 
                 message_type = message.get("type")
 
-                if message_type == "websocket.receive":
-                    if "text" in message:
-                        user_message = message["text"]
+                if message_type:
+                    if message_type == "websocket.receive":
+                        # managing agent's response
+                        if "text" in message:
+                            user_message = message["text"]
 
-                        assistant_reply = await run_agent(
-                            user_message,
-                            session_id
-                        )
+                            assistant_reply = await run_agent_with_events(
+                                user_message,
+                                session_id,
+                                ws
+                            )
 
-                        await ws.send_text(assistant_reply)
+                            await ws.send_text(assistant_reply)
 
-                    else:
-                        pass
+                        else:
+                            pass
 
-                elif message_type == "websocket.disconnect":
-                    break
+                    elif message_type == "websocket.disconnect":
+                        # logging websocket's auto-disconnect
+                        conn_id = manager.get_connection_id(ws)
+                        logger.info(f"connection {conn_id} closed")
+                        break
+
+                elif message_event:         # DA FINIRE...
+                    pass
 
             except asyncio.TimeoutError:
                 continue

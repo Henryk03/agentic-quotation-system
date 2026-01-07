@@ -86,11 +86,6 @@ class ConnectionManager:
                 self.logger.info(
                     f"connection {conn_id} failed to close"
                 )
-
-        else:
-            self.logger.info(
-                f"connection {conn_id} already closed"
-            )
             
         if conn_id in self.active_connections:
             del self.active_connections[conn_id]
