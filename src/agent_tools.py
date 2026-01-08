@@ -53,7 +53,7 @@ async def search_products(
             try:
                 context = await browser_context_manager.ensure_provider_context(
                     provider,
-                    #login_strategy=LoginStrategy.MANUAL_EXTERNAL        # DELETE this line to use the system via CLI
+                    login_strategy=LoginStrategy.MANUAL_EXTERNAL        # DELETE this line to use the system via CLI
                 )
                 provider_page.append(
                     (provider, await context.new_page())

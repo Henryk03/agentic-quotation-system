@@ -11,7 +11,7 @@ BACKEND_VENV="venvs/backend"
 FRONTEND_VENV="venvs/frontend"
 
 BACKEND_SCRIPT="websocket_server.websocket_agent_server"
-FRONTEND_SCRIPT="ui/agent_ui.py"
+FRONTEND_SCRIPT="ui.start_ui"
 
 if [ ! -d "$BACKEND_VENV" ]; then
     echo "ERROR: Backend venv not found at $BACKEND_VENV. Run setup_venvs.sh first."
@@ -40,5 +40,5 @@ sleep 3
 echo "Starting frontend (Streamlit)..."
 (
     source "$FRONTEND_VENV/bin/activate"
-    streamlit run "$FRONTEND_SCRIPT"
+    python -m "$FRONTEND_SCRIPT"
 )

@@ -2,9 +2,6 @@
 import asyncio
 from src.prompts import SYSTEM_PROMPT
 from src.agent_tools import search_products, search_products_with_computer_use
-from utils.common.exceptions import ManualFallbackException, LoginFailedException
-from fastapi import WebSocket
-from utils.events import AIMessageEvent, ToolMessageEvent, ErrorEvent, LoginRequiredEvent
 from langchain.messages import AIMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
@@ -96,42 +93,6 @@ async def run_agent(
     return response["messages"][-1]
 
 
-async def run_agent_with_events(
-        message: str,
-        session_id: str,
-        websocket: WebSocket
-    ) -> None:
-    """"""
-
-    try:
-        result = await run_agent(message, session_id)
-        result_content = result.content
-
-        # could happen that the received message is inside
-        # a list containing a dict with the response text
-        if isinstance(result_content, list):
-            result_content = result_content[0]["text"]
-
-        if isinstance(result, AIMessage):
-            event = AIMessageEvent(content=result_content)
-        elif isinstance(result, ToolMessageEvent):
-            event = ToolMessageEvent(content=result_content)
-            
-    except ManualFallbackException as mfe:
-        event = LoginRequiredEvent(
-            provider=mfe.provider.name,
-            login_url=mfe.provider.url
-        )
-
-    except Exception as e:
-        event = ErrorEvent(
-            message=str(e)
-        )
-
-    finally:
-        await websocket.send(event.to_json_str())
-
-
 
 async def main():
     """
@@ -161,53 +122,31 @@ async def main():
             print("\n")
             break
 
-        # async for chunk in graph.astream(
-        #     {
-        #         "messages": [
-        #             {"role": "user", "content": user_input}
-        #         ]
-        #     },
-        #     {
-        #         "configurable": {"thread_id": 1}
-        #     }
-        # ):
-        #     for _, update in chunk.items():
-
-        #         print(f"{"=" * 34} Message Format {"=" * 34}\n")
-        #         print(update)
-        #         print("\n")
-
-        #         response = update["messages"][-1].content
-
-        #         if isinstance(response, list):
-        #             print(f"{"=" * 34} Ai Message {"=" * 34}\n")
-        #             print(response[0].get("text"))
-        #             print("\n")
-        #         else:
-        #             update["messages"][-1].pretty_print()
-        #             print("\n")
-
-        response = await graph.ainvoke(
-            input={
+        async for chunk in graph.astream(
+            {
                 "messages": [
                     {"role": "user", "content": user_input}
                 ]
             },
-            config={
+            {
                 "configurable": {"thread_id": 1}
             }
-        )
+        ):
+            for _, update in chunk.items():
 
-        print(f"{"=" * 34} Message Format {"=" * 34}\n")
-        print(response)
-        print("\n")
+                print(f"{"=" * 34} Message Format {"=" * 34}\n")
+                print(update)
+                print("\n")
 
-        response_content = response["messages"][-1].content
+                response = update["messages"][-1].content
 
-        if isinstance(response_content, list):
-            print(response_content[0]["text"])
-        
-        print(response_content)
+                if isinstance(response, list):
+                    print(f"{"=" * 34} Ai Message {"=" * 34}\n")
+                    print(response[0].get("text"))
+                    print("\n")
+                else:
+                    update["messages"][-1].pretty_print()
+                    print("\n")
 
 
 if __name__ == "__main__":
