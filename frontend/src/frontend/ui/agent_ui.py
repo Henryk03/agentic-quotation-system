@@ -5,7 +5,7 @@ import asyncio
 import websockets
 import streamlit as st
 from typing import Optional
-from utils.events import Event
+from shared.events import Event
 from pydantic import TypeAdapter
 from websockets import ClientConnection
 from playwright.sync_api import sync_playwright

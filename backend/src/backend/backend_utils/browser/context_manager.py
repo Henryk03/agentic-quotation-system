@@ -3,12 +3,6 @@ import re
 import asyncio
 from pathlib import Path
 from typing import Callable
-from utils.provider.base_provider import BaseProvider
-from utils.browser.login_strategy import LoginStrategy
-from utils.common.exceptions import (
-    LoginFailedException,
-    ManualFallbackException
-)
 from playwright.async_api import (
     Playwright, 
     Browser, 
@@ -16,6 +10,13 @@ from playwright.async_api import (
     Page, 
     ElementHandle,
     TimeoutError as PlaywrightTimeoutError
+)
+
+from backend.provider.base_provider import BaseProvider
+from backend.backend_utils.browser.login_strategy import LoginStrategy
+from backend.backend_utils.common.exceptions import (
+    LoginFailedException,
+    ManualFallbackException
 )
 
 

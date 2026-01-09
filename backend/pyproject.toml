@@ -1,0 +1,51 @@
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-backend"
+version = "0.1.0"
+description = "Agentic quotation system's backend server"
+readme = "../README.md"
+requires-python = "==3.13"
+license = { file = "../LICENSE" }
+
+authors = [
+    { name = "Enrico Francesco Contessi" }
+]
+
+dependencies = [
+    "langchain==1.1.0",
+    "langchain-classic==1.0.0",
+    "langchain-community==0.4.1",
+    "langchain-core==1.1.0",
+    "langchain-google-genai==3.2.0",
+
+    "langgraph==1.0.4",
+    "langgraph-checkpoint==3.0.1",
+    "langgraph-prebuilt==1.0.5",
+
+    "google-genai==1.52.0",
+
+    "fastapi==0.121.3",
+    "uvicorn==0.38.0",
+
+    "playwright==1.55.0",
+
+    "beautifulsoup4==4.14.2",
+    "bs4==0.0.2",
+
+    "pydantic==2.12.2",
+    "python-dotenv==1.1.1",
+    "requests==2.32.5"
+]
+
+[project.scripts]
+agentic-backend = "backend.launch_backend:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

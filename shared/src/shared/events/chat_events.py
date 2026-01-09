@@ -1,6 +1,6 @@
 
 from typing import Literal
-from utils.events.base_event import BaseEvent
+from shared.events.base_event import BaseEvent
 
 
 class AIMessageEvent(BaseEvent):

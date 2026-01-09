@@ -1,24 +1,8 @@
 
 import requests
-from typing import TypedDict
 from playwright.async_api import Page
 
-
-class AvailabilityDict(TypedDict):
-    """
-    Dictionary specifying the CSS selectors used to identify product
-    availability on a provider's website.
-
-    Attributes:
-        available (list[str]):
-            List of selectors corresponding to products that are in stock.
-
-        not_available (list[str]):
-            List of selectors corresponding to products that are out of stock.
-    """
-
-    available: list[str]
-    not_available: list[str]
+from backend.backend_utils.common.dictionaries import AvailabilityDict
 
 
 class BaseProvider:
@@ -148,7 +132,7 @@ class BaseProvider:
         return self.auto_login.__func__ is not BaseProvider.auto_login
         
     
-    async def auto_login(self, page: Page) -> bool:
+    async def auto_login(self, _: Page) -> bool:
         """
         Default automatic login implementation, which performs no action.
         Subclasses of `BaseProvider` should override this method to

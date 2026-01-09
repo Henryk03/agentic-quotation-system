@@ -1,24 +1,26 @@
 
 import re
-import bs4
 import asyncio
+
+import bs4
 from google import genai
 from google.genai import types
-from src.prompts import USER_PROMPT
 from google.genai.types import Content, Part
-from utils.provider.base_provider import BaseProvider
-from utils.browser.login_strategy import LoginStrategy
-from utils.browser.login_manager import AsyncBrowserContextMaganer
-from utils.common.exceptions import LoginFailedException
-from utils.common.lists import SafeAsyncList
-from utils.computer_use.functions import (
-    execute_function_calls,
-    get_function_responses
-)
 from playwright.async_api import (
     async_playwright,
     Page,
     TimeoutError as PlaywrightTimeoutError
+)
+
+from backend.agent.prompts import USER_PROMPT
+from backend.provider.base_provider import BaseProvider
+from backend.backend_utils.browser.login_strategy import LoginStrategy
+from backend.backend_utils.browser.context_manager import AsyncBrowserContextMaganer
+from backend.backend_utils.common.exceptions import LoginFailedException
+from backend.backend_utils.common.lists import SafeAsyncList
+from backend.backend_utils.computer_use.functions import (
+    execute_function_calls,
+    get_function_responses
 )
 
 
@@ -40,7 +42,7 @@ async def search_products(
 
     # this import is necessary in order to have the registry
     # populated by the subclasses of `BaseProvider`
-    from utils.provider import providers
+    from backend.provider.providers import providers
     
     web_search_results_list = SafeAsyncList()
 

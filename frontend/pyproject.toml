@@ -1,0 +1,33 @@
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-frontend"
+version = "0.1.0"
+description = "Agentic quotation system's frontend"
+readme = "../README.md"
+requires-python = "==3.13"
+license = { file = "../LICENSE" }
+
+authors = [
+    { name = "Enrico Francesco Contessi" }
+]
+
+dependencies = [
+    "streamlit==1.52.0",
+    "requests==2.32.5",
+    "websockets==15.0.1",
+    "pydantic==2.12.2",
+    "playwright==1.55.0"
+]
+
+[project.scripts]
+agentic-backend = "backend.launch_frontend:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

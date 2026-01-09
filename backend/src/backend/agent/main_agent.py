@@ -1,13 +1,15 @@
 
 import asyncio
-from src.prompts import SYSTEM_PROMPT
-from src.agent_tools import search_products, search_products_with_computer_use
+
 from langchain.messages import AIMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import InMemorySaver       # mettere uno persistente
+
+from backend.agent.prompts import SYSTEM_PROMPT
+from backend.agent.agent_tools import search_products, search_products_with_computer_use
 
 
 llm = ChatGoogleGenerativeAI(
