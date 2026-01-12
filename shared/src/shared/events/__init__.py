@@ -1,13 +1,19 @@
 
 from typing import Union
-from .error_events import ErrorEvent
-from .chat_events import AIMessageEvent, ToolMessageEvent
-from .auth_events import LoginRequiredEvent, LoginCompletedEvent
+
+from shared.events.chat import ChatMessageEvent
+from shared.events.error import ErrorEvent
+from shared.events.auth import (
+    LoginCompletedEvent,
+    LoginFailedEvent,
+    LoginRequiredEvent
+)
+
 
 Event = Union[
-    AIMessageEvent,
-    ToolMessageEvent,
+    ChatMessageEvent,
     LoginRequiredEvent,
     LoginCompletedEvent,
-    ErrorEvent,
+    LoginFailedEvent,
+    ErrorEvent
 ]

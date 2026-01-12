@@ -1,9 +1,9 @@
 
 from typing import Literal
-from utils.events.base_event import BaseEvent
+from pydantic import BaseModel
 
 
-class ErrorEvent(BaseEvent):
+class ErrorEvent(BaseModel):
     """"""
     
     type: Literal["error"] = "error"

@@ -75,26 +75,6 @@ workflow.add_edge("supported_website_search", "agent")
 graph = workflow.compile(checkpointer=InMemorySaver())
 
 
-async def run_agent(
-        message: str,
-        session_id: str
-    ) -> AIMessage | ToolMessage:
-    """"""
-
-    response = await graph.ainvoke(
-        input={
-            "messages": [
-                {"role": "user", "content": message}
-            ]
-        },
-        config={
-            "configurable": {"thread_id": session_id}
-        }
-    )
-
-    return response["messages"][-1]
-
-
 
 async def main():
     """

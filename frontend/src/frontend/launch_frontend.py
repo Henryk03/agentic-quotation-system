@@ -1,9 +1,7 @@
 
-
 import os
 import sys
 import subprocess
-import asyncio
 from pathlib import Path
 
 
@@ -29,11 +27,10 @@ def running_inside_venv() -> bool:
 def create_venv() -> None:
     """"""
 
-    print("[INFO] Creating backend virtual environment...")
+    print("[INFO] Creating frontend virtual environment...")
     subprocess.check_call([sys.executable, "-m", "venv", str(VENV_DIR)])
 
     python = venv_python()
-
     subprocess.check_call([python, "-m", "pip", "install", "--upgrade", "pip"])
     subprocess.check_call([python, "-m", "pip", "install", "-e", str(PROJECT_ROOT)])
 
@@ -42,8 +39,7 @@ def relaunch_inside_venv() -> None:
     """"""
     
     python = venv_python()
-
-    print("[INFO] Relaunching backend inside virtual environment...")
+    print("[INFO] Relaunching frontend inside virtual environment...")
     subprocess.check_call([python, __file__])
     sys.exit(0)
 
@@ -56,18 +52,23 @@ def main() -> None:
     if not running_inside_venv():
         relaunch_inside_venv()
 
-    print("[INFO] Starting Agentic backend...")
+    # --- ORA SEI DENTRO IL VENV ---
+    print("[INFO] Starting Agentic frontend UI...")
 
-    if not os.getenv("GOOGLE_API_KEY"):
-        print("[WARN] GOOGLE_API_KEY not set")
+    ui_entrypoint = (
+        Path(__file__).parent / "ui" / "agent_ui.py"
+    )
 
-    from backend.server.websocket_server import start_server
-
-    try:
-        asyncio.run(start_server())
-
-    except KeyboardInterrupt:
-        print("\n[INFO] Backend stopped.")
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(ui_entrypoint),
+        ],
+        check=True,
+    )
 
 
 if __name__ == "__main__":

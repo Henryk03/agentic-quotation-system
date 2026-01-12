@@ -17,14 +17,19 @@ authors = [
 
 dependencies = [
     "streamlit==1.52.0",
+
     "requests==2.32.5",
     "websockets==15.0.1",
+
     "pydantic==2.12.2",
-    "playwright==1.55.0"
+
+    "playwright==1.55.0",
+
+    "agentic-shared @ git+https://github.com/Henryk03/agentic-quotation-system.git#subdirectory=shared"
 ]
 
 [project.scripts]
-agentic-backend = "backend.launch_frontend:main"
+agentic-frontend = "frontend.launch_frontend:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

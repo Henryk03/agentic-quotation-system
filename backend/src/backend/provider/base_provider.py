@@ -46,9 +46,6 @@ class BaseProvider:
         
     """
 
-    
-    registry: dict[str, "BaseProvider"] = {}
-
 
     def __init__(
             self,
@@ -80,13 +77,6 @@ class BaseProvider:
                     "Please, fix the error by providing a valid URL."
                 )
             )
-
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-
-        name = cls.__name__.upper()
-        BaseProvider.registry[name] = cls()
         
 
     @staticmethod
@@ -102,8 +92,8 @@ class BaseProvider:
 
         Returns:
             bool:
-                True if the URL is reachable or returns an SSL-related error.
-                False if the URL is invalid or unreachable.
+                - `True` if the URL is reachable or returns an SSL-related error.
+                - `False` if the URL is invalid or unreachable.
         """
 
         try:
@@ -125,8 +115,8 @@ class BaseProvider:
 
         Returns:
             bool:
-                True if the provider defines a custom `auto_login` method,
-                False otherwise.
+                - `True` if the provider defines a custom `auto_login` method,
+                - `False` otherwise.
         """
 
         return self.auto_login.__func__ is not BaseProvider.auto_login
@@ -145,8 +135,8 @@ class BaseProvider:
 
         Returns:
             bool:
-                True if the login procedure succeeds,
-                False otherwise.
+                - `True` if the login procedure succeeds,
+                - `False` otherwise.
         """
 
         return False

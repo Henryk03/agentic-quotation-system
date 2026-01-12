@@ -38,7 +38,9 @@ dependencies = [
 
     "pydantic==2.12.2",
     "python-dotenv==1.1.1",
-    "requests==2.32.5"
+    "requests==2.32.5",
+
+    "agentic-shared @ git+https://github.com/Henryk03/agentic-quotation-system.git#subdirectory=shared"
 ]
 
 [project.scripts]

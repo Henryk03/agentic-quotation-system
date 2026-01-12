@@ -16,7 +16,7 @@ from backend.agent.prompts import USER_PROMPT
 from backend.provider.base_provider import BaseProvider
 from backend.backend_utils.browser.login_strategy import LoginStrategy
 from backend.backend_utils.browser.context_manager import AsyncBrowserContextMaganer
-from backend.backend_utils.common.exceptions import LoginFailedException
+from backend.backend_utils.exceptions import LoginFailedException
 from backend.backend_utils.common.lists import SafeAsyncList
 from backend.backend_utils.computer_use.functions import (
     execute_function_calls,
@@ -40,9 +40,7 @@ async def search_products(
             for each product.
     """
 
-    # this import is necessary in order to have the registry
-    # populated by the subclasses of `BaseProvider`
-    from backend.provider.providers import providers
+    from backend.provider.registry import all_providers
     
     web_search_results_list = SafeAsyncList()
 
@@ -51,7 +49,7 @@ async def search_products(
         browser_context_manager = AsyncBrowserContextMaganer(apw)
         provider_page = []
 
-        for provider in BaseProvider.registry.values():
+        for provider in all_providers():
             try:
                 context = await browser_context_manager.ensure_provider_context(
                     provider,
