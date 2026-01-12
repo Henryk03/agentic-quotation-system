@@ -8,7 +8,7 @@ name = "agentic-backend"
 version = "0.1.0"
 description = "Agentic quotation system's backend server"
 readme = "./README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.13,<3.14"
 license = { file = "./LICENSE" }
 
 authors = [
