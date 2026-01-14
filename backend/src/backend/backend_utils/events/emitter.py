@@ -24,6 +24,10 @@ def langchain_message_to_event(message: BaseMessage) -> ChatMessageEvent | None:
         role = "assistant"
         content = message.content
 
+        if isinstance(content, list):
+            tmp_content = content[0]["text"]
+            content = tmp_content
+
     elif isinstance(message, HumanMessage):
         role = "user"
         content = message.content

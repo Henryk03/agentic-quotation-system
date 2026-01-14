@@ -7,9 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "agentic-frontend"
 version = "0.1.0"
 description = "Agentic quotation system's frontend"
-readme = "README.md"
 requires-python = ">=3.13,<3.14"
-license = { file = "LICENSE" }
 
 authors = [
     { name = "Enrico Francesco Contessi" }

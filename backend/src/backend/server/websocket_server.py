@@ -7,7 +7,9 @@ from fastapi import WebSocket, FastAPI
 from contextlib import asynccontextmanager
 
 from backend.agent.main_agent import graph as agent
+from backend.backend_utils.events.parser import parse_event
 from backend.backend_utils.events.dispatcher import dispatch_chat
+from backend.backend_utils.events.unpacker import decompose_chat_event
 from backend.backend_utils.connection.connection_manager import ConnectionManager
 
 
@@ -58,27 +60,40 @@ async def websocket_chat(ws: WebSocket) -> None:
 
     try:
         while True:
-            raw_message: dict = await asyncio.wait_for(
-                ws.receive()
-            )
-
-            message_type = raw_message.get("type")
-
-            if message_type == "websocket.receive":
-                user_message = raw_message.get("text")
-
-                await dispatch_chat(
-                    agent,
-                    user_message,
-                    session_id,
-                    ws
+            try:
+                raw: dict = await asyncio.wait_for(
+                    ws.receive(),
+                    timeout=5.0
                 )
 
-            elif message_type == "websocket.disconnect":
-                # logging websocket's auto-disconnect
-                conn_id = manager.get_connection_id(ws)
-                logger.info(f"connection {conn_id} closed")
-                break
+                raw_type = raw.get("type")
+
+                if raw_type == "websocket.receive":
+                    if "text" in raw:
+                        str_event = raw.get("text")
+                        event = parse_event(str_event)
+
+                        user_message, metadata = decompose_chat_event(event)
+
+                        await dispatch_chat(
+                            agent,
+                            user_message,
+                            session_id,
+                            metadata,
+                            ws
+                        )
+
+                    else:
+                        pass
+
+                elif raw_type == "websocket.disconnect":
+                    # logging websocket's auto-disconnect
+                    conn_id = manager.get_connection_id(ws)
+                    logger.info(f"connection {conn_id} closed")
+                    break
+
+            except asyncio.TimeoutError:
+                continue
 
     except Exception as e:
         logger.error(f"websocket error: {e}")
@@ -87,13 +102,13 @@ async def websocket_chat(ws: WebSocket) -> None:
         await manager.disconnect(ws)
 
 
-async def start_server() -> None:
+async def start_server(host: str, port: str) -> None:
     """"""
     
     config = uvicorn.Config(
-        "websocket_server.websocket_agent_server:app",
-        host="0.0.0.0",
-        port=8080,
+        "backend.server.websocket_server:app",
+        host=host,
+        port=port,
         log_config=None,
         log_level="critical",
         lifespan="on"

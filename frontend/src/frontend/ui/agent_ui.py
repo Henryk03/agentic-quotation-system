@@ -1,13 +1,17 @@
 
 import uuid
 import asyncio
+import logging
 
 import websockets
 import streamlit as st
+from streamlit.delta_generator import DeltaGenerator
 from pydantic import TypeAdapter
 from websockets import ClientConnection
 
-from frontend.frontend_utils.events.handler import handle_event
+from frontend.frontend_utils.browser import *
+from frontend.frontend_utils.websocket.client import WSClient
+from frontend.frontend_utils.websocket.protocol import receive_events
 
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
@@ -17,16 +21,6 @@ from shared.events.auth import (
     LoginCompletedEvent,
     LoginFailedEvent,
 )
-
-
-# ==========================
-#        Event parsing
-# ==========================
-
-event_adapter = TypeAdapter(Event)
-
-def parse_event(raw: str) -> Event:
-    return event_adapter.validate_json(raw)
 
 
 # ==========================
@@ -50,126 +44,200 @@ st.caption("Streamlit chatbot powered by Google Gemini")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "status_placeholder" not in st.session_state:
-    st.session_state.status_placeholder = st.empty()
+if "ui_state" not in st.session_state:
+    st.session_state.ui_state = {
+        "login_in_progress": False,
+        "login_message": None,
+        "login_url": None,
 
-if "ws" not in st.session_state:
-    st.session_state.ws = None
+        "sidebar_visible": True,
 
-if "loop" not in st.session_state:
-    st.session_state.loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(st.session_state.loop)
+        "selected_stores": ["Comet", "GruppoComet"],
 
-if "session_id" not in st.session_state:
-    st.session_state.session_id = uuid.uuid4().hex
+        "chats": {
+            "default": st.session_state.messages
+        },
 
-if "ws_uri" not in st.session_state:
-    st.session_state.ws_uri = "ws://0.0.0.0:8080/ws/chat"
+        "current_chat": "default",
+    }
+
+if "ws_client" not in st.session_state:
+    st.session_state.ws_client = WSClient(
+        websocket=None,
+        session_id=uuid.uuid4().hex,
+        websocket_uri="websocket://0.0.0.0:8080/websocket/chat"
+    )
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format=""
+    )
+
+
+# ==========================
+#          Helpers
+# ==========================
+
+def get_event_loop() -> asyncio.AbstractEventLoop:
+    """"""
+
+    if "loop" not in st.session_state:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        st.session_state.loop = loop
+
+    return st.session_state.loop
+
+
+
+# ==========================
+#      Event handling
+# ==========================
+
+def handle_event(
+        event: Event,
+        placeholder: DeltaGenerator | None = None,
+    ) -> bool:
+    """"""
+
+    # ==========================
+    #  Chat messages (persist)
+    # ==========================
+    if isinstance(event, ChatMessageEvent):
+        st.session_state.ui_state["login_in_progress"] = False
+        st.session_state.ui_state["login_message"] = None
+        st.session_state.ui_state["login_url"] = None
+
+        # tool calls will be ignored
+        content = event.content
+
+        if isinstance(content, list):
+            content = content[0].get("text")
+
+        st.session_state.messages.append(
+            {
+                "role": event.role,
+                "content": content,
+            }
+        )
+
+        return True
+
+    # ==========================
+    #      Errors (persist)
+    # ==========================
+    if isinstance(event, ErrorEvent):
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": f"⚠️ {event.message}",
+            }
+        )
+
+        return True
+    
+    # ==========================
+    #   Login flow (temporary)
+    # ==========================
+    if isinstance(event, LoginRequiredEvent):
+        st.session_state.ui_state["login_in_progress"] = True
+        st.session_state.ui_state["login_message"] = event.message
+        st.session_state.ui_state["login_url"] = str(event.login_url)
+        
+        return False
+
+    if isinstance(event, LoginCompletedEvent):
+        st.session_state.ui_state["login_in_progress"] = False
+        st.session_state.ui_state["login_message"] = None
+        st.session_state.ui_state["login_url"] = None
+
+        return False
+
+    if isinstance(event, LoginFailedEvent):
+        st.session_state.ui_state["login_in_progress"] = False
+        st.session_state.ui_state["login_message"] = None
+        st.session_state.ui_state["login_url"] = None
+        
+        return False
+
+
+def on_event(event: Event) -> None:
+    """"""
+
+    handle_event(
+        event,
+        st.session_state.status_placeholder
+    )
+
+
+def on_error(exception: Exception) -> None:
+    """"""
+
+    pass
+
+
+# ==========================
+#      Header controls
+# ==========================
+
+col1, col2, col3 = st.columns([1, 1, 2])
+
+with col1:
+    if st.button("📁 Sidebar"):
+        st.session_state.ui_state["sidebar_visible"] = (
+            not st.session_state.ui_state["sidebar_visible"]
+        )
+
+with col2:
+    if st.button("\u2795 Nuova Chat"):
+        chat_id = uuid.uuid4().hex
+
+        st.session_state.ui_state["chats"][chat_id] = []
+        st.session_state.ui_state["current_chat"] = chat_id
+        st.session_state.messages = []
+
+        st.rerun()
+
+with col3:
+    st.session_state.ui_state["selected_stores"] = st.multiselect(
+        "Store",
+        options=["Comet", "GruppoComet"],
+        default=st.session_state.ui_state["selected_stores"],
+        label_visibility="collapsed",
+    )
 
 
 # ==========================
 #          Sidebar
 # ==========================
 
-with st.sidebar:
-    st.header("Settings")
+if st.session_state.ui_state["sidebar_visible"]:
+    with st.sidebar:
+        st.header("Chat")
 
-    st.session_state.ws_uri = st.text_input(
-        "WebSocket URI",
-        st.session_state.ws_uri,
-    )
+        for chat_id in st.session_state.ui_state["chats"]:
+            if st.button(f"💬 {chat_id}", key=f"chat-{chat_id}"):
+                st.session_state.ui_state["current_chat"] = chat_id
+                st.session_state.messages = (
+                    st.session_state.ui_state["chats"][chat_id]
+                )
+                st.rerun()
 
-    st.write("Session ID:")
-    st.code(st.session_state.session_id)
+        st.divider()
 
-    if st.button("🧹 Clear chat", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+        if st.button("🧹 Clear chat"):
+            st.session_state.messages = []
+            st.rerun()
 
 
 # ==========================
-#     Render chat history
+#    Render chat history
 # ==========================
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-
-
-# ==========================
-#      WebSocket logic
-# ==========================
-
-async def ws_listener(ws: ClientConnection) -> None:
-    """Ascolta continuamente eventi dal server."""
-
-    async for raw in ws:
-        try:
-            event = parse_event(raw)
-            handle_event(
-                st.session_state.status_placeholder,
-                event,
-            )
-        except Exception as exc:
-            st.error(f"Event parse error: {exc}")
-
-
-async def connect_ws() -> ClientConnection:
-    """Crea connessione WS e avvia listener."""
-    url = f"{st.session_state.ws_uri}?session={st.session_state.session_id}"
-
-    for _ in range(2):
-        try:
-            ws = await websockets.connect(url)
-
-            asyncio.create_task(ws_listener(ws))
-            return ws
-        
-        except:
-            asyncio.sleep(2)   
-
-
-async def get_ws() -> ClientConnection:
-    """"""
-
-    ws = st.session_state.ws
-
-    if ws is None or ws.close_code is not None:
-        ws = await connect_ws()
-        st.session_state.ws = ws
-
-    return ws
-
-
-async def send_text(message: str) -> None:
-    """"""
-
-    for _ in range(2):
-        ws = await get_ws()
-
-        try:
-            await ws.send(message)
-
-        except:
-            st.session_state.ws = None
-
-    raise RuntimeError("Impossibile comunicare con il server.")
-        
-
-
-async def send_event(event: Event) -> None:
-    """"""
-
-    for _ in range(2):
-        ws = await get_ws()
-
-        try:
-            await ws.send(event.model_dump_json())
-
-        except:
-            st.session_state.ws = None
-
-    raise RuntimeError("Impossibile comunicare con il server.")
 
 
 # ==========================
@@ -189,6 +257,29 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    st.session_state.loop.run_until_complete(
-        send_text(prompt)
-    )
+    try:
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+
+                metadata = {
+                    "selected_stores": st.session_state.ui_state["selected_store"]
+                }
+
+                received_events = get_event_loop().run_until_complete(
+                    st.session_state.ws_client.send(
+                        prompt,
+                        metadata,
+                        on_event,
+                        on_error
+                    )
+                )
+        
+        if received_events:
+            st.rerun()
+        
+    except Exception as e:
+        err = f"WebSocket Error: {e}"
+
+        st.session_state.messages.append(
+            {"role": "assistant", "content": f"⚠️ {err}"}
+        )

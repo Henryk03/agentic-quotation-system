@@ -9,7 +9,8 @@ PROVIDER_REGISTRY: dict[str, BaseProvider] = {}
 def register_provider(provider_cls: BaseProvider) -> None:
     """"""
 
-    name = provider_cls.name.upper()
+    istance = provider_cls()
+    name = istance.name.upper()
     PROVIDER_REGISTRY[name] = provider_cls
 
 

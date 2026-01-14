@@ -14,7 +14,7 @@ from playwright.async_api import (
 
 from backend.provider.base_provider import BaseProvider
 from backend.backend_utils.browser.login_strategy import LoginStrategy
-from backend.backend_utils.common.exceptions import (
+from backend.backend_utils.exceptions import (
     LoginFailedException,
     ManualFallbackException
 )

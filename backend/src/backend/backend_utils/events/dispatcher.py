@@ -22,6 +22,7 @@ async def dispatch_chat(
         agent: Runnable,
         user_input: str,
         session_id: str,
+        metadata: dict[str, list[str]],
         websocket: WebSocket,
     ) -> None:
     """
@@ -29,6 +30,8 @@ async def dispatch_chat(
     - invia input a LangChain
     - streamma gli eventi verso il client
     """
+
+    # capire come trasportare i metadati alla funzione di ricerca prodotti
 
     try:
         async for state in agent.astream(

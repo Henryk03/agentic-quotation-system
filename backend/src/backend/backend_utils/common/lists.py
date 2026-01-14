@@ -2,6 +2,7 @@
 import asyncio
 from typing import Any
 
+
 class SafeAsyncList:
     """
     ADT for a thread-safe asynchronous list.

@@ -1,0 +1,116 @@
+
+import asyncio
+import logging
+from typing import Callable
+
+import websockets
+from websockets import ClientConnection
+
+from frontend.frontend_utils.events.converter import to_chat_message_event
+from frontend.frontend_utils.websocket.protocol import receive_events
+
+from shared.events import Event
+
+
+class WSClient:
+    """"""
+
+
+    def __init__(
+            self,
+            websocket: ClientConnection | None,
+            session_id: str,
+            websocket_uri: str,
+            logger: logging.Logger = logging.getLogger("agent-frontend")
+        ):
+
+        self.websocket = websocket
+        self.session_id = session_id
+        self.websocket_uri = websocket_uri
+        self.logger = logger
+
+    
+    async def connect(self) -> ClientConnection | None:
+        """"""
+
+        ws_uri = self.websocket_uri
+        s_id = self.session_id
+
+        url = f"{ws_uri}?session={s_id}"
+
+        for _ in range(2):
+            try:
+                ws = await websockets.connect(url)
+                await asyncio.sleep(0.2)
+
+                self.logger.info(f"successfully connected at {ws_uri}")
+
+                return ws
+            
+            except:
+                await asyncio.sleep(2)
+
+        self.logger.error(f"connection to {ws_uri} failed")
+        return
+
+
+    async def get_websocket(self) -> ClientConnection:
+        """"""
+
+        self.logger.debug("connecting to server...")
+
+        ws = self.websocket
+
+        if ws is None or ws.close_code is not None:
+            self.logger.info("connection closed")
+            ws = await self.connect()
+            self.logger.debug("successfully reconnected")
+
+            self.websocket = ws
+
+        else:
+            self.logger.debug("already connected")
+
+        return ws
+    
+
+    async def ensure_alive(
+            self, 
+            websocket: ClientConnection,
+            timeout: float = 2.0
+        ) -> bool:
+        """"""
+
+        try:
+            pong = await websocket.ping()
+            await asyncio.wait_for(pong, timeout)
+            return True
+
+        except:
+            return False
+    
+
+    async def send(
+            self,
+            role: str,
+            message: Event,
+            metadata: dict[str, list[str]],
+            on_event: Callable[[Event], None],
+            on_error: Callable[[Exception], None] | None = None
+        ) -> bool:
+        """"""
+
+        ws = await self.get_websocket()
+
+        if not await self.ensure_alive(ws):
+            self.logger.debug("connection dead, reconnecting...")
+            self.websocket = None
+
+            ws = await self.get_websocket()
+
+        event = to_chat_message_event(role, message, metadata)
+
+        await ws.send(event.model_dump_json())
+        received = await receive_events(ws, on_event, on_error)
+
+        return received

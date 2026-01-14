@@ -3,7 +3,8 @@ import asyncio
 
 from fastapi import WebSocket
 
-from backend.events.parser import parse_event
+from backend.backend_utils.events.parser import parse_event
+
 from shared.events import (
     LoginCompletedEvent,
     LoginFailedEvent,

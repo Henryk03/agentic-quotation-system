@@ -7,9 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "agentic-backend"
 version = "0.1.0"
 description = "Agentic quotation system's backend server"
-readme = "./README.md"
 requires-python = ">=3.13,<3.14"
-license = { file = "./LICENSE" }
 
 authors = [
     { name = "Enrico Francesco Contessi" }
@@ -42,9 +40,6 @@ dependencies = [
 
     "agentic-shared @ git+https://github.com/Henryk03/agentic-quotation-system.git#subdirectory=shared"
 ]
-
-[project.scripts]
-agentic-backend = "backend.launch_backend:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
