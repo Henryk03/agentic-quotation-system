@@ -9,4 +9,4 @@ class ChatMessageEvent(BaseModel):
     event: Literal["chat.message"] = "chat.message"
     role: Literal["user", "assistant", "tool"]
     content: str
-    metadata: dict[str, list[str]]
+    metadata: dict[str, list[str] | str]
