@@ -1,5 +1,5 @@
 
-from backend.provider.base_provider import BaseProvider
+from shared.provider.base_provider import BaseProvider
 
 
 class ManualFallbackException(Exception):

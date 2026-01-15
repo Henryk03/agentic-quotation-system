@@ -71,7 +71,9 @@ async def websocket_chat(ws: WebSocket) -> None:
                 if raw_type == "websocket.receive":
                     if "text" in raw:
                         str_event = raw.get("text")
+                        logger.info(f"Received event as string: {str_event}")
                         event = parse_event(str_event)
+                        logger.info("Successfully converted to event")
 
                         user_message, metadata = decompose_chat_event(event)
 

@@ -3,6 +3,7 @@ import re
 import asyncio
 from pathlib import Path
 from typing import Callable
+
 from playwright.async_api import (
     Playwright, 
     Browser, 
@@ -12,15 +13,17 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError
 )
 
-from backend.provider.base_provider import BaseProvider
 from backend.backend_utils.browser.login_strategy import LoginStrategy
 from backend.backend_utils.exceptions import (
     LoginFailedException,
     ManualFallbackException
 )
 
+from shared.provider.base_provider import BaseProvider
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+
 LOG_IN_STATES_DIR = PROJECT_ROOT / "logins"
 LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
 
@@ -123,8 +126,8 @@ class AsyncBrowserContextMaganer:
             return f"Unexpected error: {e}"
 
         try:
-            # some captchas may be hidden into
-            # other html tags
+            # some captchas may be hidden
+            # into other html tags
             tag_texts = [
                 "div",
                 "img",

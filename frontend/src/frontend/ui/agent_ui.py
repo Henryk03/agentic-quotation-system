@@ -3,15 +3,13 @@ import uuid
 import asyncio
 import logging
 
-import websockets
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
-from pydantic import TypeAdapter
-from websockets import ClientConnection
 
 from frontend.frontend_utils.browser import *
 from frontend.frontend_utils.websocket.client import WSClient
-from frontend.frontend_utils.websocket.protocol import receive_events
+
+from shared.provider.registry import all_provider_names
 
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
@@ -21,57 +19,6 @@ from shared.events.auth import (
     LoginCompletedEvent,
     LoginFailedEvent,
 )
-
-
-# ==========================
-#        Page setup
-# ==========================
-
-st.set_page_config(
-    page_title="Agent Chat",
-    page_icon="🤖",
-    layout="centered",
-)
-
-st.title("🤖 Agent Chat")
-st.caption("Streamlit chatbot powered by Google Gemini")
-
-
-# ==========================
-#        Session state
-# ==========================
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-if "ui_state" not in st.session_state:
-    st.session_state.ui_state = {
-        "login_in_progress": False,
-        "login_message": None,
-        "login_url": None,
-
-        "sidebar_visible": True,
-
-        "selected_stores": ["Comet", "GruppoComet"],
-
-        "chats": {
-            "default": st.session_state.messages
-        },
-
-        "current_chat": "default",
-    }
-
-if "ws_client" not in st.session_state:
-    st.session_state.ws_client = WSClient(
-        websocket=None,
-        session_id=uuid.uuid4().hex,
-        websocket_uri="websocket://0.0.0.0:8080/websocket/chat"
-    )
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format=""
-    )
 
 
 # ==========================
@@ -90,17 +37,15 @@ def get_event_loop() -> asyncio.AbstractEventLoop:
     return st.session_state.loop
 
 
-
 # ==========================
 #      Event handling
 # ==========================
 
-def handle_event(
-        event: Event,
-        placeholder: DeltaGenerator | None = None,
-    ) -> bool:
+def handle_event(event: Event) -> bool:
     """"""
 
+    ephemeral: DeltaGenerator = st.session_state.ephemeral_container
+        
     # ==========================
     #  Chat messages (persist)
     # ==========================
@@ -109,11 +54,18 @@ def handle_event(
         st.session_state.ui_state["login_message"] = None
         st.session_state.ui_state["login_url"] = None
 
-        # tool calls will be ignored
         content = event.content
 
         if isinstance(content, list):
             content = content[0].get("text")
+
+        if ephemeral:
+            ephemeral.markdown(content)
+            st.session_state.ephemeral_container = None
+
+        else:
+            with st.chat_message(event.role):
+                st.markdown(content)        
 
         st.session_state.messages.append(
             {
@@ -165,10 +117,7 @@ def handle_event(
 def on_event(event: Event) -> None:
     """"""
 
-    handle_event(
-        event,
-        st.session_state.status_placeholder
-    )
+    handle_event(event)
 
 
 def on_error(exception: Exception) -> None:
@@ -178,56 +127,117 @@ def on_error(exception: Exception) -> None:
 
 
 # ==========================
-#      Header controls
+#        Session state
 # ==========================
 
-col1, col2, col3 = st.columns([1, 1, 2])
+if "chat_id" not in st.session_state:
+    st.session_state.chat_id = uuid.uuid4().hex
 
-with col1:
-    if st.button("📁 Sidebar"):
-        st.session_state.ui_state["sidebar_visible"] = (
-            not st.session_state.ui_state["sidebar_visible"]
-        )
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-with col2:
-    if st.button("\u2795 Nuova Chat"):
-        chat_id = uuid.uuid4().hex
+if "ephemeral_container" not in st.session_state:
+    st.session_state.ephemeral_container = None
 
-        st.session_state.ui_state["chats"][chat_id] = []
-        st.session_state.ui_state["current_chat"] = chat_id
-        st.session_state.messages = []
-
-        st.rerun()
-
-with col3:
-    st.session_state.ui_state["selected_stores"] = st.multiselect(
-        "Store",
-        options=["Comet", "GruppoComet"],
-        default=st.session_state.ui_state["selected_stores"],
-        label_visibility="collapsed",
+if "ws_client" not in st.session_state:
+    st.session_state.ws_client = WSClient(
+        websocket=None,
+        session_id=uuid.uuid4().hex,
+        websocket_uri="ws://0.0.0.0:8080/ws/chat"
     )
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format=""
+    )
+
+if "ui_state" not in st.session_state:
+    st.session_state.ui_state = {
+        "login_in_progress": False,
+        "login_message": None,
+        "login_url": None,
+
+        "sidebar_visible": True,
+
+        "selected_stores": [],
+        "store_dialog_open": False,
+
+        "chats": {
+            "Chat - 1": st.session_state.messages
+        },
+
+        "current_chat": "Chat - 1",
+    }
+
+
+# ==========================
+#        Page setup
+# ==========================
+
+st.set_page_config(
+    page_title="Agent Chat",
+    page_icon="🤖",
+    layout="centered",
+)
+
+st.title("🤖 Agent Chat")
+st.caption("Streamlit chatbot powered by Google Gemini")
 
 
 # ==========================
 #          Sidebar
 # ==========================
 
-if st.session_state.ui_state["sidebar_visible"]:
-    with st.sidebar:
-        st.header("Chat")
+with st.sidebar:
+    st.title("Settings")
 
-        for chat_id in st.session_state.ui_state["chats"]:
-            if st.button(f"💬 {chat_id}", key=f"chat-{chat_id}"):
-                st.session_state.ui_state["current_chat"] = chat_id
-                st.session_state.messages = (
-                    st.session_state.ui_state["chats"][chat_id]
-                )
-                st.rerun()
+    if st.button("🛒 Select Store", use_container_width=True):
+        st.session_state.ui_state["store_dialog_open"] = True
+        st.rerun()
 
-        st.divider()
+    st.divider()
 
-        if st.button("🧹 Clear chat"):
-            st.session_state.messages = []
+    st.title("Chats")
+
+    if st.button("\u2795 New Chat", use_container_width=True):
+        num_chat = len(st.session_state.ui_state["chats"].keys()) + 1
+        chat_name = f"Chat - {num_chat}"
+
+        new_chat_id = uuid.uuid4().hex
+
+        st.session_state.chat_id = new_chat_id
+        st.session_state.ui_state["chats"][chat_name] = []
+        st.session_state.ui_state["current_chat"] = chat_name
+        st.session_state.messages = st.session_state.ui_state["chats"][chat_name]
+
+        st.rerun()
+
+    if st.button("🧹 Clear Chat", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+
+    if st.button("🗑️ Delete All Chats", use_container_width=True):
+        new_chat_id = uuid.uuid4().hex
+
+        st.session_state.chat_id = new_chat_id
+        st.session_state.messages = []
+
+        st.session_state.ui_state["chats"] = {
+            "Chat - 1": st.session_state.messages
+        }
+        st.session_state.ui_state["current_chat"] = "Chat - 1"
+
+        st.rerun()
+
+    st.divider()
+
+    for chat_name in st.session_state.ui_state["chats"]:
+        if st.button(f"💬 {chat_name}", use_container_width=True):
+            st.session_state.ui_state["current_chat"] = chat_name
+            st.session_state.messages = (
+                st.session_state.ui_state["chats"][chat_name]
+            )
+
             st.rerun()
 
 
@@ -241,7 +251,45 @@ for msg in st.session_state.messages:
 
 
 # ==========================
-#        Chat input
+#   Store selection dialog
+# ==========================
+
+@st.dialog("Select Store")
+def store_selector_dialog() -> None:
+    """"""
+
+    st.multiselect(
+        "Select one or more stores or type to add new ones...",
+        options=all_provider_names(),
+        key="store_multiselect",
+        accept_new_options=True
+    )
+    st.caption((
+        "⚠️ *Note: Searching within manually added stores "
+        "take longer to process.*"
+    ))
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("✅ Confirm"):
+            st.session_state.ui_state["selected_stores"] = (
+                st.session_state.store_multiselect
+            )
+            st.session_state.ui_state["store_dialog_open"] = False
+            st.rerun()
+
+    with col2:
+        if st.button("❌ Cancel"):
+            st.session_state.ui_state["store_dialog_open"] = False
+            st.rerun()
+
+if st.session_state.ui_state["store_dialog_open"]:
+    store_selector_dialog()
+
+
+# ==========================
+#       Send message
 # ==========================
 
 prompt: str | None = st.chat_input("Type a message...")
@@ -257,23 +305,30 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    assistant_msg = st.chat_message("assistant")
+    st.session_state.ephemeral_container = assistant_msg.empty()
+
+    with st.session_state.ephemeral_container:
+        with st.spinner("Thinking..."):
+            import time
+            time.sleep(1)
+
+    metadata = {
+        "selected_stores": st.session_state.ui_state["selected_stores"],
+        "chat_id": st.session_state.chat_id
+    }
+
     try:
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
+        received_events = get_event_loop().run_until_complete(
+            st.session_state.ws_client.send(
+                role="user",
+                message=prompt,
+                metadata=metadata,
+                on_event=on_event,
+                on_error=on_error,
+            )
+        )
 
-                metadata = {
-                    "selected_stores": st.session_state.ui_state["selected_store"]
-                }
-
-                received_events = get_event_loop().run_until_complete(
-                    st.session_state.ws_client.send(
-                        prompt,
-                        metadata,
-                        on_event,
-                        on_error
-                    )
-                )
-        
         if received_events:
             st.rerun()
         

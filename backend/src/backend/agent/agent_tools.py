@@ -13,19 +13,21 @@ from playwright.async_api import (
 )
 
 from backend.agent.prompts import USER_PROMPT
-from backend.provider.base_provider import BaseProvider
+from backend.backend_utils.common.lists import SafeAsyncList
+from backend.backend_utils.exceptions import LoginFailedException
 from backend.backend_utils.browser.login_strategy import LoginStrategy
 from backend.backend_utils.browser.context_manager import AsyncBrowserContextMaganer
-from backend.backend_utils.exceptions import LoginFailedException
-from backend.backend_utils.common.lists import SafeAsyncList
 from backend.backend_utils.computer_use.functions import (
     execute_function_calls,
     get_function_responses
 )
 
+from shared.provider.base_provider import BaseProvider
+
 
 async def search_products(
-        products: list[str]
+        products: list[str],
+        providers: list[str]
     ) -> str:
     """
     Perform web search for each product in the given list.
@@ -34,22 +36,28 @@ async def search_products(
         products (list[str]):
             A list of product names or keywords to search for.
 
+        providers (list[str]):
+            A list of specific provider names where the search 
+            should be restricted.
+
     Returns:
         str:
             A formatted string containing the information found 
             for each product.
     """
 
-    from backend.provider.registry import all_providers
+    from shared.provider.registry import all_providers
     
     web_search_results_list = SafeAsyncList()
+
+    # fare controllo var d'ambiente se debug (CLI) o meno (UI)
 
     async with async_playwright() as apw:
 
         browser_context_manager = AsyncBrowserContextMaganer(apw)
         provider_page = []
 
-        for provider in all_providers():
+        for provider in providers:
             try:
                 context = await browser_context_manager.ensure_provider_context(
                     provider,

@@ -30,11 +30,13 @@ class WSClient:
         self.logger = logger
 
     
-    async def connect(self) -> ClientConnection | None:
+    async def connect(self) -> ClientConnection:
         """"""
 
         ws_uri = self.websocket_uri
         s_id = self.session_id
+        
+        # inserire la lingua nell'.env al setup
 
         url = f"{ws_uri}?session={s_id}"
 
@@ -51,7 +53,8 @@ class WSClient:
                 await asyncio.sleep(2)
 
         self.logger.error(f"connection to {ws_uri} failed")
-        return
+
+        raise Exception("Unable to connect to server")
 
 
     async def get_websocket(self) -> ClientConnection:
@@ -62,9 +65,7 @@ class WSClient:
         ws = self.websocket
 
         if ws is None or ws.close_code is not None:
-            self.logger.info("connection closed")
             ws = await self.connect()
-            self.logger.debug("successfully reconnected")
 
             self.websocket = ws
 
@@ -94,7 +95,7 @@ class WSClient:
             self,
             role: str,
             message: Event,
-            metadata: dict[str, list[str]],
+            metadata: dict[str, list[str] | str],
             on_event: Callable[[Event], None],
             on_error: Callable[[Exception], None] | None = None
         ) -> bool:

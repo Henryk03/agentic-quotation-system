@@ -1,5 +1,5 @@
 
-from backend.provider.registry import all_providers_string
+from shared.provider.registry import all_provider_names
 
 
 """Default prompts used by the agent"""
@@ -24,7 +24,7 @@ SYSTEM_PROMPT = (
     "only (do NOT include words like 'storage' or 'ram').\n"
     "Determine whether the user wants to search for items on a specific website. "
     "If the website mentioned by the user is included in the supported providers: "
-    f"{all_providers_string()}, then use the `supported_website_search` tool. "
+    f"{", ".join(all_provider_names())}, then use the `supported_website_search` tool. "
     "If the website is not in the supported list, use the "
     "`search_products_with_computer_use` tool to perform a general search on the "
     "user-specified site.\n"
