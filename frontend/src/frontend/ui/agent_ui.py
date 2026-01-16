@@ -60,12 +60,7 @@ def handle_event(event: Event) -> bool:
             content = content[0].get("text")
 
         if ephemeral:
-            ephemeral.markdown(content)
-            st.session_state.ephemeral_container = None
-
-        else:
-            with st.chat_message(event.role):
-                st.markdown(content)        
+            ephemeral.markdown(content)       
 
         st.session_state.messages.append(
             {
@@ -73,6 +68,8 @@ def handle_event(event: Event) -> bool:
                 "content": content,
             }
         )
+
+        st.session_state.ephemeral_container = None
 
         return True
 
@@ -258,9 +255,15 @@ for msg in st.session_state.messages:
 def store_selector_dialog() -> None:
     """"""
 
+    base_options: list[str] = all_provider_names()
+    current_selection: list[str] = st.session_state.ui_state["selected_stores"]
+
+    full_options: list[str] = list(set(base_options + current_selection))
+
     st.multiselect(
         "Select one or more stores or type to add new ones...",
-        options=all_provider_names(),
+        options=full_options,
+        default=current_selection,
         key="store_multiselect",
         accept_new_options=True
     )
@@ -284,6 +287,8 @@ def store_selector_dialog() -> None:
             st.session_state.ui_state["store_dialog_open"] = False
             st.rerun()
 
+    st.session_state.ui_state["store_dialog_open"] = False
+
 if st.session_state.ui_state["store_dialog_open"]:
     store_selector_dialog()
 
@@ -306,12 +311,9 @@ if prompt:
         st.markdown(prompt)
 
     assistant_msg = st.chat_message("assistant")
-    st.session_state.ephemeral_container = assistant_msg.empty()
+    placeholder = assistant_msg.empty()
 
-    with st.session_state.ephemeral_container:
-        with st.spinner("Thinking..."):
-            import time
-            time.sleep(1)
+    st.session_state.ephemeral_container = placeholder
 
     metadata = {
         "selected_stores": st.session_state.ui_state["selected_stores"],
@@ -319,15 +321,17 @@ if prompt:
     }
 
     try:
-        received_events = get_event_loop().run_until_complete(
-            st.session_state.ws_client.send(
-                role="user",
-                message=prompt,
-                metadata=metadata,
-                on_event=on_event,
-                on_error=on_error,
+        with placeholder:
+            placeholder.markdown("Thinking...")
+            received_events = get_event_loop().run_until_complete(
+                st.session_state.ws_client.send(
+                    role="user",
+                    message=prompt,
+                    metadata=metadata,
+                    on_event=on_event,
+                    on_error=on_error,
+                )
             )
-        )
 
         if received_events:
             st.rerun()
