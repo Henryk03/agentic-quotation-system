@@ -98,8 +98,9 @@ def main():
     venv_path = Path(__file__).parent / ".venv"
     if not venv_path.exists():
         print("📁 Creating virtual environment...")
-        if not run_command([sys.executable, "-m", "venv", ".venv"], 
-                          "Virtual environment creation"):
+        if not run_command(
+            [sys.executable, "-m", "venv", ".venv"], 
+            "Virtual environment creation"):
             return 1
     else:
         print("✓ Virtual environment already exists")

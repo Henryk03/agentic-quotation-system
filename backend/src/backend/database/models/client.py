@@ -31,4 +31,13 @@ class Client(Base):
         onupdate=func.now()
     )
 
-    chats = relationship("Chat", back_populates="client", cascade="all, delete-orphan")
+    chats = relationship(
+        "Chat", 
+        back_populates="client", 
+        cascade="all, delete-orphan"
+    )
+    credentials = relationship(
+        "Credential", 
+        back_populates="client", 
+        cascade="all, delete-orphan"
+    )

@@ -12,6 +12,14 @@ from backend.backend_utils.events.dispatcher import dispatch_chat
 from backend.backend_utils.events.unpacker import decompose_chat_event
 from backend.backend_utils.connection.connection_manager import ConnectionManager
 
+from backend.database.engine import SessionLocal
+from backend.database.repositories import (
+    client_repo,
+    chat_repo,
+    message_repo,
+    credential_repo
+)
+
 
 logger = logging.getLogger("agent-server")
 LOGGER_FORMAT = "%(levelname)s:     %(message)s"
@@ -71,17 +79,47 @@ async def websocket_chat(ws: WebSocket) -> None:
                 if raw_type == "websocket.receive":
                     if "text" in raw:
                         str_event = raw.get("text")
-                        logger.info(f"Received event as string: {str_event}")
                         event = parse_event(str_event)
-                        logger.info("Successfully converted to event")
-
                         user_message, metadata = decompose_chat_event(event)
+
+                        chat_id = metadata.get("chat_id")
+                        credentials = metadata.get("credentials")
+                        selected_stores = metadata.get("selected_stores")
+
+                        with SessionLocal() as db:
+                            _ = client_repo.get_or_create_client(
+                                db,
+                                session_id
+                            )
+                            _ = chat_repo.get_or_create_chat(
+                                db,
+                                chat_id,
+                                session_id
+                            )
+
+                            message_repo.save_message(
+                                db,
+                                session_id,
+                                chat_id,
+                                event.role,
+                                event.content
+                            )
+
+                            for store, creds in credentials:
+                                credential_repo.upsert_credentials(
+                                    db,
+                                    session_id,
+                                    store,
+                                    creds["username"],
+                                    creds["password"]
+                                )
 
                         await dispatch_chat(
                             agent,
                             user_message,
                             session_id,
-                            metadata,
+                            chat_id,
+                            selected_stores,
                             ws
                         )
 

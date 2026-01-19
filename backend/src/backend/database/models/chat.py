@@ -9,12 +9,14 @@ class Chat(Base):
 
     __tablename__ = "chats"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-
-    chat_id: Mapped[str] = mapped_column(String)
+    chat_id: Mapped[str] = mapped_column(
+        String,
+        primary_key=True
+    )
 
     session_id: Mapped[str] = mapped_column(
-        ForeignKey("clients.session_id")
+        ForeignKey("clients.session_id"),
+        primary_key=True
     )
 
     created_at: Mapped[str] = mapped_column(
@@ -24,7 +26,3 @@ class Chat(Base):
 
     client = relationship("Client", back_populates="chats")
     messages = relationship("Message", back_populates="chat", cascade="all, delete-orphan")
-
-    __table_args__ = (
-        UniqueConstraint("session_id", "chat_id")
-    )

@@ -52,8 +52,10 @@ async def search_products(
 
     # fare controllo var d'ambiente se debug (CLI) o meno (UI)
 
-    async with async_playwright() as apw:
+    # cambiare implementazione in modo che computer use venga
+    # utilizzata quando gli store selezionati NON sono supportati
 
+    async with async_playwright() as apw:
         browser_context_manager = AsyncBrowserContextMaganer(apw)
         provider_page = []
 

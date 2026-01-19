@@ -9,7 +9,7 @@ from streamlit.delta_generator import DeltaGenerator
 from frontend.frontend_utils.browser import *
 from frontend.frontend_utils.websocket.client import WSClient
 
-from shared.provider.registry import all_provider_names
+from shared.provider.registry import all_provider_names, support_autologin
 
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
@@ -158,6 +158,13 @@ if "ui_state" not in st.session_state:
 
         "selected_stores": [],
         "store_dialog_open": False,
+        "autologin_dialog_open": False,
+
+        "autologin": {
+            "pending_stores": [],
+            "current_store": None,
+            "credentials": {}
+        },
 
         "chats": {
             "Chat - 1": st.session_state.messages
@@ -197,8 +204,7 @@ with st.sidebar:
     st.title("Chats")
 
     if st.button("\u2795 New Chat", use_container_width=True):
-        num_chat = len(st.session_state.ui_state["chats"].keys()) + 1
-        chat_name = f"Chat - {num_chat}"
+        chat_name = f"Chat - {len(st.session_state.ui_state["chats"]) + 1}"
 
         new_chat_id = uuid.uuid4().hex
 
@@ -210,7 +216,11 @@ with st.sidebar:
         st.rerun()
 
     if st.button("🧹 Clear Chat", use_container_width=True):
-        st.session_state.messages = []
+        current = st.session_state.ui_state["current_chat"]
+
+        st.session_state.ui_state["chats"][current].clear()
+        st.session_state.messages = st.session_state.ui_state["chats"][current]
+
         st.rerun()
 
     if st.button("🗑️ Delete All Chats", use_container_width=True):
@@ -251,6 +261,62 @@ for msg in st.session_state.messages:
 #   Store selection dialog
 # ==========================
 
+@st.dialog("Auto-login credentials")
+def insert_autologin_credentials() -> None:
+    """"""
+
+    state = st.session_state.ui_state["autologin"]
+    store = state["current_store"]
+
+    st.markdown(f"### Login credentials for **{store}**")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    col1, col2 = st.columns(2)
+    show_err_message = False
+
+    with col1:
+        if st.button("💾 Save"):
+            if username.strip() == "" or password.strip() == "":
+                show_err_message = True
+            
+            else:
+                state["credentials"][store] = {
+                    "username": username,
+                    "password": password
+                }
+
+                state["pending_stores"].remove(store)
+                state["current_store"] = (
+                    state["pending_stores"][0]
+                    if state["pending_stores"] else None
+                )
+
+                if not state["current_store"]:
+                    st.session_state.ui_state["autologin_dialog_open"] = False
+
+                st.rerun()
+
+    with col2:
+        if st.button("↪️ Skip"):
+            state["pending_stores"].remove(store)
+            state["current_store"] = (
+                state["pending_stores"][0]
+                if state["pending_stores"] else None
+            )
+
+            if not state["current_store"]:
+                st.session_state.ui_state["autologin_dialog_open"] = False
+
+            st.rerun()
+
+    if show_err_message:
+        st.error(
+            "⛔️ Please set both **Username** and **Password** to save."
+        )
+
+
 @st.dialog("Select Store")
 def store_selector_dialog() -> None:
     """"""
@@ -276,10 +342,24 @@ def store_selector_dialog() -> None:
 
     with col1:
         if st.button("✅ Confirm"):
-            st.session_state.ui_state["selected_stores"] = (
-                st.session_state.store_multiselect
+            selected = st.session_state.store_multiselect
+
+            st.session_state.ui_state["selected_stores"] = selected
+
+            autologin_stores: list[str] = [
+                s for s in selected if support_autologin(s)
+            ]
+
+            st.session_state.ui_state["autologin"]["pending_stores"] = autologin_stores
+            st.session_state.ui_state["autologin"]["current_store"] = (
+                autologin_stores[0] if autologin_stores else None
             )
+
             st.session_state.ui_state["store_dialog_open"] = False
+            st.session_state.ui_state["autologin_dialog_open"] = bool(
+                autologin_stores
+            )
+
             st.rerun()
 
     with col2:
@@ -291,6 +371,9 @@ def store_selector_dialog() -> None:
 
 if st.session_state.ui_state["store_dialog_open"]:
     store_selector_dialog()
+
+if st.session_state.ui_state["autologin_dialog_open"]:
+    insert_autologin_credentials()
 
 
 # ==========================
@@ -317,7 +400,8 @@ if prompt:
 
     metadata = {
         "selected_stores": st.session_state.ui_state["selected_stores"],
-        "chat_id": st.session_state.chat_id
+        "chat_id": st.session_state.chat_id,
+        "credentials": st.session_state.ui_state["autologin"]["credentials"]
     }
 
     try:

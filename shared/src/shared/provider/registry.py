@@ -1,4 +1,6 @@
 
+import asyncio
+
 from shared.provider.base_provider import BaseProvider
 from shared.provider.providers import comet, gruppo_comet
 
@@ -43,8 +45,8 @@ def support_autologin(provider: str) -> bool:
     """"""
 
     if provider in PROVIDER_REGISTRY:
-        istance: BaseProvider = PROVIDER_REGISTRY[provider]()
+        instance: BaseProvider = PROVIDER_REGISTRY[provider]()
 
-        return istance.has_auto_login()
+        return instance.has_auto_login()
     
     return False

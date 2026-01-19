@@ -369,7 +369,9 @@ class AsyncBrowserContextMaganer:
     async def ensure_provider_context(
             self,
             provider: BaseProvider,
-            login_strategy: LoginStrategy = LoginStrategy.AUTO
+            login_strategy: LoginStrategy = (
+                LoginStrategy.AUTO if testing else LoginStrategy.MANUAL_EXTERNAL
+            )
         ) -> BrowserContext:
         """
         Return an instanse of `BrowserContext` to be used to navigate the 
@@ -395,8 +397,8 @@ class AsyncBrowserContextMaganer:
         page = None
         
         try:
-            # manual login if `state_path`` is absent AND login is required
-            if not state_path.exists() and provider.login_required:
+            # manual login if `state_path` is absent AND login is required
+            if not state_path.exists() and provider.login_required:             # cambiare!!!
                 try:
                     raise ManualFallbackException(provider)
                 except:

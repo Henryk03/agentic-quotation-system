@@ -106,7 +106,7 @@ class BaseProvider:
 
         
 
-    async def has_auto_login(self) -> bool:
+    def has_auto_login(self) -> bool:
         """
         Determine whether the current `BaseProvider` instance provides
         its own implementation of the `auto_login` method. This is true

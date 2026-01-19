@@ -8,6 +8,9 @@ from langchain_core.messages import (
     BaseMessage
 )
 
+from backend.database.engine import SessionLocal
+from backend.database.repositories import message_repo
+
 from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
 from shared.events.auth import (
@@ -50,16 +53,26 @@ def langchain_message_to_event(message: BaseMessage) -> ChatMessageEvent | None:
 
 async def emit_message(
         websocket: WebSocket,
-        *,
-        message: BaseMessage
+        message: BaseMessage,
+        session_id: str,
+        chat_id: str
     ) -> None:
-    """Invia una lista di messaggi LangChain come eventi websocket."""
+    """"""
 
     try:
         event = langchain_message_to_event(message)
 
         if not event:
             return 
+        
+        with SessionLocal() as db:
+            message_repo.save_message(
+                db,
+                session_id,
+                chat_id,
+                event.role,
+                event.content
+            )
 
         await websocket.send_text(event.model_dump_json())
 
@@ -70,7 +83,6 @@ async def emit_message(
 
 async def emit_login_required(
         websocket: WebSocket,
-        *,
         provider: str,
         login_url: str
     ) -> None:
@@ -86,7 +98,6 @@ async def emit_login_required(
 
 async def emit_login_completed(
         websocket: WebSocket,
-        *,
         provider: str
     ) -> None:
     """"""
@@ -97,7 +108,6 @@ async def emit_login_completed(
 
 async def emit_login_failed(
         websocket: WebSocket,
-        *,
         provider: str,
         reason: str | None = None
     ) -> None:

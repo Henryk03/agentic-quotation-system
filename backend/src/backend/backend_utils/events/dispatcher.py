@@ -47,17 +47,11 @@ async def dispatch_chat(
         agent: Runnable,
         user_input: str,
         session_id: str,
-        metadata: dict[str, list[str] | str],
+        chat_id: str,
+        selected_stores: list[str],
         websocket: WebSocket,
     ) -> None:
-    """
-    Gestisce una richiesta chat:
-    - invia input a LangChain
-    - streamma gli eventi verso il client
-    """
-
-    chat_id: str = metadata["chat_id"]
-    selected_stores: list[str] = metadata["selected_stores"]
+    """"""
 
     user_message: str = await __format_message(
         user_input,
@@ -73,12 +67,17 @@ async def dispatch_chat(
 
             for _, data in state.items():
                 message = data["messages"][-1]
-                is_tool_call = message.content == ""
+                is_tool_call = message.content.strip() == ""
 
                 if is_tool_call:
                     continue
 
-                await emit_message(websocket, message=message)
+                await emit_message(
+                    websocket,
+                    message,
+                    session_id,
+                    chat_id
+                )
 
     except ManualFallbackException as mfe:
         await emit_login_required(
