@@ -37,3 +37,14 @@ def get_provider_registry() -> dict[str, BaseProvider]:
     """"""
 
     return PROVIDER_REGISTRY
+
+
+def support_autologin(provider: str) -> bool:
+    """"""
+
+    if provider in PROVIDER_REGISTRY:
+        istance: BaseProvider = PROVIDER_REGISTRY[provider]()
+
+        return istance.has_auto_login()
+    
+    return False
