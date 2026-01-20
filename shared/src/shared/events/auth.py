@@ -17,7 +17,7 @@ class LoginCompletedEvent(BaseModel):
 
     event: Literal["login.completed"] = "login.completed"
     provider: str
-    message: str
+    state: str
 
 
 class LoginFailedEvent(BaseModel):
@@ -26,3 +26,11 @@ class LoginFailedEvent(BaseModel):
     event: Literal["login.failed"] = "login.failed"
     provider: str
     reason: str | None = None
+
+
+class AutoLoginCredentialsEvent(BaseModel):
+    """"""
+
+    event: Literal["autologin.credential.provided", "autologin.credentials.received"]
+    provider: str
+    credentials: dict | None

@@ -8,8 +8,8 @@ from contextlib import asynccontextmanager
 
 from backend.agent.main_agent import graph as agent
 from backend.backend_utils.events.parser import parse_event
+from backend.backend_utils.events.handler import EventHandler
 from backend.backend_utils.events.dispatcher import dispatch_chat
-from backend.backend_utils.events.unpacker import decompose_chat_event
 from backend.backend_utils.connection.connection_manager import ConnectionManager
 
 from backend.database.engine import SessionLocal
@@ -80,6 +80,17 @@ async def websocket_chat(ws: WebSocket) -> None:
                     if "text" in raw:
                         str_event = raw.get("text")
                         event = parse_event(str_event)
+
+                        with SessionLocal() as db:
+                            EventHandler.handle_event(
+                                db,
+                                event,
+                                session_id
+                            )
+
+                        # spostare agente e dispatch nell'handler e snellire il
+                        # server in modo che faccia da ponte tra UI e backend "vero"
+
                         user_message, metadata = decompose_chat_event(event)
 
                         chat_id = metadata.get("chat_id")
@@ -104,6 +115,8 @@ async def websocket_chat(ws: WebSocket) -> None:
                                 event.role,
                                 event.content
                             )
+
+                            if credential_repo.get_credentials
 
                             for store, creds in credentials:
                                 credential_repo.upsert_credentials(
@@ -153,6 +166,8 @@ async def start_server(host: str, port: str) -> None:
         log_level="critical",
         lifespan="on"
     )
+
+    print("📣 Ready for connections (Press Ctrl+C to stop)")
 
     server = uvicorn.Server(config)
     await server.serve()

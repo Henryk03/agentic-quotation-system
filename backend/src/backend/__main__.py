@@ -1,83 +1,54 @@
-"""Entry point for backend server"""
 
-import os
 import sys
 import asyncio
-from pathlib import Path
-from dotenv import load_dotenv
 
-def load_environment():
-    """Load environment variables from .env"""
-    backend_root = Path(__file__).parent.parent.parent
-    env_path = backend_root / ".env"
-    
-    if env_path.exists():
-        load_dotenv(env_path)
-        print("✅ Environment variables loaded from .env")
-    else:
-        print("⚠️  .env file not found, using system environment variables")
+from backend.config import settings
 
-def validate_config():
-    """Validate required configuration"""
-    api_key = os.getenv("GOOGLE_API_KEY")
-    
-    if not api_key or api_key == "your_api_key_here":
-        print("❌ GOOGLE_API_KEY not configured in .env!")
-        print("   Please edit .env and add your API key")
-        return False
-    
-    return True
-
-def print_config():
-    """Print current configuration"""
-    host = os.getenv("HOST", "0.0.0.0")
-    port = os.getenv("PORT", "8080")
-    headless = os.getenv("HEADLESS", "true").lower() == "true"
-    
-    print(f"🔧 Configuration:")
-    print(f"   Host: {host}")
-    print(f"   Port: {port}")
-    print(f"   Headless: {headless}")
 
 async def async_main():
-    """Async main entry point"""
     print("🔧 Initializing Agentic Backend Server...")
     
-    # Load environment
-    load_environment()
+    is_valid, errors = settings.validate()
     
-    # Validate configuration
-    if not validate_config():
+    if not is_valid:
+        print("❌ Configuration errors found:")
+
+        for error in errors:
+            print(f"   - {error}")
+
+        print("\n💡 Please edit your .env file to fix these issues.")
         return 1
     
-    # Get configuration
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
+    print(f"✅ Configuration validated.")
+    print(f"✅ Configuration loaded from .env\n")
+
+    print(f"🔧 Settings: ")
+    print("   Host={settings.HOST}")
+    print("   Port={settings.PORT}")
+    print("   Headless={settings.HEADLESS}")
     
-    print_config()
-    
-    # Import and start server
-    print(f"\n🚀 Starting server on {host}:{port}...\n")
+    print(f"\n🚀 Starting server on {settings.HOST}:{settings.PORT}...")
+
     from backend.server.websocket_server import start_server
     
     try:
-        await start_server(host=host, port=port)
-    except KeyboardInterrupt:
-        print("\n\n👋 Server stopped by user")
+        await start_server(host=settings.HOST, port=settings.PORT)
+
     except Exception as e:
         print(f"\n❌ Server error: {e}")
         return 1
     
     return 0
 
+
 def main():
-    """Synchronous entry point that runs async_main"""
     try:
-        exit_code = asyncio.run(async_main())
-        return exit_code
+        sys.exit(asyncio.run(async_main()))
+        
     except KeyboardInterrupt:
         print("\n\n👋 Shutdown requested")
-        return 0
+        sys.exit(0)
+
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

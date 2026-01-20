@@ -13,7 +13,11 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError
 )
 
-from backend.backend_utils.browser.login_strategy import LoginStrategy
+from backend.config import settings
+from backend.database.engine import SessionLocal
+from backend.database.repositories import credential_repo
+from backend.database.repositories import browser_context_repo
+from backend.backend_utils.signals.login_required import LoginRequiredSignal
 from backend.backend_utils.exceptions import (
     LoginFailedException,
     ManualFallbackException
@@ -22,10 +26,11 @@ from backend.backend_utils.exceptions import (
 from shared.provider.base_provider import BaseProvider
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+if settings.CLI_MODE:
+    BACKEND_ROOT = Path(__file__).resolve().parents[4]
 
-LOG_IN_STATES_DIR = PROJECT_ROOT / "logins"
-LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
+    LOG_IN_STATES_DIR = BACKEND_ROOT / ".logins"
+    LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
 
 SCREEN_WIDTH = 1440
 SCREEN_HEIGHT = 900
@@ -36,7 +41,7 @@ class AsyncBrowserContextMaganer:
     Class to manage asynchronous login actions in websites
     
     Attributes:
-        apw (Playwright):
+        async_playwright (Playwright):
             An asynchronous playwright context manager.
     """
 
@@ -45,9 +50,22 @@ class AsyncBrowserContextMaganer:
     _manual_login_lock = asyncio.Lock()
 
 
-    def __init__(self, playwright: Playwright):
-        self.apw = playwright
-    
+    def __init__(
+            self,
+            playwright: Playwright, 
+            session_id: str | None = None
+        ):
+
+        self.async_playwright = playwright
+        self.session_id = session_id
+
+
+    @staticmethod
+    def is_cli_mode() -> bool:
+        """"""
+
+        return settings.CLI_MODE
+
 
     @staticmethod
     def __state_path(provider: BaseProvider) -> Path:
@@ -66,6 +84,38 @@ class AsyncBrowserContextMaganer:
     
 
     @staticmethod
+    def __get_current_state(
+            session_id: str | None,
+            provider: str
+        ) -> Path | dict | None:
+        """"""
+
+        if AsyncBrowserContextMaganer.is_cli_mode():
+            path = AsyncBrowserContextMaganer.__state_path(provider)
+            return path
+
+        else:
+            with SessionLocal() as db:
+                if session_id:
+                    ctx = browser_context_repo.get_browser_context(
+                        db,
+                        session_id,
+                        provider
+                    )
+                    return ctx
+
+                else:
+                    pass
+
+    
+    @staticmethod
+    async def __save_current_state() -> None:
+        """"""
+
+        pass
+
+    
+    @staticmethod
     async def close_page_resources(page: Page) -> None:
         """
         Clean up Playwright resources associated with the given page.
@@ -83,6 +133,7 @@ class AsyncBrowserContextMaganer:
             await page.close()
             await context.close()
             await browser.close()
+
         except:
             pass
 
@@ -281,9 +332,7 @@ class AsyncBrowserContextMaganer:
 
     async def create_browser_context(
         self,
-        *,
-        headless: bool,
-        storage_state: Path | None = None,
+        state: Path | dict | None = None,
         start_url: str | None = None
         ) -> tuple[Browser, BrowserContext, Page]:
         """
@@ -304,10 +353,12 @@ class AsyncBrowserContextMaganer:
                 The browser, its context, and the page.
         """
 
-        browser = await self.apw.chromium.launch(headless=headless)
+        browser = await self.async_playwright.chromium.launch(
+            headless=settings.HEADLESS
+        )
         context = await browser.new_context(
             storage_state=(
-                storage_state if storage_state and storage_state.exists() else None
+                state if state and state.exists() else None
             ),
             viewport={
                 "width": SCREEN_WIDTH,
@@ -324,10 +375,8 @@ class AsyncBrowserContextMaganer:
 
     async def __prepare_provider_context(
             self,
-            *,
-            headless: bool = True,
             provider: BaseProvider,
-            state_path: Path
+            state: Path | dict
         ) -> tuple[Browser, BrowserContext, Page]:
         """
         Create and initialize a new browser context for the given provider.
@@ -353,8 +402,8 @@ class AsyncBrowserContextMaganer:
         """
 
         browser, context, page = await self.create_browser_context(
-            headless=headless,
-            storage_state=state_path,
+            headless=settings.HEADLESS,
+            state=state,
             start_url=provider.url
         )
 
@@ -368,11 +417,9 @@ class AsyncBrowserContextMaganer:
 
     async def ensure_provider_context(
             self,
-            provider: BaseProvider,
-            login_strategy: LoginStrategy = (
-                LoginStrategy.AUTO if testing else LoginStrategy.MANUAL_EXTERNAL
-            )
-        ) -> BrowserContext:
+            session_id: str,
+            provider: BaseProvider
+        ) -> BrowserContext | LoginRequiredSignal:
         """
         Return an instanse of `BrowserContext` to be used to navigate the 
         given provider's website. It may require the user to manual logging-in
@@ -388,25 +435,33 @@ class AsyncBrowserContextMaganer:
 
         Returns:
             BrowserContext
-        """
+        """ 
 
-        state_path = AsyncBrowserContextMaganer.__state_path(provider)
+        state = AsyncBrowserContextMaganer.__get_current_state(
+            session_id,
+            provider
+        )
 
         browser = None
         context = None
         page = None
-        
+
         try:
-            # manual login if `state_path` is absent AND login is required
-            if not state_path.exists() and provider.login_required:             # cambiare!!!
-                try:
-                    raise ManualFallbackException(provider)
-                except:
-                    raise LoginFailedException(provider)
+            if self.is_cli_mode():
+                if not state.exists() and provider.login_required:
+                    try:
+                        self.__manual_login(provider, state)
+
+                    except:
+                        raise LoginFailedException(provider)
+                        
+            else:
+                if not state and provider.login_requried:
+                    return LoginRequiredSignal(provider)
 
             browser, context, page = await self.__prepare_provider_context(
                 provider=provider,
-                state_path=state_path
+                state=state
             )
 
             logged_in = await AsyncBrowserContextMaganer.__is_logged_in(
@@ -418,28 +473,46 @@ class AsyncBrowserContextMaganer:
                 await page.close()
                 return context
             
-            # the `auto_login` is used when the context is present, but expired
             if await provider.has_auto_login():
                 if await self.detect_captcha(page):
-                    raise ManualFallbackException(
-                        provider,
-                        "Captcha detected. Proceeding with manual login."
-                    )
+                    if self.is_cli_mode():
+                        raise ManualFallbackException(
+                            provider,
+                            "Captcha detected. Proceeding with manual login."
+                        )
+                    
+                    else:
+                        return LoginRequiredSignal(
+                            provider,
+                            "CAPTCHA_DETECTED"
+                        )
+                    
+                credentials: dict | None = None
+                    
+                if not self.is_cli_mode():
+                    with SessionLocal() as db:
+                        credentials = credential_repo.get_credentials(
+                            db,
+                            session_id,
+                            provider
+                        )
                 
                 try:
-                    await provider.auto_login(page)
+                    await provider.auto_login(page, credentials)
                     await page.wait_for_load_state("networkidle")
 
                     if await self.__is_logged_in(provider, page):
-                        # ensure the new context
-                        await context.storage_state(path=state_path)
+                        await self.__save_current_state()
+                        await context.storage_state(path=state)
                         return context
+                    
                 except:
-                    pass
+                    raise ManualFallbackException(provider)
 
-            raise ManualFallbackException(provider)
+
+                    
         
-        except ManualFallbackException as mfe:
+        except ManualFallbackException:
             if page:
                 await page.close()
             if context:
@@ -447,12 +520,7 @@ class AsyncBrowserContextMaganer:
             if browser:
                 await browser.close()
 
-            # login via streamlit (UI)
-            if login_strategy == LoginStrategy.MANUAL_EXTERNAL:
-                raise mfe
-
             try:
-                # login via chromium tab (CLI)
                 await self.__manual_login(provider, state_path)
                 _, context, _ = await self.__prepare_provider_context(
                     headless=True,

@@ -15,7 +15,7 @@ from playwright.async_api import (
 from backend.agent.prompts import USER_PROMPT
 from backend.backend_utils.common.lists import SafeAsyncList
 from backend.backend_utils.exceptions import LoginFailedException
-from backend.backend_utils.browser.login_strategy import LoginStrategy
+from backend.backend_utils.signals.login_required import LoginRequiredSignal
 from backend.backend_utils.browser.context_manager import AsyncBrowserContextMaganer
 from backend.backend_utils.computer_use.functions import (
     execute_function_calls,
@@ -26,6 +26,7 @@ from shared.provider.base_provider import BaseProvider
 
 
 async def search_products(
+        session_id: str | None, 
         products: list[str],
         providers: list[str]
     ) -> str:
@@ -45,8 +46,6 @@ async def search_products(
             A formatted string containing the information found 
             for each product.
     """
-
-    from shared.provider.registry import all_providers
     
     web_search_results_list = SafeAsyncList()
 
@@ -57,16 +56,20 @@ async def search_products(
 
     async with async_playwright() as apw:
         browser_context_manager = AsyncBrowserContextMaganer(apw)
-        provider_page = []
+        provider_page: list[tuple] = []
 
         for provider in providers:
             try:
-                context = await browser_context_manager.ensure_provider_context(
-                    provider,
-                    login_strategy=LoginStrategy.MANUAL_EXTERNAL        # DELETE this line to use the system via CLI
+                context_or_signal = await browser_context_manager.ensure_provider_context(
+                    session_id,
+                    provider
                 )
+
+                if isinstance(context_or_signal, LoginRequiredSignal):
+                    pass
+
                 provider_page.append(
-                    (provider, await context.new_page())
+                    (provider, await context_or_signal.new_page())
                 )
 
             except LoginFailedException as lfe:
@@ -193,7 +196,7 @@ async def __search_in_website(
         await result_list.add(formatted_block)
 
 
-async def search_products_with_computer_use(
+async def __search_with_computer_use(
         product_list: list[str],
         website: str
     ) -> str:
@@ -257,7 +260,8 @@ async def search_products_with_computer_use(
         ]
 
         max_iter = 10
-        for i in range(max_iter):
+
+        for _ in range(max_iter):
             model_response = client.models.generate_content(
                 model='gemini-2.5-computer-use-preview-10-2025',
                 contents=contents,

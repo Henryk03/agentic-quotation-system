@@ -213,3 +213,5 @@ __marimo__/
 # private folders
 logins/
 logs/
+.logins/
+.logs/

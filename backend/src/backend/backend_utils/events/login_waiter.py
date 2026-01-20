@@ -13,15 +13,9 @@ from shared.events import (
 
 async def wait_for_login(
         websocket: WebSocket,
-        *,
         timeout: int = 60,
     ) -> None:
-    """
-    Attende un evento di login dalla UI:
-    - login.completed → ritorna
-    - login.failed    → solleva eccezione
-    - timeout         → solleva TimeoutError
-    """
+    """"""
 
     deadline = asyncio.get_event_loop().time() + timeout
 

@@ -166,6 +166,8 @@ if "ui_state" not in st.session_state:
             "credentials": {}
         },
 
+        "send_credentials_now": False,
+
         "chats": {
             "Chat - 1": st.session_state.messages
         },
@@ -258,7 +260,7 @@ for msg in st.session_state.messages:
 
 
 # ==========================
-#   Store selection dialog
+#   Store related dialogs
 # ==========================
 
 @st.dialog("Auto-login credentials")
@@ -295,6 +297,7 @@ def insert_autologin_credentials() -> None:
 
                 if not state["current_store"]:
                     st.session_state.ui_state["autologin_dialog_open"] = False
+                    st.session_state.ui_state["send_credentials_now"] = True
 
                 st.rerun()
 
@@ -374,6 +377,14 @@ if st.session_state.ui_state["store_dialog_open"]:
 
 if st.session_state.ui_state["autologin_dialog_open"]:
     insert_autologin_credentials()
+
+if st.session_state.ui_state["send_credentials_now"]:
+    for _ in range(2):
+        received_event = get_event_loop().run_until_complete(
+            st.session_state.ws_client.send_credentials(
+                
+            )
+        )
 
 
 # ==========================

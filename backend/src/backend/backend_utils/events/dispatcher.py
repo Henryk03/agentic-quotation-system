@@ -90,14 +90,8 @@ async def dispatch_chat(
             # waiting a login-related event from the UI
             await wait_for_login(websocket)
 
-            await emit_login_completed(
-                websocket,
-                provider=mfe.name
-            )
+            # ...
 
         except Exception as login_exc:
-            await emit_login_failed(
-                websocket,
-                provider=mfe.name,
-                reason=str(login_exc)
-            )
+            # ...
+            pass

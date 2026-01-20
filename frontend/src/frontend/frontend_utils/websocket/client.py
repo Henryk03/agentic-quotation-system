@@ -94,7 +94,7 @@ class WSClient:
     async def send(
             self,
             role: str,
-            message: Event,
+            message: str,
             metadata: dict[str, list[str] | str],
             on_event: Callable[[Event], None],
             on_error: Callable[[Exception], None] | None = None
@@ -115,3 +115,13 @@ class WSClient:
         received = await receive_events(ws, on_event, on_error)
 
         return received
+    
+
+    async def send_credentials(
+            self,
+            session_id: str,
+            credentials: dict
+        ) -> None:
+        """"""
+
+        pass

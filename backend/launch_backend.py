@@ -3,47 +3,68 @@ import sys
 import platform
 import subprocess
 from pathlib import Path
+from typing import Literal
 
 
-def get_venv_python():
-    """Get the path to Python in venv."""
+sys.path.append(str(Path(__file__).parent / "src"))
+
+try:
+    from backend.config import settings
+
+except ImportError:
+    print("Error")
+    print()
+
+    sys.exit(1)
+
+
+def get_venv_python() -> Path:
+    """"""
+
     venv_path = Path(__file__).parent / ".venv"
     
     if platform.system() == "Windows":
         return venv_path / "Scripts" / "python.exe"
+    
     return venv_path / "bin" / "python"
 
 
 
-
-def main():
-    """Launch backend server using venv"""
+def main() -> Literal[1, 0]:
+    """"""
     
-    # Check if venv exists
     venv_python = get_venv_python()
     
     if not venv_python.exists():
         print("❌ Virtual environment not found!")
         print("   Please run 'python setup_backend.py' first")
+
         return 1
     
-    print("🚀 Starting backend server...\n")
+    if settings.CLI_MODE:
+        target_module = "backend.agent.main_agent"
+        print("🤖 Starting Agent in CLI mode...\n")
+
+    else:
+        target_module = "backend"
+        print("🚀 Starting Backend Server...\n")
     
     try:
-        # Execute backend module using venv's Python
-        # Questo chiama src/backend/__main__.py
         result = subprocess.run(
-            [str(venv_python), "-m", "backend"],
+            [str(venv_python), "-m", target_module],
             cwd=Path(__file__).parent
         )
-        return result.returncode
+
+        return result.returncode        # redirigere log in file.log e mostrare messaggio che server in exe!!!!
         
     except KeyboardInterrupt:
         print("\n\n👋 Backend server stopped by user")
         return 0
+    
     except Exception as e:
         print(f"\n❌ Error launching backend: {e}")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())
