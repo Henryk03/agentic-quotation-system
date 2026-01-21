@@ -103,8 +103,8 @@ class BaseProvider:
             return False
         except requests.exceptions.SSLError:    # expired certificate
             return True
-        
 
+        
     def has_auto_login(self) -> bool:
         """
         Determine whether the current `BaseProvider` instance provides

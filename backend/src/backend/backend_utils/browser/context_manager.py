@@ -30,7 +30,7 @@ if settings.CLI_MODE:
     BACKEND_ROOT = Path(__file__).resolve().parents[4]
 
     LOG_IN_STATES_DIR = BACKEND_ROOT / ".logins"
-    LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
+    LOG_IN_STATES_DIR.mkdir(0o600, exist_ok=True)
 
 SCREEN_WIDTH = 1440
 SCREEN_HEIGHT = 900
@@ -87,32 +87,85 @@ class AsyncBrowserContextMaganer:
     def __get_current_state(
             session_id: str | None,
             provider: str
-        ) -> Path | dict | None:
+        ) -> Path | tuple | None:
         """"""
 
         if AsyncBrowserContextMaganer.is_cli_mode():
             path = AsyncBrowserContextMaganer.__state_path(provider)
-            return path
+            return path if path.exists() else None
 
         else:
             with SessionLocal() as db:
                 if session_id:
-                    ctx = browser_context_repo.get_browser_context(
+                    ctx, rsn = browser_context_repo.get_browser_context(
                         db,
                         session_id,
                         provider
                     )
-                    return ctx
+                    return ctx, rsn
 
                 else:
                     pass
 
     
     @staticmethod
-    async def __save_current_state() -> None:
+    async def __save_current_state(
+        session_id: str,
+        provider: str,
+        context: BrowserContext
+    ) -> None:
         """"""
 
-        pass
+        state_dict: dict = await context.storage_state()
+
+        if AsyncBrowserContextMaganer.is_cli_mode():
+            pass        # fare caso per CLI
+
+        else:
+            with SessionLocal() as db:
+                browser_context_repo.upsert_browser_context(
+                    db,
+                    session_id,
+                    provider,
+                    state_dict
+                )
+
+
+    @staticmethod
+    async def __handle_failure(
+            provider: BaseProvider, 
+            reason: str = None
+        ) -> None | LoginRequiredSignal:
+        """"""
+
+        if AsyncBrowserContextMaganer.is_cli_mode():
+            raise ManualFallbackException(provider, reason)
+        
+        return LoginRequiredSignal(provider.name, provider.url, reason)
+    
+
+    @staticmethod
+    async def __get_creds_by_mode(
+            self,
+            session_id: str,
+            provider: str
+        ) -> dict | None:
+        """"""
+
+        credentials: dict | None = None
+
+        if not AsyncBrowserContextMaganer.is_cli_mode():
+            with SessionLocal() as db:
+                credentials = credential_repo.get_credentials(
+                    db,
+                    session_id,
+                    provider
+                )
+
+        else:
+            pass    # fare caso per cli
+
+        return credentials
 
     
     @staticmethod
@@ -437,31 +490,30 @@ class AsyncBrowserContextMaganer:
             BrowserContext
         """ 
 
-        state = AsyncBrowserContextMaganer.__get_current_state(
+        state, fail_reason = AsyncBrowserContextMaganer.__get_current_state(
             session_id,
             provider
         )
 
-        browser = None
+        if state == "LOGIN_FAILED":
+            raise LoginFailedException(provider, fail_reason)
+
         context = None
         page = None
 
         try:
-            if self.is_cli_mode():
-                if not state.exists() and provider.login_required:
-                    try:
-                        self.__manual_login(provider, state)
+            if not state and provider.login_required:
+                failure = AsyncBrowserContextMaganer.__handle_failure(
+                    provider, 
+                    "MISSING_STATE"
+                )
+                
+                if isinstance(failure, LoginRequiredSignal):
+                    return failure
 
-                    except:
-                        raise LoginFailedException(provider)
-                        
-            else:
-                if not state and provider.login_requried:
-                    return LoginRequiredSignal(provider)
-
-            browser, context, page = await self.__prepare_provider_context(
-                provider=provider,
-                state=state
+            _, context, page = await self.__prepare_provider_context(
+                provider,
+                state
             )
 
             logged_in = await AsyncBrowserContextMaganer.__is_logged_in(
@@ -475,62 +527,54 @@ class AsyncBrowserContextMaganer:
             
             if await provider.has_auto_login():
                 if await self.detect_captcha(page):
-                    if self.is_cli_mode():
-                        raise ManualFallbackException(
-                            provider,
-                            "Captcha detected. Proceeding with manual login."
-                        )
+                    raise ManualFallbackException(
+                        provider,
+                        "CAPTCHA_DETECTED"
+                    )
                     
-                    else:
-                        return LoginRequiredSignal(
-                            provider,
-                            "CAPTCHA_DETECTED"
-                        )
-                    
-                credentials: dict | None = None
-                    
-                if not self.is_cli_mode():
-                    with SessionLocal() as db:
-                        credentials = credential_repo.get_credentials(
-                            db,
-                            session_id,
-                            provider
-                        )
-                
-                try:
-                    await provider.auto_login(page, credentials)
-                    await page.wait_for_load_state("networkidle")
-
-                    if await self.__is_logged_in(provider, page):
-                        await self.__save_current_state()
-                        await context.storage_state(path=state)
-                        return context
-                    
-                except:
-                    raise ManualFallbackException(provider)
-
-
-                    
-        
-        except ManualFallbackException:
-            if page:
-                await page.close()
-            if context:
-                await context.close()
-            if browser:
-                await browser.close()
-
-            try:
-                await self.__manual_login(provider, state_path)
-                _, context, _ = await self.__prepare_provider_context(
-                    headless=True,
-                    provider=provider,
-                    state_path=state_path
+                credentials = await AsyncBrowserContextMaganer.__get_creds_by_mode(
+                    session_id,
+                    provider
                 )
-            except:
-                raise LoginFailedException(provider)
+                
+                await provider.auto_login(page, credentials)
+                await page.wait_for_load_state("networkidle")
 
-            return context
+                if await self.__is_logged_in(provider, page):
+                    await self.__save_current_state(
+                        session_id,
+                        provider,
+                        context
+                    )
+                    await AsyncBrowserContextMaganer.close_page_resources(
+                        page
+                    )
+
+                    return context
+                    
+            raise ManualFallbackException(provider)             
+        
+        except (ManualFallbackException, Exception) as e:
+            if page:
+                await AsyncBrowserContextMaganer.close_page_resources(
+                    page
+                )
+
+            if AsyncBrowserContextMaganer.is_cli_mode():
+                try:
+                    await self.__manual_login(provider, state)
+                    _, context, _ = await self.__prepare_provider_context(
+                        headless=True,
+                        provider=provider,
+                        state_path=state
+                    )
+
+                except:
+                    raise LoginFailedException(provider)
+
+                return context
+            
+            return LoginRequiredSignal(provider, str(e))
 
 
     async def __manual_login(

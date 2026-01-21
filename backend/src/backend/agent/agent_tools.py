@@ -15,6 +15,7 @@ from playwright.async_api import (
 from backend.agent.prompts import USER_PROMPT
 from backend.backend_utils.common.lists import SafeAsyncList
 from backend.backend_utils.exceptions import LoginFailedException
+from backend.backend_utils.signals.login_failed import LoginFailedSignal
 from backend.backend_utils.signals.login_required import LoginRequiredSignal
 from backend.backend_utils.browser.context_manager import AsyncBrowserContextMaganer
 from backend.backend_utils.computer_use.functions import (
@@ -49,13 +50,11 @@ async def search_products(
     
     web_search_results_list = SafeAsyncList()
 
-    # fare controllo var d'ambiente se debug (CLI) o meno (UI)
-
-    # cambiare implementazione in modo che computer use venga
-    # utilizzata quando gli store selezionati NON sono supportati
-
     async with async_playwright() as apw:
-        browser_context_manager = AsyncBrowserContextMaganer(apw)
+        browser_context_manager = AsyncBrowserContextMaganer(
+            apw,
+            session_id if session_id else None
+        )
         provider_page: list[tuple] = []
 
         for provider in providers:
@@ -66,7 +65,7 @@ async def search_products(
                 )
 
                 if isinstance(context_or_signal, LoginRequiredSignal):
-                    pass
+                    return context_or_signal
 
                 provider_page.append(
                     (provider, await context_or_signal.new_page())

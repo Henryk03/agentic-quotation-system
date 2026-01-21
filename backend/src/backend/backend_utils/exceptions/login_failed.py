@@ -17,11 +17,21 @@ class LoginFailedException(Exception):
     """
 
 
-    def __init__(self, provider: BaseProvider):
+    def __init__(
+            self,
+            provider: BaseProvider,
+            reason: str | None = None
+        ):
+
         self.provider = provider
-        super().__init__(
-            (
-                f"Login failed while logging into '{provider.name}'. "
-                "Please try again."
-            )
-        )
+        self.reason = reason
+
+        base_message = f"Login failed while logging into {provider.name}."
+
+        if reason:
+            full_message = f"{base_message} Reason: {reason}."
+
+        else:
+            full_message = f"{base_message} Please try again."
+
+        super().__init__(full_message)

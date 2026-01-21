@@ -5,16 +5,12 @@ from fastapi import WebSocket
 from langchain_core.runnables import Runnable
 from langchain_core.messages import HumanMessage
 
+from backend.backend_utils.events.emitter import EventEmitter
+from backend.backend_utils.signals.login_required import LoginRequiredSignal
 from backend.backend_utils.events.login_waiter import wait_for_login
 from backend.backend_utils.exceptions import (
     LoginFailedException,
     ManualFallbackException
-)
-from backend.backend_utils.events.emitter import (
-    emit_message, 
-    emit_login_required,
-    emit_login_completed,
-    emit_login_failed
 )
 
 
@@ -66,32 +62,29 @@ async def dispatch_chat(
             ):
 
             for _, data in state.items():
-                message = data["messages"][-1]
+                message_or_signal = data["messages"][-1]
+
+                if isinstance(message_or_signal, LoginRequiredSignal):
+                    signal = message_or_signal
+
+                    EventEmitter.emit_login_required(
+                        websocket,
+                        signal.provider,
+                        signal.login_url
+                    )
+
+                message = message_or_signal
                 is_tool_call = message.content.strip() == ""
 
                 if is_tool_call:
                     continue
 
-                await emit_message(
+                await EventEmitter.emit_chat_message(
                     websocket,
                     message,
                     session_id,
                     chat_id
                 )
-
-    except ManualFallbackException as mfe:
-        await emit_login_required(
-            websocket,
-            provider=mfe.name,
-            login_url=mfe.url
-        )
-
-        try:
-            # waiting a login-related event from the UI
-            await wait_for_login(websocket)
-
-            # ...
-
-        except Exception as login_exc:
-            # ...
-            pass
+                
+    except Exception as e:
+        await EventEmitter.emit

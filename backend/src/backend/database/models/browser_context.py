@@ -22,6 +22,11 @@ class BrowserContext(Base):
 
     state: Mapped[str] = mapped_column(String)
 
+    fail_reason: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True
+    )
+
     updated_at: Mapped[str] = mapped_column(
         DateTime,
         server_default=func.now(),

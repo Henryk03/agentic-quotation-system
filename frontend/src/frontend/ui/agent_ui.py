@@ -411,8 +411,7 @@ if prompt:
 
     metadata = {
         "selected_stores": st.session_state.ui_state["selected_stores"],
-        "chat_id": st.session_state.chat_id,
-        "credentials": st.session_state.ui_state["autologin"]["credentials"]
+        "chat_id": st.session_state.chat_id
     }
 
     try:

@@ -6,10 +6,10 @@ import uvicorn
 from fastapi import WebSocket, FastAPI
 from contextlib import asynccontextmanager
 
-from backend.agent.main_agent import graph as agent
+
 from backend.backend_utils.events.parser import parse_event
 from backend.backend_utils.events.handler import EventHandler
-from backend.backend_utils.events.dispatcher import dispatch_chat
+
 from backend.backend_utils.connection.connection_manager import ConnectionManager
 
 from backend.database.engine import SessionLocal
@@ -87,54 +87,6 @@ async def websocket_chat(ws: WebSocket) -> None:
                                 event,
                                 session_id
                             )
-
-                        # spostare agente e dispatch nell'handler e snellire il
-                        # server in modo che faccia da ponte tra UI e backend "vero"
-
-                        user_message, metadata = decompose_chat_event(event)
-
-                        chat_id = metadata.get("chat_id")
-                        credentials = metadata.get("credentials")
-                        selected_stores = metadata.get("selected_stores")
-
-                        with SessionLocal() as db:
-                            _ = client_repo.get_or_create_client(
-                                db,
-                                session_id
-                            )
-                            _ = chat_repo.get_or_create_chat(
-                                db,
-                                chat_id,
-                                session_id
-                            )
-
-                            message_repo.save_message(
-                                db,
-                                session_id,
-                                chat_id,
-                                event.role,
-                                event.content
-                            )
-
-                            if credential_repo.get_credentials
-
-                            for store, creds in credentials:
-                                credential_repo.upsert_credentials(
-                                    db,
-                                    session_id,
-                                    store,
-                                    creds["username"],
-                                    creds["password"]
-                                )
-
-                        await dispatch_chat(
-                            agent,
-                            user_message,
-                            session_id,
-                            chat_id,
-                            selected_stores,
-                            ws
-                        )
 
                     else:
                         pass

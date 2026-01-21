@@ -17,6 +17,7 @@ class LoginCompletedEvent(BaseModel):
 
     event: Literal["login.completed"] = "login.completed"
     provider: str
+    metadata: str
     state: str
 
 
@@ -25,6 +26,8 @@ class LoginFailedEvent(BaseModel):
 
     event: Literal["login.failed"] = "login.failed"
     provider: str
+    metadata: dict
+    state: str = "LOGIN_FAILED"
     reason: str | None = None
 
 

@@ -15,11 +15,6 @@ class Client(Base):
         primary_key=True
     )
 
-    profile: Mapped[dict] = mapped_column(
-        JSON, 
-        default=dict
-    )
-
     created_at: Mapped[str] = mapped_column(
         DateTime, 
         server_default=func.now()
