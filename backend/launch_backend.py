@@ -47,7 +47,7 @@ def main() -> Literal[1, 0]:
 
     else:
         target_module = "backend"
-        print("🚀 Starting Backend Server...\n")
+        print("\n🚀 Starting Backend Server...\n")
     
     try:
         result = subprocess.run(

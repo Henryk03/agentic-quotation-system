@@ -1,5 +1,6 @@
 
 import sys
+import shutil
 import platform
 import subprocess
 from pathlib import Path
@@ -8,6 +9,35 @@ from typing import Literal
 
 MIN_PY = (3, 13)
 MAX_PY = (3, 14)
+
+
+def clean_cache() -> bool:
+    """"""
+
+    print("🧹 Cleaning cache...", end=" ", flush=True)
+
+    try:
+        count = 0
+
+        for path in Path(".").rglob("__pycache__"):
+            if path.is_dir():
+                shutil.rmtree(path)
+                count += 1
+        
+        print(f"✅")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error during cache cleanup: {e}")
+        return False
+
+
+def generate_secret_key() -> str:
+    """"""
+
+    from cryptography.fernet import Fernet
+
+    return Fernet.generate_key().decode()
 
 
 def check_python_version() -> bool:
@@ -56,7 +86,7 @@ def run_command(
         return False
 
 
-def get_venv_python() -> None:
+def get_venv_python() -> Path:
     """"""
 
     venv_path = Path(".venv")
@@ -69,9 +99,9 @@ def get_venv_python() -> None:
 
 def prompt(
         question: str,
-        default: str = None,
+        default: str | None = None,
         secret: bool = False
-    ) -> str:
+    ) -> str | None:
     """Prompt user for input with optional default value."""
 
     if default:
@@ -93,7 +123,7 @@ def prompt(
 def create_env_file_interactive() -> bool:
     """"""
 
-    env_file = Path(".env")
+    env_file: Path = Path(".env")
     
     if env_file.exists():
         print()
@@ -101,7 +131,7 @@ def create_env_file_interactive() -> bool:
             "⚠️  .env file already exists. Overwrite? (y/N): "
         ).lower()
 
-        if overwrite != 'y':
+        if overwrite not in ["", "y", "yes"]:
             print("✅ Keeping existing .env file")
             return True
     
@@ -114,29 +144,44 @@ def create_env_file_interactive() -> bool:
     
     print("🛠️  Development cofiguration")
     cli_mode = prompt("Enable CLI mode? (true/false)", default="true")
-    config['CLI_MODE'] = cli_mode.lower()
+    config["CLI_MODE"] = cli_mode.lower() if cli_mode else None
     
     log_level = prompt("Log level (DEBUG/INFO/WARNING/ERROR)", default="INFO")
-    config['LOG_LEVEL'] = log_level.upper()
+    config["LOG_LEVEL"] = log_level.upper() if log_level else None
     
     print("\n🔑 Google Gemini API Key")
     print("Get your key at: https://makersuite.google.com/app/apikey")
     api_key = prompt("Google API Key", secret=True)
-    config['GOOGLE_API_KEY'] = api_key or "your_api_key_here"
+    config["GOOGLE_API_KEY"] = api_key or "your_api_key_here"
     
     print("\n🌐 Server Configuration")
     host = prompt("Server host", default="0.0.0.0")
-    config['HOST'] = host
+    config["HOST"] = host
     port = prompt("Server port", default="8080")
-    config['PORT'] = port
+    config["PORT"] = port
 
     print("\n" + "🗄️ Database configuration")
     db_url = prompt("Database URL")
-    config['DB_URL'] = db_url or "protocol://user:password@host:port/db_name"
+    config["DB_URL"] = db_url or "protocol://user:password@host:port/db_name"
 
     print("\n🎭 Playwright Configuration")
     headless = prompt("Run browser in headless mode? (true/false)", default="true")
-    config['HEADLESS'] = headless.lower()
+    config["HEADLESS"] = headless.lower() if headless else None
+
+    print("\n🔐 Security configuration")
+    gen_key = input("Generate a new SECRET_KEY? (Y/n): ").lower()
+
+    if gen_key in ["", "y", "yes"]:
+        secret_key = generate_secret_key()
+        print("✅ Secret key generated.")
+        
+    else:
+        secret_key = prompt(
+            "Enter existing SECRET_KEY",
+            default="your_fallback_key_here"
+        )
+    
+    config["SECRET_KEY"] = secret_key
     
     print(f"\n💾 Writing configuration to .env...")
     
@@ -144,27 +189,30 @@ def create_env_file_interactive() -> bool:
         "# Backend Environment Variables\n"
         "\n"
         "# Development\n"
-        f"CLI_MODE={config['CLI_MODE']}\n"
-        f"LOG_LEVEL={config['LOG_LEVEL']}\n"
+        f"CLI_MODE={config["CLI_MODE"]}\n"
+        f"LOG_LEVEL={config["LOG_LEVEL"]}\n"
         "\n"
         "# Google Gemini API\n"
-        f"GOOGLE_API_KEY={config['GOOGLE_API_KEY']}\n"
+        f"GOOGLE_API_KEY={config["GOOGLE_API_KEY"]}\n"
         "\n"
         "# Server Configuration\n"
-        f"HOST={config['HOST']}\n"
-        f"PORT={config['PORT']}\n"
+        f"HOST={config["HOST"]}\n"
+        f"PORT={config["PORT"]}\n"
         "\n"
         "# Database configuration\n"
-        f"DATABASE_URL={config['DB_URL']}\n"
+        f"DATABASE_URL={config["DB_URL"]}\n"
         "\n"
         "# Playwright\n"
-        f"HEADLESS={config['HEADLESS']}\n"
+        f"HEADLESS={config["HEADLESS"]}\n"
+        "\n"
+        "# Secret key\n"
+        f"SECRET_KEY={config["SECRET_KEY"]}"
     )
     
     env_file.write_text(env_content)
     print("✅ .env file created successfully")
     
-    if config['GOOGLE_API_KEY'] == "your_api_key_here":
+    if config["GOOGLE_API_KEY"] == "your_api_key_here":
         print("⚠️ Warning: Remember to add your Google API Key to .env!")
     
     return True
@@ -195,6 +243,10 @@ def create_env_file_from_template() -> bool:
         "\n"
         "# Playwright\n"
         "HEADLESS=true\n"
+        "\n"
+        "# Secret key\n"
+        "SECRET_KEY=your_secret_key_here"
+
     )
 
     if env_file.exists():
@@ -215,11 +267,17 @@ def create_env_file_from_template() -> bool:
             ):
             print("⚠️  Action required: Update the DATABASE_URL in the .env file.")
 
+        if (
+            "your_secret_key_here" in content
+            ) or (
+                "SECRET_KEY=" not in content
+            ):
+            print("⚠️  Action required: Update the SECRET_KEY in the .env file.")
+
         return True
     
     try:
         if env_example.exists():
-            import shutil
             shutil.copy(env_example, env_file)
             print(f"✅ {env_file.name} created from {env_example.name}")
 
@@ -240,6 +298,11 @@ def main() -> Literal[1, 0]:
     """"""
 
     print("\n🔧 Setting up backend environment...\n")
+
+
+    # initial cleanup
+    if not clean_cache():
+        return 1
 
 
     # 0. Check Pyhton version
@@ -295,7 +358,7 @@ def main() -> Literal[1, 0]:
     configure_mode = input("Configure .env interactively? (Y/n): ").lower()
     print("="*60)
     
-    if configure_mode in ['', 'y', 'yes']:
+    if configure_mode in ["", "y", "yes"]:
         if not create_env_file_interactive():
             return 1
         

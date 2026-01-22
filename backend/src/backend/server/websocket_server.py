@@ -3,6 +3,7 @@ import asyncio
 import logging
 
 import uvicorn
+from starlette.types import Message
 from fastapi import WebSocket, FastAPI
 from contextlib import asynccontextmanager
 
@@ -19,6 +20,8 @@ from backend.database.repositories import (
     message_repo,
     credential_repo
 )
+
+from shared.events import Event
 
 
 logger = logging.getLogger("agent-server")
@@ -38,7 +41,7 @@ async def lifespan(app: FastAPI):
 
     logger.info("server shutting down...")
 
-    manager = app.state.manager
+    manager: ConnectionManager = app.state.manager
 
     for ws in manager.get_active():
         try:
@@ -64,28 +67,32 @@ async def websocket_chat(ws: WebSocket) -> None:
     manager: ConnectionManager = app.state.manager
 
     await manager.connect(ws)
-    session_id = ws.query_params.get("session")
+    session_id: str = ws.query_params.get("session") or ""
+
+    if session_id == "":
+        await manager.disconnect(ws, reason="No Session ID found")
 
     try:
         while True:
             try:
-                raw: dict = await asyncio.wait_for(
+                raw: Message = await asyncio.wait_for(
                     ws.receive(),
                     timeout=5.0
                 )
 
-                raw_type = raw.get("type")
+                raw_type: str | None = raw.get("type")
 
                 if raw_type == "websocket.receive":
                     if "text" in raw:
-                        str_event = raw.get("text")
-                        event = parse_event(str_event)
+                        str_event: str | None = raw.get("text")
+                        event: Event = parse_event(str(str_event))
 
                         with SessionLocal() as db:
-                            EventHandler.handle_event(
+                            await EventHandler.handle_event(
                                 db,
                                 event,
-                                session_id
+                                session_id,
+                                ws
                             )
 
                     else:
@@ -93,7 +100,7 @@ async def websocket_chat(ws: WebSocket) -> None:
 
                 elif raw_type == "websocket.disconnect":
                     # logging websocket's auto-disconnect
-                    conn_id = manager.get_connection_id(ws)
+                    conn_id: str | None = manager.get_connection_id(ws)
                     logger.info(f"connection {conn_id} closed")
                     break
 
@@ -107,7 +114,7 @@ async def websocket_chat(ws: WebSocket) -> None:
         await manager.disconnect(ws)
 
 
-async def start_server(host: str, port: str) -> None:
+async def start_server(host: str, port: int) -> None:
     """"""
     
     config = uvicorn.Config(
