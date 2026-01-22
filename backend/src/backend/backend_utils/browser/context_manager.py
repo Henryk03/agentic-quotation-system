@@ -2,7 +2,7 @@
 import re
 import asyncio
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Awaitable
 
 from playwright.async_api import (
     Playwright, 
@@ -10,6 +10,8 @@ from playwright.async_api import (
     BrowserContext, 
     Page, 
     ElementHandle,
+    StorageState,
+    Locator,
     TimeoutError as PlaywrightTimeoutError
 )
 
@@ -65,6 +67,13 @@ class AsyncBrowserContextMaganer:
         """"""
 
         return settings.CLI_MODE
+    
+
+    @staticmethod
+    def is_headless_mode() -> bool:
+        """"""
+
+        return settings.HEADLESS
 
 
     @staticmethod
@@ -87,15 +96,18 @@ class AsyncBrowserContextMaganer:
     def __get_current_state(
             session_id: str | None,
             provider: str
-        ) -> Path | tuple | None:
+        ) -> tuple[Path | StorageState | str | None, str | None]:
         """"""
 
         if AsyncBrowserContextMaganer.is_cli_mode():
-            path = AsyncBrowserContextMaganer.__state_path(provider)
-            return path if path.exists() else None
+            path: Path = AsyncBrowserContextMaganer.__state_path(provider)
+            return path, None if path.exists() else None
 
         else:
             with SessionLocal() as db:
+                ctx: StorageState | str | None
+                rsn: str | None
+
                 if session_id:
                     ctx, rsn = browser_context_repo.get_browser_context(
                         db,
@@ -105,36 +117,38 @@ class AsyncBrowserContextMaganer:
                     return ctx, rsn
 
                 else:
-                    pass
+                    return None, None
 
     
     @staticmethod
     async def __save_current_state(
-        session_id: str,
+        session_id: str | None,
         provider: str,
         context: BrowserContext
     ) -> None:
         """"""
 
-        state_dict: dict = await context.storage_state()
+        state_dict: StorageState = await context.storage_state()
 
         if AsyncBrowserContextMaganer.is_cli_mode():
             pass        # fare caso per CLI
 
         else:
             with SessionLocal() as db:
-                browser_context_repo.upsert_browser_context(
-                    db,
-                    session_id,
-                    provider,
-                    state_dict
-                )
+                if session_id:
+                    browser_context_repo.upsert_browser_context(
+                        db,
+                        session_id,
+                        provider,
+                        state_dict,
+                        None
+                    )
 
 
     @staticmethod
     async def __handle_failure(
             provider: BaseProvider, 
-            reason: str = None
+            reason: str | None = None
         ) -> None | LoginRequiredSignal:
         """"""
 
@@ -146,21 +160,21 @@ class AsyncBrowserContextMaganer:
 
     @staticmethod
     async def __get_creds_by_mode(
-            self,
-            session_id: str,
+            session_id: str | None,
             provider: str
-        ) -> dict | None:
+        ) -> dict[str, str] | None:
         """"""
 
-        credentials: dict | None = None
+        credentials: dict[str, str] | None = None
 
         if not AsyncBrowserContextMaganer.is_cli_mode():
             with SessionLocal() as db:
-                credentials = credential_repo.get_credentials(
-                    db,
-                    session_id,
-                    provider
-                )
+                if session_id:
+                    credentials = credential_repo.get_credentials(
+                        db,
+                        session_id,
+                        provider
+                    )
 
         else:
             pass    # fare caso per cli
@@ -180,12 +194,12 @@ class AsyncBrowserContextMaganer:
         """
 
         try:
-            context = page.context
-            browser = context.browser
+            context: BrowserContext = page.context
+            browser: Browser | None = context.browser
 
             await page.close()
             await context.close()
-            await browser.close()
+            await browser.close() if browser else None
 
         except:
             pass
@@ -207,7 +221,7 @@ class AsyncBrowserContextMaganer:
             - `str` with an error message if something went wrong.
         """
 
-        captcha_text = re.compile(
+        captcha_text: re.Pattern[str] = re.compile(
             r"captcha|not robot|non robot",
             re.IGNORECASE
         )
@@ -221,32 +235,37 @@ class AsyncBrowserContextMaganer:
             await page.wait_for_selector("iframe", timeout=1000)
             for frame in page.frames:
                 if frame is not page.main_frame:
-                    url = frame.url or ""
+                    url: str = frame.url or ""
                     if re.search(captcha_text, url):
                         return True
+                    
         except PlaywrightTimeoutError:
             pass
+
         except Exception as e:
-            return f"Unexpected error: {e}"
+            return f"Unexpected error: {str(e)}"
 
         try:
             # some captchas may be hidden
             # into other html tags
-            tag_texts = [
+            tag_texts: list[str] = [
                 "div",
                 "img",
                 "li"
             ]
 
-            results = await AsyncBrowserContextMaganer.__find_elements_with_attr_pattern(
-                page,
-                tag_texts,
-                captcha_text,
-                early_end=True
+            results: list[ElementHandle] = (
+                await AsyncBrowserContextMaganer.__find_elements_with_attr_pattern(
+                    page,
+                    tag_texts,
+                    captcha_text,
+                    early_end=True
+                )
             )
 
             if results == []:
                 return False
+            
             else:
                 return True
 
@@ -304,8 +323,8 @@ class AsyncBrowserContextMaganer:
                     satisfy the regex.
             """
 
-            matches = []
-            elements = await webpage.query_selector_all(tag)
+            matches: list[ElementHandle] = []
+            elements: list[ElementHandle] = await webpage.query_selector_all(tag)
 
             async def check_elem(element: ElementHandle) -> ElementHandle | None:
                 """
@@ -317,7 +336,7 @@ class AsyncBrowserContextMaganer:
                     - `ElementHandle` otherwise.
                 """
 
-                attributes = await element.evaluate(
+                attributes: dict[str, str] = await element.evaluate(
                     "(node) => {"
                         "const obj = {};"
                         "for(const attr of node.attributes){"
@@ -335,7 +354,7 @@ class AsyncBrowserContextMaganer:
         
             if not early_end:
                 # long execution
-                results = await asyncio.gather(
+                results: list[ElementHandle | None] = await asyncio.gather(
                     *(check_elem(e) for e in elements)
                 )
 
@@ -346,10 +365,13 @@ class AsyncBrowserContextMaganer:
                 return matches
             else:
                 # short execution
-                tasks = [
+                tasks: list[asyncio.Task[ElementHandle | None]] = [
                     asyncio.create_task(check_elem(e))
                     for e in elements
                 ]
+
+                done: set[asyncio.Task[ElementHandle | None]]
+                pending: set[asyncio.Task[ElementHandle | None]]
 
                 while tasks:
                     done, pending = await asyncio.wait(
@@ -359,7 +381,7 @@ class AsyncBrowserContextMaganer:
                     
                     for t in done:
                         try:
-                            result = t.result()
+                            result: ElementHandle | None = t.result()
                         except:
                             result = None
 
@@ -377,15 +399,19 @@ class AsyncBrowserContextMaganer:
 
                 return matches
         
-        tag_results = await asyncio.gather(*(check_tag(tag) for tag in html_tags))
-        tag_results = [elem for sublist in tag_results for elem in sublist]
+        tag_results: list[list[ElementHandle]] = await asyncio.gather(
+            *(check_tag(tag) for tag in html_tags)
+        )
+        final_tag_results: list[ElementHandle] = [
+            elem for sublist in tag_results for elem in sublist
+        ]
 
-        return tag_results
+        return final_tag_results
 
 
     async def create_browser_context(
         self,
-        state: Path | dict | None = None,
+        state: Path | StorageState | str | None = None,
         start_url: str | None = None
         ) -> tuple[Browser, BrowserContext, Page]:
         """
@@ -406,18 +432,32 @@ class AsyncBrowserContextMaganer:
                 The browser, its context, and the page.
         """
 
+        browser: Browser
+        context: BrowserContext
+        page: Page
+
         browser = await self.async_playwright.chromium.launch(
-            headless=settings.HEADLESS
+            headless=AsyncBrowserContextMaganer.is_headless_mode()
         )
+
+        storage_state_param = None
+
+        if not state:
+            if isinstance(state, Path):
+                if state.exists():
+                    storage_state_param = state
+
+            else:
+                storage_state_param = state
+
         context = await browser.new_context(
-            storage_state=(
-                state if state and state.exists() else None
-            ),
+            storage_state=storage_state_param,
             viewport={
                 "width": SCREEN_WIDTH,
                 "height": SCREEN_HEIGHT
             }
         )
+
         page = await context.new_page()
 
         if start_url:
@@ -429,7 +469,7 @@ class AsyncBrowserContextMaganer:
     async def __prepare_provider_context(
             self,
             provider: BaseProvider,
-            state: Path | dict
+            state: Path | StorageState | str | None
         ) -> tuple[Browser, BrowserContext, Page]:
         """
         Create and initialize a new browser context for the given provider.
@@ -454,8 +494,11 @@ class AsyncBrowserContextMaganer:
                 the initialized browser context, and the opened page.
         """
 
+        browser: Browser
+        context: BrowserContext
+        page: Page
+
         browser, context, page = await self.create_browser_context(
-            headless=settings.HEADLESS,
             state=state,
             start_url=provider.url
         )
@@ -470,7 +513,7 @@ class AsyncBrowserContextMaganer:
 
     async def ensure_provider_context(
             self,
-            session_id: str,
+            session_id: str | None,
             provider: BaseProvider
         ) -> BrowserContext | LoginRequiredSignal:
         """
@@ -488,7 +531,10 @@ class AsyncBrowserContextMaganer:
 
         Returns:
             BrowserContext
-        """ 
+        """
+
+        state: Path | StorageState | str | None
+        fail_reason: str | None
 
         state, fail_reason = AsyncBrowserContextMaganer.__get_current_state(
             session_id,
@@ -498,8 +544,8 @@ class AsyncBrowserContextMaganer:
         if state == "LOGIN_FAILED":
             raise LoginFailedException(provider, fail_reason)
 
-        context = None
-        page = None
+        context: BrowserContext | None = None
+        page: Page | None = None
 
         try:
             if not state and provider.login_required:
@@ -562,17 +608,18 @@ class AsyncBrowserContextMaganer:
 
             if AsyncBrowserContextMaganer.is_cli_mode():
                 try:
-                    await self.__manual_login(provider, state)
-                    _, context, _ = await self.__prepare_provider_context(
-                        headless=True,
-                        provider=provider,
-                        state_path=state
-                    )
+                    if isinstance(state, Path):
+                        await self.__manual_login(provider, state)
+                        _, context, _ = await self.__prepare_provider_context(
+                            provider=provider,
+                            state=state
+                        )
 
                 except:
                     raise LoginFailedException(provider)
 
-                return context
+                if context:
+                    return context
             
             return LoginRequiredSignal(provider, str(e))
 
@@ -605,12 +652,15 @@ class AsyncBrowserContextMaganer:
                 cannot be initialized correctly.
         """
 
+        context: BrowserContext | None = None
+        page: Page | None = None
+
         async with self._manual_login_lock:
-            _, context, page = await self.__prepare_provider_context(
-                headless=False,
-                provider=provider,
-                state_path=state_path
-            )
+            if isinstance(state_path, Path):
+                _, context, page = await self.__prepare_provider_context(
+                    provider=provider,
+                    state=state_path
+                )
 
             if await AsyncBrowserContextMaganer.__wait_until_logged_in(
                 provider=provider,
@@ -622,7 +672,6 @@ class AsyncBrowserContextMaganer:
                 await self.close_page_resources(page)
             else:
                 await self.close_page_resources(page)
-
                 raise LoginFailedException(provider)
 
 
@@ -652,22 +701,26 @@ class AsyncBrowserContextMaganer:
         #     return False
 
         try:
-            logout_texts = re.compile(
+            logout_texts: re.Pattern[str] = re.compile(
                 r"(?:log|sign)[- ]?out",
                 re.IGNORECASE
             )
 
-            results = await AsyncBrowserContextMaganer.__find_elements_with_attr_pattern(
-                page,
-                provider.logout_selectors,
-                logout_texts,
-                early_end=True
+            results: list[ElementHandle] = (
+                await AsyncBrowserContextMaganer.__find_elements_with_attr_pattern(
+                    page,
+                    provider.logout_selectors,
+                    logout_texts,
+                    early_end=True
+                )
             )
 
             if results == []:
                 return False
+            
             else:
                 return True
+            
         except:
             pass
 
@@ -678,9 +731,9 @@ class AsyncBrowserContextMaganer:
     async def __wait_until_logged_in(
         provider: BaseProvider,
         page: Page,
-        check_func: Callable[[BaseProvider, Page], bool],
-        timeout: float | None = 15000,
-        interval: float | None = 500
+        check_func: Callable[[BaseProvider, Page], Awaitable[bool]],
+        timeout: float = 15000,
+        interval: float = 500
         ) -> bool:
         """
         Wait until the user is logged-in into the given
@@ -747,7 +800,7 @@ class AsyncBrowserContextMaganer:
             None
         """
 
-        decline_texts = re.compile(
+        decline_texts: re.Pattern[str] = re.compile(
             (
                 "rifiuta|rifiuto|declina|decline|refuse|deny|reject"
                 "necessary|essential only|essenziali|chiudi|chiudere"
@@ -756,29 +809,35 @@ class AsyncBrowserContextMaganer:
             re.IGNORECASE
         )
 
-        accept_texts = re.compile(
+        accept_texts: re.Pattern[str] = re.compile(
             "accetta|accettare|accept",
             re.IGNORECASE
         )
 
         for sel in provider.popup_selectors:
             try:
-                elements = page.locator(sel)
-                count = await elements.count()
-                accept_cookie = None
+                elements: Locator = page.locator(sel)
+                count: int = await elements.count()
+                accept_cookie: Locator | None = None
+
                 for i in range(count):
-                    elem = elements.nth(i)
+                    elem: Locator = elements.nth(i)
+
                     if await elem.is_visible():
                         # we return the text content or an empty string, 
                         # cause the if-statemente could fail with a NoneType
-                        text = await elem.text_content() or ""
+                        text: str = await elem.text_content() or ""
+
                         if re.search(decline_texts, text):
                             await elem.click()
+
                         elif re.search(accept_texts, text):
                             accept_cookie = elem
+
                 # we click on accept when there is no reject button
                 if (accept_cookie is not None) and (await accept_cookie.is_visible()):
                     await accept_cookie.click()
+                    
             except:
                 continue
 

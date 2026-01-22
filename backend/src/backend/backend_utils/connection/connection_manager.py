@@ -1,7 +1,9 @@
 
 import uuid
 from logging import Logger
+
 from fastapi import WebSocket
+from starlette.datastructures import Address
 from fastapi.websockets import WebSocketState
 
 
@@ -29,6 +31,9 @@ class ConnectionManager:
         ) -> str | None:
         """"""
 
+        conn_id: str
+        ws: WebSocket
+
         for conn_id, ws in self.active_connections.items():
             if ws is websocket:
                 return conn_id
@@ -42,23 +47,26 @@ class ConnectionManager:
         ) -> None:
         """"""
 
-        client = websocket.client
+        client: Address | None = websocket.client
 
         try:
             await websocket.accept()
-        except: 
-            self.logger.exception(
-                f"connection refused: failed to accept websocket from {client.host}"
-            )
+
+        except:
+            if client:
+                self.logger.exception(
+                    f"connection refused: failed to accept websocket from {client.host}"
+                )
 
             return None
         
-        conn_id = str(uuid.uuid4().hex)
+        conn_id: str = str(uuid.uuid4().hex)
         self.active_connections[conn_id] = websocket
 
-        self.logger.info(
-            f"connection {conn_id} accepted from {client.host}:{client.port}"
-        )
+        if client:
+            self.logger.info(
+                f"connection {conn_id} accepted from {client.host}:{client.port}"
+            )
 
         self.logger.info(
             f"currently active connections: {len(self.get_active())}"
@@ -73,7 +81,7 @@ class ConnectionManager:
         ) -> None:
         """"""
         
-        conn_id = self.get_connection_id(websocket)
+        conn_id: str | None = self.get_connection_id(websocket)
 
         if websocket.client_state != WebSocketState.DISCONNECTED:
             try:
@@ -82,6 +90,7 @@ class ConnectionManager:
                 self.logger.info(
                     f"connection {conn_id} successfully closed"
                 )
+                
             except:
                 self.logger.info(
                     f"connection {conn_id} failed to close"

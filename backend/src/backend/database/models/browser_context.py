@@ -11,7 +11,7 @@ class BrowserContext(Base):
     __tablename__ = "browser_contexts"
 
     session_id: Mapped[str] = mapped_column(
-        ForeignKey("client.session_id", ondelete="CASCADE"),
+        ForeignKey("clients.session_id", ondelete="CASCADE"),
         primary_key=True
     )
 
@@ -33,4 +33,7 @@ class BrowserContext(Base):
         onupdate=func.now()
     )
 
-    client = relationship("Client")
+    client = relationship(
+        "Client",
+        back_populates="browser_contexts",
+    )

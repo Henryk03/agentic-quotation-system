@@ -33,7 +33,7 @@ def get_venv_python() -> Path:
 def main() -> Literal[1, 0]:
     """"""
     
-    venv_python = get_venv_python()
+    venv_python: Path = get_venv_python()
     
     if not venv_python.exists():
         print("❌ Virtual environment not found!")
@@ -41,24 +41,25 @@ def main() -> Literal[1, 0]:
 
         return 1
     
+    target_module: str
+    
     if settings.CLI_MODE:
         target_module = "backend.agent.main_agent"
         print("🤖 Starting Agent in CLI mode...\n")
 
-    else:
-        target_module = "backend"
-        print("\n🚀 Starting Backend Server...\n")
+    target_module = "backend"
+    print("\n🚀 Starting Backend Server...\n")
     
     try:
-        result = subprocess.run(
+        result: subprocess.CompletedProcess = subprocess.run(
             [str(venv_python), "-m", target_module],
             cwd=Path(__file__).parent
         )
 
-        return result.returncode        # redirigere log in file.log e mostrare messaggio che server in exe!!!!
+        result.returncode
         
     except KeyboardInterrupt:
-        print("\n\n👋 Backend server stopped by user")
+        print("\n👋 Backend server stopped by user")
         return 0
     
     except Exception as e:

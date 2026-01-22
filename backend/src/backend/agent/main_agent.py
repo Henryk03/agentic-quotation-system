@@ -8,7 +8,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import InMemorySaver       # mettere uno persistente
 
 from backend.agent.prompts import SYSTEM_PROMPT
-from backend.agent.agent_tools import search_products, search_products_with_computer_use
+from backend.agent.agent_tools import search_products
 
 
 llm = ChatGoogleGenerativeAI(

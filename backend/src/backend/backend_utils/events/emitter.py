@@ -1,4 +1,6 @@
 
+from typing import Literal
+
 from fastapi import WebSocket
 from langchain_core.messages import (
     AIMessage,
@@ -24,32 +26,69 @@ from shared.events.auth import (
 class EventEmitter:
     """"""
 
+
+    @staticmethod
+    def __get_langchain_role(
+            message: BaseMessage
+        ) -> Literal["assistant", "tool", "user", "system"] | None:
+        """"""
+
+        match message:
+            case AIMessage():
+                return "assistant"
+            
+            case ToolMessage():
+                return "tool"
+            
+            case HumanMessage():
+                return "user"
+            
+            case SystemMessage():
+                return "system"
+            
+            case _:
+                return None
+            
+
+    @staticmethod
+    def __normalize_content(
+            content: str | list[str | dict]
+        ) -> str | None:
+        """"""
+
+        if isinstance(content, str):
+            return content.strip() or None
+
+        if isinstance(content, list) and content:
+            first = content[0]
+
+            if isinstance(first, str):
+                return first.strip() or None
+
+            if isinstance(first, dict):
+                text = str(first.get("text", "")).strip()
+                return text or None
+
+        return None
+
+
     @staticmethod
     def __langchain_message_to_event(message: BaseMessage) -> ChatMessageEvent | None:
         """Converte un messaggio LangChain in un ChatMessageEvent."""
 
-        match message:
-            case AIMessage():
-                role = "assistant"
-                content = message.content
+        role: str | None = EventEmitter.__get_langchain_role(
+            message
+        )
 
-                if isinstance(content, list):
-                    tmp_content = content[0]["text"]
-                    content = tmp_content
+        if role != "assistant" or role != "tool":
+            return None
+        
+        content: str = EventEmitter.__normalize_content(
+            message.content
+        )
 
-            case HumanMessage():
-                role = "user"
-                content = message.content
-
-            case ToolMessage():
-                role = "tool"
-                content = message.content
-
-            case SystemMessage():
-                return  # no event will be emitted with system messages
-
-            case _:
-                raise TypeError(f"Unsupported LangChain message: {type(message)}")
+        if not content:
+            return None
 
         return ChatMessageEvent(
             role=role,
@@ -67,10 +106,12 @@ class EventEmitter:
         """"""
 
         try:
-            event = EventEmitter.__langchain_message_to_event(message)
+            event: Event | None = EventEmitter.__langchain_message_to_event(
+                message
+            )
 
             if not event:
-                return 
+                return None
             
             with SessionLocal() as db:
                 message_repo.save_message(

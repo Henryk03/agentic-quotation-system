@@ -1,8 +1,9 @@
 
 import asyncio
 import logging
+from typing import Any
 
-import uvicorn
+from uvicorn import Config, Server
 from starlette.types import Message
 from fastapi import WebSocket, FastAPI
 from contextlib import asynccontextmanager
@@ -10,16 +11,8 @@ from contextlib import asynccontextmanager
 
 from backend.backend_utils.events.parser import parse_event
 from backend.backend_utils.events.handler import EventHandler
-
 from backend.backend_utils.connection.connection_manager import ConnectionManager
-
 from backend.database.engine import SessionLocal
-from backend.database.repositories import (
-    client_repo,
-    chat_repo,
-    message_repo,
-    credential_repo
-)
 
 from shared.events import Event
 
@@ -80,11 +73,11 @@ async def websocket_chat(ws: WebSocket) -> None:
                     timeout=5.0
                 )
 
-                raw_type: str | None = raw.get("type")
+                raw_type: Any | None = raw.get("type")
 
                 if raw_type == "websocket.receive":
                     if "text" in raw:
-                        str_event: str | None = raw.get("text")
+                        str_event: Any | None = raw.get("text")
                         event: Event = parse_event(str(str_event))
 
                         with SessionLocal() as db:
@@ -117,8 +110,8 @@ async def websocket_chat(ws: WebSocket) -> None:
 async def start_server(host: str, port: int) -> None:
     """"""
     
-    config = uvicorn.Config(
-        "backend.server.websocket_server:app",
+    config: Config = Config(
+        app="backend.server.websocket_server:app",
         host=host,
         port=port,
         log_config=None,
@@ -126,7 +119,7 @@ async def start_server(host: str, port: int) -> None:
         lifespan="on"
     )
 
-    print("📣 Ready for connections (Press Ctrl+C to stop)")
+    print("📣 Ready for connections (Press Ctrl+C to stop)\n")
 
-    server = uvicorn.Server(config)
+    server: Server = Server(config)
     await server.serve()

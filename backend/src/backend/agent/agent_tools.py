@@ -8,6 +8,8 @@ from google.genai import types
 from google.genai.types import Content, Part
 from playwright.async_api import (
     async_playwright,
+    Browser,
+    BrowserContext,
     Page,
     TimeoutError as PlaywrightTimeoutError
 )
@@ -15,7 +17,6 @@ from playwright.async_api import (
 from backend.agent.prompts import USER_PROMPT
 from backend.backend_utils.common.lists import SafeAsyncList
 from backend.backend_utils.exceptions import LoginFailedException
-from backend.backend_utils.signals.login_failed import LoginFailedSignal
 from backend.backend_utils.signals.login_required import LoginRequiredSignal
 from backend.backend_utils.browser.context_manager import AsyncBrowserContextMaganer
 from backend.backend_utils.computer_use.functions import (
@@ -30,7 +31,7 @@ async def search_products(
         session_id: str | None, 
         products: list[str],
         providers: list[str]
-    ) -> str:
+    ) -> str | LoginRequiredSignal:
     """
     Perform web search for each product in the given list.
 
@@ -48,20 +49,24 @@ async def search_products(
             for each product.
     """
     
-    web_search_results_list = SafeAsyncList()
+    web_search_results_list: SafeAsyncList
+    browser_context_manager: AsyncBrowserContextMaganer
 
     async with async_playwright() as apw:
+        web_search_results_list = SafeAsyncList()
         browser_context_manager = AsyncBrowserContextMaganer(
             apw,
             session_id if session_id else None
         )
-        provider_page: list[tuple] = []
+        provider_page: list[tuple[BaseProvider, Page]] = []
 
         for provider in providers:
             try:
-                context_or_signal = await browser_context_manager.ensure_provider_context(
-                    session_id,
-                    provider
+                context_or_signal: BrowserContext | LoginRequiredSignal = (
+                    await browser_context_manager.ensure_provider_context(
+                        session_id,
+                        provider
+                    )
                 )
 
                 if isinstance(context_or_signal, LoginRequiredSignal):
@@ -364,7 +369,7 @@ async def __wait_for_all_selectors(
         page: Page,
         selectors: list[str] | dict,
         timeout: float = 2000
-    ) -> None:
+    ) -> bool:
     """
     Wait for all specified selectors to appear on the page.
 
@@ -396,6 +401,7 @@ async def __wait_for_all_selectors(
             )
         )
         return True
+    
     except PlaywrightTimeoutError:
         return False
 
@@ -422,10 +428,11 @@ async def __select_text(
             or "N/A" if no element matches.
     """
 
-    selectors = await __normalize_selectors(selectors)
+    norm_selectors: list[str] = await __normalize_selectors(selectors)
     
-    for sel in selectors:
-        elem = tag.select_one(sel)
+    for sel in norm_selectors:
+        elem: bs4.Tag | None = tag.select_one(sel)
+
         if elem:
             return elem.get_text(strip=True)
         
@@ -462,7 +469,7 @@ async def __select_all_text(
     # in some websites the availability of a product
     # is espressed only as a button that let the user buy
     # that product.
-    availability_alt_texts = re.compile(
+    availability_alt_texts: re.Pattern[str] = re.compile(
         r"aggiungi al carrello|add to cart", 
         re.IGNORECASE
     )
@@ -470,18 +477,25 @@ async def __select_all_text(
     texts: list[str] = []
 
     if isinstance(selectors, dict):
+        state: str
+        sel_list: list[str]
+
         for state, sel_list in selectors.items():
             for sel in sel_list:
                 for elem in tag.select(sel):
-                    text = elem.get_text(strip=True)
+                    text: str = elem.get_text(strip=True)
+
                     if re.search(availability_alt_texts, text) and state == "available":
                         text = "Disponibile"
+
                     if text:
                         texts.append(text)
+
     else:
         for sel in selectors:
             for elem in tag.select(sel):
                 text = elem.get_text(strip=True)
+
                 if text:
                     texts.append(text)
 
@@ -491,7 +505,7 @@ async def __select_all_text(
 async def __format_block(
         provider: BaseProvider,
         lines: list[str]
-    ):
+    ) -> str:
     """
     Format a block of text with the provider name followed by
     a list of content lines.

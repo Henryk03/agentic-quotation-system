@@ -3,15 +3,11 @@ import asyncio
 
 from fastapi import WebSocket
 from langchain_core.runnables import Runnable
-from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+from langchain_core.messages import HumanMessage, BaseMessage
 
 from backend.backend_utils.events.emitter import EventEmitter
 from backend.backend_utils.signals.login_required import LoginRequiredSignal
-from backend.backend_utils.events.login_waiter import wait_for_login
-from backend.backend_utils.exceptions import (
-    LoginFailedException,
-    ManualFallbackException
-)
 
 
 async def __format_message(
@@ -19,6 +15,8 @@ async def __format_message(
         selected_stores: list[str]
     ) -> str:
     """"""
+
+    store_list: str
 
     if len(selected_stores) >= 1:
         store_list = "* " + "\n*".join(selected_stores)
@@ -54,37 +52,40 @@ async def dispatch_chat(
         selected_stores
     )
 
+    config: RunnableConfig = {
+        "configurable": {"thread_id": chat_id}
+    }
+
     try:
         async for state in agent.astream(
                 input={"messages": [HumanMessage(user_message)]},
-                config={"thread_id": chat_id},
+                config=config,
                 stream_mode="updates"
             ):
 
             for _, data in state.items():
-                message_or_signal = data["messages"][-1]
+                message_or_signal: BaseMessage | LoginRequiredSignal = (
+                    data["messages"][-1]
+                )
 
                 if isinstance(message_or_signal, LoginRequiredSignal):
-                    signal = message_or_signal
+                    signal: LoginRequiredSignal = message_or_signal
 
-                    EventEmitter.emit_login_required(
+                    await EventEmitter.emit_login_required(
                         websocket,
                         signal.provider,
                         signal.login_url
                     )
 
-                message = message_or_signal
-                is_tool_call = message.content.strip() == ""
+                elif isinstance(message_or_signal, BaseMessage):
+                    message: BaseMessage = message_or_signal
 
-                if is_tool_call:
-                    continue
-
-                await EventEmitter.emit_chat_message(
-                    websocket,
-                    message,
-                    session_id,
-                    chat_id
-                )
+                    await EventEmitter.emit_chat_message(
+                        websocket,
+                        message,
+                        session_id,
+                        chat_id
+                    )
                 
     except Exception as e:
-        await EventEmitter.emit
+        pass                    # decidere cosa fare...

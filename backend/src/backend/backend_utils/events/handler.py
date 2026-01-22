@@ -63,8 +63,12 @@ class EventHandler:
         """"""
 
         event_type: Literal[
-            ""
-        ] = getattr(event, "event", None)
+            "autologin.credentials.provided",
+            "chat.message",
+            "login.completed",
+            "login.failed",
+            "error"
+        ] = getattr(event, "event", "error")
 
         _ = await EventHandler.__ensure_client(db, session_id)
 
@@ -117,15 +121,15 @@ class EventHandler:
         ) -> None:
         """"""
 
-        if not event.credentials:
-            return
+        if event.event != "autologin.credential.provided":
+            return None
 
         for store, creds in event.credentials.items():
             credential_repo.upsert_credentials(
                 db, session_id, store, creds["username"], creds["password"]
             )
 
-        EventEmitter.emit_event(
+        await EventEmitter.emit_event(
             websocket,
             AutoLoginCredentialsEvent(
                 event="autologin.credentials.received",
@@ -144,6 +148,9 @@ class EventHandler:
         ) -> None:
         """"""
 
+        if event.event != "chat.message":
+            return None
+
         role = event.role
         message = event.message
 
@@ -161,7 +168,7 @@ class EventHandler:
         )
 
         if role == "user":
-            dispatch_chat(
+            await dispatch_chat(
                 agent,
                 message,
                 session_id,
@@ -180,19 +187,19 @@ class EventHandler:
         ) -> None:
         """"""
 
-        if not event.state:
-            return
+        if event.event != "login.completed":
+            return None
         
-        if event.state:
-            chat_id = event.metadata.get("chat_id")
-            selected_stores = event.metadata.get("selected_stores")
-        
-            browser_context_repo.upsert_browser_context(
-                db,
-                session_id,
-                event.store,
-                event.state
-            )
+        chat_id: str = event.metadata.get("chat_id")
+        selected_stores: list[str] = event.metadata.get("selected_stores")
+    
+        browser_context_repo.upsert_browser_context(
+            db,
+            session_id,
+            event.store,
+            event.state,
+            None
+        )
 
         last_message = message_repo.get_last_user_message(
             db, 
@@ -200,14 +207,15 @@ class EventHandler:
             chat_id
         )
 
-        dispatch_chat(
-            agent,
-            last_message,
-            session_id,
-            chat_id,
-            selected_stores,
-            websocket
-        )
+        if last_message:
+            await dispatch_chat(
+                agent,
+                last_message,
+                session_id,
+                chat_id,
+                selected_stores,
+                websocket
+            )
 
 
     @staticmethod
@@ -219,15 +227,20 @@ class EventHandler:
         ) -> None:
         """"""
 
-        chat_id = event.metadata.get("chat_id")
-        selected_stores = event.metadata.get("selected_stores")
+        if event.event != "login.failed":
+            return None
+
+        chat_id: str = event.metadata.get("chat_id")
+        selected_stores: list[str] = event.metadata.get("selected_stores")
+        fail_reason: str | None = event.reason
 
         if event.state == "LOGIN_FAILED":
             browser_context_repo.upsert_browser_context(
                 db,
                 session_id,
                 event.provider,
-                event.state
+                event.state,
+                fail_reason
             )
 
         last_message = message_repo.get_last_user_message(
@@ -236,11 +249,12 @@ class EventHandler:
             chat_id
         )
 
-        dispatch_chat(
-            agent,
-            last_message,
-            session_id,
-            chat_id,
-            selected_stores,
-            websocket
-        )
+        if last_message:
+            await dispatch_chat(
+                agent,
+                last_message,
+                session_id,
+                chat_id,
+                selected_stores,
+                websocket
+            )

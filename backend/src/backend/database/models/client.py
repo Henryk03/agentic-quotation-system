@@ -1,5 +1,5 @@
 
-from sqlalchemy import String, JSON, DateTime, func
+from sqlalchemy import String, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -35,4 +35,9 @@ class Client(Base):
         "Credential", 
         back_populates="client", 
         cascade="all, delete-orphan"
+    )
+    browser_contexts = relationship(
+        "BrowserContext",
+        back_populates="client",
+        cascade="all, delete-orphan",
     )

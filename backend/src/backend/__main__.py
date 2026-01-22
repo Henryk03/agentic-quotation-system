@@ -6,7 +6,10 @@ from backend.config import settings
 
 
 async def async_main():
-    print("🔧 Initializing Agentic Backend Server...")
+    print("🔧 Initializing Agentic Backend Server...\n")
+
+    is_valid: bool
+    errors: list[str]
     
     is_valid, errors = settings.validate()
     
@@ -23,9 +26,9 @@ async def async_main():
     print(f"✅ Configuration loaded from .env\n")
 
     print(f"🔧 Settings: ")
-    print("   Host={settings.HOST}")
-    print("   Port={settings.PORT}")
-    print("   Headless={settings.HEADLESS}")
+    print(f"   Host={settings.HOST}")
+    print(f"   Port={settings.PORT}")
+    print(f"   Headless={settings.HEADLESS}")
     
     print(f"\n🚀 Starting server on {settings.HOST}:{settings.PORT}...")
 
@@ -43,12 +46,12 @@ async def async_main():
 
 def main():
     try:
-        sys.exit(asyncio.run(async_main()))
+        return asyncio.run(async_main())
         
     except KeyboardInterrupt:
         print("\n\n👋 Shutdown requested")
-        sys.exit(0)
+        return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

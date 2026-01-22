@@ -7,7 +7,7 @@ from backend.database.models.message import Message
 
 def get_last_user_message(
         db: Session,
-        sessio_id: str,
+        session_id: str,
         chat_id: str,
     ) -> str | None:
     """"""
@@ -15,7 +15,7 @@ def get_last_user_message(
     message = (
         db.query(Message)
         .filter(
-            Message.sessio_id == sessio_id,
+            Message.session_id == session_id,
             Message.chat_id == chat_id,
             Message.role == "user"
         )

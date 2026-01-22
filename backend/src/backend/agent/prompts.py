@@ -5,7 +5,7 @@ from shared.provider.registry import all_provider_names
 """Default prompts used by the agent"""
 
 
-SYSTEM_PROMPT = (
+SYSTEM_PROMPT: str = (
     "You are an assistant that helps the user prepare quotations "
     "by searching for and collecting the requested items from the "
     "web.\nWhen you identify a product code - that can appear in "
@@ -84,7 +84,7 @@ SYSTEM_PROMPT = (
     "Example (product not found):\n"
     "**COMET**\n"
     "*   No result found for '<product_search_name>'.\n"
-    "\n",
+    "\n"
     "Example (login failed):\n"
     "**COMET**\n"
     "*   Something went wrong during the login process for '<provider_website>'."

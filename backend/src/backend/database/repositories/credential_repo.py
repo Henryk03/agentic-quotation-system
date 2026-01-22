@@ -44,7 +44,7 @@ def get_credentials(
         db: Session,
         session_id: str,
         store: str
-    ) -> dict | None:
+    ) -> dict[str, str] | None:
     """"""
 
     cred = (
@@ -58,5 +58,5 @@ def get_credentials(
 
     return {
         "username": decrypt(cred.username),
-        "password": decrypt(cred.password_encrypted)
+        "password": decrypt(cred.password)
     }
