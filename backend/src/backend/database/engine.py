@@ -1,13 +1,21 @@
 
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    AsyncSession,
+    async_sessionmaker
+)
 
 from backend.config import settings
 
 
 DATABASE_URL: str | None = settings.DATABASE_URL
 
+# da sistemare driver a seconda del protocollo (postgreSQL, mySQL, ecc.)...
+
 if DATABASE_URL:
-    engine = create_engine(DATABASE_URL, echo=False)
-    SessionLocal = sessionmaker(bind=engine)
+    engine = create_async_engine(DATABASE_URL, echo=False)
+    AsyncSessionLocal = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )

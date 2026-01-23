@@ -10,7 +10,7 @@ from langchain_core.messages import (
     BaseMessage
 )
 
-from backend.database.engine import SessionLocal
+from backend.database.engine import AsyncSessionLocal
 from backend.database.repositories import message_repo
 
 from shared.events import Event
@@ -73,17 +73,19 @@ class EventEmitter:
 
 
     @staticmethod
-    def __langchain_message_to_event(message: BaseMessage) -> ChatMessageEvent | None:
-        """Converte un messaggio LangChain in un ChatMessageEvent."""
+    def __langchain_message_to_event(
+            message: BaseMessage
+        ) -> ChatMessageEvent | None:
+        """"""
 
         role: str | None = EventEmitter.__get_langchain_role(
             message
         )
 
-        if role != "assistant" or role != "tool":
+        if role != "assistant" and role != "tool":
             return None
         
-        content: str = EventEmitter.__normalize_content(
+        content: str | None = EventEmitter.__normalize_content(
             message.content
         )
 
@@ -113,8 +115,8 @@ class EventEmitter:
             if not event:
                 return None
             
-            with SessionLocal() as db:
-                message_repo.save_message(
+            async with AsyncSessionLocal() as db:
+                await message_repo.save_message(
                     db,
                     session_id,
                     chat_id,

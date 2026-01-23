@@ -1,17 +1,19 @@
 
-from sqlalchemy.orm import Session
+
+from sqlalchemy import select, desc
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.chat import Chat
 
 
-def get_or_create_chat(
-        db: Session,
+async def get_or_create_chat(
+        db: AsyncSession,
         chat_id: str,
         session_id: str
     ) -> Chat:
     """"""
 
-    chat = db.get(Chat, (chat_id, session_id))
+    chat = await db.get(Chat, (chat_id, session_id))
 
     if not chat:
         chat = Chat(
@@ -20,6 +22,7 @@ def get_or_create_chat(
         )
         
         db.add(chat)
-        db.commit()
+        await db.commit()
+        await db.refresh(chat)
 
     return chat

@@ -1,6 +1,6 @@
 
-from sqlalchemy.orm import Session
 from typing import Literal
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import WebSocket
 
@@ -27,12 +27,12 @@ class EventHandler:
 
     @staticmethod
     async def __ensure_client(
-            db: Session,
+            db: AsyncSession,
             session_id: str
         ) -> Client:
         """"""
 
-        return client_repo.get_or_create_client(
+        return await client_repo.get_or_create_client(
             db,
             session_id
         )
@@ -40,13 +40,13 @@ class EventHandler:
 
     @staticmethod
     async def __ensure_chat(
-            db: Session,
+            db: AsyncSession,
             chat_id: str,
             session_id: str
         ) -> Chat:
         """"""
 
-        return chat_repo.get_or_create_chat(
+        return await chat_repo.get_or_create_chat(
             db,
             chat_id,
             session_id
@@ -55,7 +55,7 @@ class EventHandler:
 
     @staticmethod
     async def handle_event(
-            db: Session,
+            db: AsyncSession,
             event: Event,
             session_id: str,
             websocket: WebSocket
@@ -114,7 +114,7 @@ class EventHandler:
 
     @staticmethod
     async def __handle_credentials(
-            db: Session, 
+            db: AsyncSession, 
             event: Event, 
             session_id: str,
             websocket: WebSocket
@@ -125,7 +125,7 @@ class EventHandler:
             return None
 
         for store, creds in event.credentials.items():
-            credential_repo.upsert_credentials(
+            await credential_repo.upsert_credentials(
                 db, session_id, store, creds["username"], creds["password"]
             )
 
@@ -141,7 +141,7 @@ class EventHandler:
 
     @staticmethod
     async def __handle_chat_message(
-            db: Session,
+            db: AsyncSession,
             event: Event,
             session_id: str,
             websocket: WebSocket
@@ -152,14 +152,14 @@ class EventHandler:
             return None
 
         role = event.role
-        message = event.message
+        message = event.content
 
         chat_id = event.metadata.get("chat_id")
         selected_stores = event.metadata.get("selected_stores")
 
         _ = await EventHandler.__ensure_chat(db, chat_id, session_id)
 
-        message_repo.save_message(
+        await message_repo.save_message(
             db,
             session_id,
             chat_id,
@@ -180,7 +180,7 @@ class EventHandler:
     
     @staticmethod
     async def __handle_browser_context(
-            db: Session,
+            db: AsyncSession,
             event: Event, 
             session_id: str,
             websocket: WebSocket
@@ -193,7 +193,7 @@ class EventHandler:
         chat_id: str = event.metadata.get("chat_id")
         selected_stores: list[str] = event.metadata.get("selected_stores")
     
-        browser_context_repo.upsert_browser_context(
+        await browser_context_repo.upsert_browser_context(
             db,
             session_id,
             event.store,
@@ -201,7 +201,7 @@ class EventHandler:
             None
         )
 
-        last_message = message_repo.get_last_user_message(
+        last_message = await message_repo.get_last_user_message(
             db, 
             session_id, 
             chat_id
@@ -220,7 +220,7 @@ class EventHandler:
 
     @staticmethod
     async def __handle_failed_login(
-            db: Session,
+            db: AsyncSession,
             event: Event,
             session_id: str,
             websocket: WebSocket
@@ -235,7 +235,7 @@ class EventHandler:
         fail_reason: str | None = event.reason
 
         if event.state == "LOGIN_FAILED":
-            browser_context_repo.upsert_browser_context(
+            await browser_context_repo.upsert_browser_context(
                 db,
                 session_id,
                 event.provider,
@@ -243,7 +243,7 @@ class EventHandler:
                 fail_reason
             )
 
-        last_message = message_repo.get_last_user_message(
+        last_message = await message_repo.get_last_user_message(
             db, 
             session_id, 
             chat_id

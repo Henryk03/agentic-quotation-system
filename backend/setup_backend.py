@@ -254,23 +254,23 @@ def create_env_file_from_template() -> bool:
         content = env_file.read_text()
 
         if (
-                "your_api_key_here" in content
-            ) or (
-                "GOOGLE_API_KEY=" not in content
+            "your_api_key_here" in content
+            or
+            "GOOGLE_API_KEY=" not in content
             ):
             print("⚠️  Action required: Update your GOOGLE_API_KEY in the .env file.")
 
         if (
             "protocol://user:password@host:port/db_name" in content
-            ) or (
-                "DATABASE_URL=" not in content
+            or
+            "DATABASE_URL=" not in content
             ):
             print("⚠️  Action required: Update the DATABASE_URL in the .env file.")
 
         if (
             "your_secret_key_here" in content
-            ) or (
-                "SECRET_KEY=" not in content
+            or
+            "SECRET_KEY=" not in content
             ):
             print("⚠️  Action required: Update the SECRET_KEY in the .env file.")
 
@@ -291,6 +291,83 @@ def create_env_file_from_template() -> bool:
     except Exception as e:
         print(f"❌ Error creating .env file: {e}")
         return False
+    
+
+def ensure_alembic() -> bool:
+    """"""
+
+    alembic_dir: Path = Path("alembic")
+
+    if not alembic_dir.exists():
+        try:
+            alembic_template: Path = Path("alembic_template")
+
+            print("📦 Initializing Alembic from template...", end=" ", flush=True)
+
+            shutil.copytree(alembic_template / "alembic", alembic_dir)
+            shutil.copy(alembic_template / "alembic.ini", Path("alembic.ini"))
+
+            print("✅")
+
+            return True
+        
+        except:
+            return False
+        
+    print("Alembic found!")
+    
+    return True
+
+
+def upgrade_database(
+        python: Path
+    ) -> bool:
+    """"""
+
+    return run_command(
+        [str(python), "-m", "alembic", "upgrade", "head"],
+        "⬆️ Applying database migrations",
+        silent=False
+    )
+
+
+def is_database_initialized(
+        python: Path
+    ) -> bool:
+    """"""
+
+    try:
+        subprocess.run(
+            [str(python), "-m", "alembic", "current"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    
+    except subprocess.CalledProcessError:
+        return False
+    
+
+def ensure_initial_migration(
+        python: Path
+    ) -> bool:
+    """"""
+
+    versions = Path("alembic/versions")
+
+    if any(versions.iterdir()):
+        return True
+
+    return run_command(
+        [
+            str(python), "-m", "alembic",
+            "revision", "--autogenerate",
+            "-m", "initial schema"
+        ],
+        "🧱 No migrations found, generating initial schema",
+        silent=False
+    )
 
 
 
@@ -311,19 +388,28 @@ def main() -> Literal[1, 0]:
 
 
     # 1. Create venv
-    venv_path = Path(".venv")
+    venv_path: Path = Path(".venv")
+    if venv_path.exists():
+        overwrite = input(
+            "⚠️  Virtual environment already exists.\n"
+            "    Recreate it? (y/N): "
+        ).lower()
+
+        if overwrite in ("y", "yes"):
+            print("🗑️ Removing existing virtual environment...")
+            shutil.rmtree(venv_path)
+
+        else:
+            print("✅ Keeping existing virtual environment")
+
     if not venv_path.exists():
         if not run_command(
-            [sys.executable, "-m", "venv", ".venv"], 
+            [sys.executable, "-m", "venv", ".venv"],
             "📁 Creating virtual environment"
-            ):
-
+        ):
             return 1
-        
-    else:
-        print("✅ Virtual environment already exists")
     
-    venv_python = get_venv_python()
+    venv_python: Path = get_venv_python()
     
 
     # 2. Upgrade pip
@@ -347,7 +433,7 @@ def main() -> Literal[1, 0]:
     # 4. Install Playwright browsers
     if not run_command(
         [str(venv_python), "-m", "playwright", "install", "chromium"],
-        "🌐 Playwright browser installation (this may take a minute)"
+        "🌐 Playwright browser installation (this may take a while)"
         ):
 
         return 1
@@ -365,7 +451,40 @@ def main() -> Literal[1, 0]:
     else:
         if not create_env_file_from_template():
             return 1
+        
+
+    # 6. Configure database
+    print("\n" + "="*60)
+    print("🗄️ Database configuration")
+    print("="*60)
+
+    if not ensure_alembic():
+        return 1
     
+    if not ensure_initial_migration(venv_python):
+        return 1
+
+    if is_database_initialized(venv_python):
+        choice = input(
+            "⚠️  Database already initialized.\n\n"
+            "   [U] Upgrade migrations\n"
+            "   [S] Skip database setup\n\n"
+            "   Choice (U/S) [U]: "
+        ).lower()
+
+        if choice in ("", "u", "upgrade"):
+            if not upgrade_database(venv_python):
+                return 1
+            
+        else:
+            print("⏭️  Skipping database migrations")
+
+    else:
+        print("📦 Initializing database schema...")
+
+        if not upgrade_database(venv_python):
+            return 1
+ 
     print("\n" + "="*60)
     print("✅ Setup complete!")
     print("="*60)

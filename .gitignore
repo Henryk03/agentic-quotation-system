@@ -215,3 +215,7 @@ logins/
 logs/
 .logins/
 .logs/
+
+# alembic
+/backend/alembic/
+/backend/alembic.ini

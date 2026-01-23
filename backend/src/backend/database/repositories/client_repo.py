@@ -1,21 +1,22 @@
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.client import Client
 
 
-def get_or_create_client(
-        db: Session,
+async def get_or_create_client(
+        db: AsyncSession,
         session_id: str
     ) -> Client:
     """"""
 
-    client = db.get(Client, session_id)
+    client = await db.get(Client, session_id)
 
     if not client:
         client = Client(session_id=session_id)
         
         db.add(client)
-        db.commit()
+        await db.commit()
+        await db.refresh(client)
 
     return client

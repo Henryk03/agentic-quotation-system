@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from backend.backend_utils.events.parser import parse_event
 from backend.backend_utils.events.handler import EventHandler
 from backend.backend_utils.connection.connection_manager import ConnectionManager
-from backend.database.engine import SessionLocal
+from backend.database.engine import AsyncSessionLocal
 
 from shared.events import Event
 
@@ -80,7 +80,7 @@ async def websocket_chat(ws: WebSocket) -> None:
                         str_event: Any | None = raw.get("text")
                         event: Event = parse_event(str(str_event))
 
-                        with SessionLocal() as db:
+                        async with AsyncSessionLocal() as db:
                             await EventHandler.handle_event(
                                 db,
                                 event,

@@ -16,7 +16,7 @@ from playwright.async_api import (
 )
 
 from backend.config import settings
-from backend.database.engine import SessionLocal
+from backend.database.engine import AsyncSessionLocal
 from backend.database.repositories import credential_repo
 from backend.database.repositories import browser_context_repo
 from backend.backend_utils.signals.login_required import LoginRequiredSignal
@@ -93,7 +93,7 @@ class AsyncBrowserContextMaganer:
     
 
     @staticmethod
-    def __get_current_state(
+    async def __get_current_state(
             session_id: str | None,
             provider: str
         ) -> tuple[Path | StorageState | str | None, str | None]:
@@ -104,12 +104,12 @@ class AsyncBrowserContextMaganer:
             return path, None if path.exists() else None
 
         else:
-            with SessionLocal() as db:
+            async with AsyncSessionLocal() as db:
                 ctx: StorageState | str | None
                 rsn: str | None
 
                 if session_id:
-                    ctx, rsn = browser_context_repo.get_browser_context(
+                    ctx, rsn = await browser_context_repo.get_browser_context(
                         db,
                         session_id,
                         provider
@@ -134,9 +134,9 @@ class AsyncBrowserContextMaganer:
             pass        # fare caso per CLI
 
         else:
-            with SessionLocal() as db:
+            async with AsyncSessionLocal() as db:
                 if session_id:
-                    browser_context_repo.upsert_browser_context(
+                    await browser_context_repo.upsert_browser_context(
                         db,
                         session_id,
                         provider,
@@ -168,9 +168,9 @@ class AsyncBrowserContextMaganer:
         credentials: dict[str, str] | None = None
 
         if not AsyncBrowserContextMaganer.is_cli_mode():
-            with SessionLocal() as db:
+            async with AsyncSessionLocal() as db:
                 if session_id:
-                    credentials = credential_repo.get_credentials(
+                    credentials = await credential_repo.get_credentials(
                         db,
                         session_id,
                         provider
@@ -536,7 +536,7 @@ class AsyncBrowserContextMaganer:
         state: Path | StorageState | str | None
         fail_reason: str | None
 
-        state, fail_reason = AsyncBrowserContextMaganer.__get_current_state(
+        state, fail_reason = await AsyncBrowserContextMaganer.__get_current_state(
             session_id,
             provider
         )

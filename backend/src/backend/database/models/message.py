@@ -1,5 +1,5 @@
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, func
+from sqlalchemy import String, Text, DateTime, ForeignKeyConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -12,13 +12,9 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
-    session_id: Mapped[str] = mapped_column(
-        ForeignKey("clients.session_id")
-    )
+    session_id: Mapped[str] = mapped_column(nullable=False)
 
-    chat_id: Mapped[str] = mapped_column(
-        ForeignKey("chats.chat_id")
-    )
+    chat_id: Mapped[str] = mapped_column(nullable=False)
 
     role: Mapped[str] = mapped_column(String)
 
@@ -29,4 +25,22 @@ class Message(Base):
         server_default=func.now()
     )
 
-    chat = relationship("Chat", back_populates="messages")
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["chat_id", "session_id"],
+            ["chats.chat_id", "chats.session_id"]
+        ),
+        ForeignKeyConstraint(
+            ["session_id"],
+            ["clients.session_id"]
+        ),
+    )
+
+    chat = relationship(
+        "Chat",
+        primaryjoin=(
+            "and_(Message.chat_id==Chat.chat_id, "
+            "Message.session_id==Chat.session_id)"
+        ),
+        back_populates="messages"
+    )

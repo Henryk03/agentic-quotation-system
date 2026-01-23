@@ -1,35 +1,36 @@
 
-from sqlalchemy import desc
-from sqlalchemy.orm import Session
+from sqlalchemy import select, desc
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.message import Message
 
 
-def get_last_user_message(
-        db: Session,
+async def get_last_user_message(
+        db: AsyncSession,
         session_id: str,
         chat_id: str,
     ) -> str | None:
     """"""
 
-    message = (
-        db.query(Message)
-        .filter(
+    stmt = (
+        select(Message)
+        .where(
             Message.session_id == session_id,
             Message.chat_id == chat_id,
             Message.role == "user"
         )
-        .order_by(
-            desc(Message.created_at)
-        )
-        .first()
+        .order_by(desc(Message.created_at))
+        .limit(1)
     )
+    
+    result = await db.execute(stmt)
+    message = result.scalar_one_or_none()
 
     return message.content if message else None
 
 
-def save_message(
-        db: Session, 
+async def save_message(
+        db: AsyncSession, 
         session_id: str, 
         chat_id: str, 
         role: str, 
@@ -45,4 +46,4 @@ def save_message(
     )
 
     db.add(msg)
-    db.commit()
+    await db.commit()

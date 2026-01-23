@@ -6,6 +6,10 @@ from langchain_core.runnables import Runnable
 from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import HumanMessage, BaseMessage
 
+from backend.database.engine import AsyncSessionLocal
+from backend.database.repositories.chat_repo import get_or_create_chat
+from backend.database.repositories.client_repo import get_or_create_client
+
 from backend.backend_utils.events.emitter import EventEmitter
 from backend.backend_utils.signals.login_required import LoginRequiredSignal
 
@@ -47,13 +51,20 @@ async def dispatch_chat(
     ) -> None:
     """"""
 
+    async with AsyncSessionLocal() as db:
+        # 1. Assicurati che il client esista
+        _ = await get_or_create_client(db, session_id)
+        
+        # 2. Assicurati che la chat esista
+        _ = await get_or_create_chat(db, chat_id, session_id)
+
     user_message: str = await __format_message(
         user_input,
         selected_stores
     )
 
     config: RunnableConfig = {
-        "configurable": {"thread_id": chat_id}
+        "configurable": {"thread_id": f"{session_id}|{chat_id}"}
     }
 
     try:

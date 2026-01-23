@@ -1,6 +1,7 @@
 
 import json
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from playwright.async_api import StorageState
 
@@ -8,8 +9,8 @@ from backend.database.models.browser_context import BrowserContext
 from backend.backend_utils.security.db_security import encrypt, decrypt
 
 
-def upsert_browser_context(
-        db: Session,
+async def upsert_browser_context(
+        db: AsyncSession,
         session_id: str,
         store: str,
         state: StorageState | str,
@@ -17,11 +18,16 @@ def upsert_browser_context(
     ) -> None:
     """"""
     
-    context = (
-        db.query(BrowserContext)
-        .filter_by(session_id=session_id, store=store)
-        .first()
+    stmt = (
+        select(BrowserContext)
+        .where(
+            BrowserContext.session_id == session_id,
+            BrowserContext.store == store
+        )
     )
+
+    result = await db.execute(stmt)
+    context = result.scalar_one_or_none()
 
     string_state = json.dumps(state) if isinstance(state, dict) else state
     enc_state = encrypt(string_state)
@@ -40,21 +46,26 @@ def upsert_browser_context(
 
         db.add(context)
 
-    db.commit()
+    await db.commit()
 
 
-def get_browser_context(
-        db: Session,
+async def get_browser_context(
+        db: AsyncSession,
         session_id: str,
         store: str
     ) -> tuple[StorageState | str | None, str | None]:
     """"""
 
-    context: BrowserContext | None = (
-        db.query(BrowserContext)
-        .filter_by(session_id=session_id, store=store)
-        .first()
+    stmt = (
+        select(BrowserContext)
+        .where(
+            BrowserContext.session_id == session_id,
+            BrowserContext.store == store
+        )
     )
+
+    result = await db.execute(stmt)
+    context = result.scalar_one_or_none() 
 
     if not context:
         return None, None

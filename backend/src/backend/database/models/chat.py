@@ -1,8 +1,9 @@
 
-from sqlalchemy import String, DateTime, func, ForeignKey, UniqueConstraint
+from sqlalchemy import String, DateTime, func, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
+
 
 class Chat(Base):
     """"""
@@ -17,6 +18,11 @@ class Chat(Base):
     session_id: Mapped[str] = mapped_column(
         ForeignKey("clients.session_id"),
         primary_key=True
+    )
+
+    state: Mapped[dict | None] = mapped_column(
+        JSON, 
+        nullable=True
     )
 
     created_at: Mapped[str] = mapped_column(
