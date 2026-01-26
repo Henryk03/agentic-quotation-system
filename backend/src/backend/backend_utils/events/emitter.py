@@ -82,7 +82,7 @@ class EventEmitter:
             message
         )
 
-        if role != "assistant" and role != "tool":
+        if role != "assistant":
             return None
         
         content: str | None = EventEmitter.__normalize_content(

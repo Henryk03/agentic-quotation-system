@@ -22,7 +22,8 @@ from backend.database.repositories import browser_context_repo
 from backend.backend_utils.signals.login_required import LoginRequiredSignal
 from backend.backend_utils.exceptions import (
     LoginFailedException,
-    ManualFallbackException
+    ManualFallbackException,
+    UILoginException
 )
 
 from shared.provider.base_provider import BaseProvider
@@ -77,7 +78,9 @@ class AsyncBrowserContextMaganer:
 
 
     @staticmethod
-    def __state_path(provider: BaseProvider) -> Path:
+    def __state_path(
+            provider: BaseProvider
+        ) -> Path:
         """
         Return the `Path` to the given provider's state file.
 
@@ -95,7 +98,7 @@ class AsyncBrowserContextMaganer:
     @staticmethod
     async def __get_current_state(
             session_id: str | None,
-            provider: str
+            provider: BaseProvider
         ) -> tuple[Path | StorageState | str | None, str | None]:
         """"""
 
@@ -112,7 +115,7 @@ class AsyncBrowserContextMaganer:
                     ctx, rsn = await browser_context_repo.get_browser_context(
                         db,
                         session_id,
-                        provider
+                        provider.name
                     )
                     return ctx, rsn
 
@@ -123,7 +126,7 @@ class AsyncBrowserContextMaganer:
     @staticmethod
     async def __save_current_state(
         session_id: str | None,
-        provider: str,
+        provider: BaseProvider,
         context: BrowserContext
     ) -> None:
         """"""
@@ -139,7 +142,7 @@ class AsyncBrowserContextMaganer:
                     await browser_context_repo.upsert_browser_context(
                         db,
                         session_id,
-                        provider,
+                        provider.name,
                         state_dict,
                         None
                     )
@@ -149,19 +152,19 @@ class AsyncBrowserContextMaganer:
     async def __handle_failure(
             provider: BaseProvider, 
             reason: str | None = None
-        ) -> None | LoginRequiredSignal:
+        ) -> None:
         """"""
 
         if AsyncBrowserContextMaganer.is_cli_mode():
             raise ManualFallbackException(provider, reason)
         
-        return LoginRequiredSignal(provider.name, provider.url, reason)
+        raise UILoginException(provider, reason)
     
 
     @staticmethod
     async def __get_creds_by_mode(
             session_id: str | None,
-            provider: str
+            provider: BaseProvider
         ) -> dict[str, str] | None:
         """"""
 
@@ -173,7 +176,7 @@ class AsyncBrowserContextMaganer:
                     credentials = await credential_repo.get_credentials(
                         db,
                         session_id,
-                        provider
+                        provider.name
                     )
 
         else:
@@ -515,7 +518,7 @@ class AsyncBrowserContextMaganer:
             self,
             session_id: str | None,
             provider: BaseProvider
-        ) -> BrowserContext | LoginRequiredSignal:
+        ) -> BrowserContext | None:
         """
         Return an instanse of `BrowserContext` to be used to navigate the 
         given provider's website. It may require the user to manual logging-in
@@ -548,14 +551,15 @@ class AsyncBrowserContextMaganer:
         page: Page | None = None
 
         try:
-            if not state and provider.login_required:
-                failure = AsyncBrowserContextMaganer.__handle_failure(
+            login_required: bool = provider.login_required
+
+            print(f"TIPO DI LOGIN_REQUIRED: {type(login_required)}")
+
+            if not state and login_required:
+                await AsyncBrowserContextMaganer.__handle_failure(
                     provider, 
                     "MISSING_STATE"
                 )
-                
-                if isinstance(failure, LoginRequiredSignal):
-                    return failure
 
             _, context, page = await self.__prepare_provider_context(
                 provider,
@@ -567,7 +571,7 @@ class AsyncBrowserContextMaganer:
                 page
             ) 
             
-            if logged_in or not provider.login_required:
+            if logged_in or not login_required:
                 await page.close()
                 return context
             
@@ -600,7 +604,7 @@ class AsyncBrowserContextMaganer:
                     
             raise ManualFallbackException(provider)             
         
-        except (ManualFallbackException, Exception) as e:
+        except ManualFallbackException:
             if page:
                 await AsyncBrowserContextMaganer.close_page_resources(
                     page
@@ -611,17 +615,14 @@ class AsyncBrowserContextMaganer:
                     if isinstance(state, Path):
                         await self.__manual_login(provider, state)
                         _, context, _ = await self.__prepare_provider_context(
-                            provider=provider,
-                            state=state
+                            provider,
+                            state
                         )
 
                 except:
                     raise LoginFailedException(provider)
-
-                if context:
-                    return context
-            
-            return LoginRequiredSignal(provider, str(e))
+                
+        return context
 
 
     async def __manual_login(

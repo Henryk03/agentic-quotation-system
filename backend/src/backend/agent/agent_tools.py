@@ -25,6 +25,7 @@ from backend.backend_utils.computer_use.functions import (
 )
 
 from shared.provider.base_provider import BaseProvider
+from shared.provider.registry import get_provider
 
 
 async def search_products(
@@ -48,6 +49,8 @@ async def search_products(
             A formatted string containing the information found 
             for each product.
     """
+
+    print(f"La ricerca sara' fatta su questi siti: {providers}")
     
     web_search_results_list: SafeAsyncList
     browser_context_manager: AsyncBrowserContextMaganer
@@ -61,25 +64,27 @@ async def search_products(
         provider_page: list[tuple[BaseProvider, Page]] = []
 
         for provider in providers:
+            provider_instance = get_provider(provider)
+
             try:
-                context_or_signal: BrowserContext | LoginRequiredSignal = (
+                context_or_none: BrowserContext | None = (
                     await browser_context_manager.ensure_provider_context(
                         session_id,
-                        provider
+                        provider_instance
                     )
                 )
-
-                if isinstance(context_or_signal, LoginRequiredSignal):
-                    return context_or_signal
-
-                provider_page.append(
-                    (provider, await context_or_signal.new_page())
-                )
+                
+                if context_or_none:
+                    provider_page.append(
+                        (provider_instance, await context_or_none.new_page())
+                    )
 
             except LoginFailedException as lfe:
                 await web_search_results_list.add(
-                    await __format_block(provider, [str(lfe)])
+                    await __format_block(provider_instance, [str(lfe)])
                 )
+
+        print("Avviamo la ricerca...")
 
         await asyncio.gather(
             *(__search_in_website(
@@ -90,6 +95,8 @@ async def search_products(
             )
         )
 
+        print("Ricerca completata!")
+
         # clean up
         for _, page in provider_page:
             await AsyncBrowserContextMaganer.close_page_resources(page)
@@ -97,6 +104,8 @@ async def search_products(
     web_search_results_str = "\n\n".join(
         [result for result in await web_search_results_list.get_all()]
     )
+
+    print(f"Risultato della ricerca: {web_search_results_str}")
 
     return web_search_results_str
 

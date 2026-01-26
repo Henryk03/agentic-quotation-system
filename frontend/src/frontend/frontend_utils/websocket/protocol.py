@@ -46,6 +46,8 @@ async def receive_events(
                 
             if needs_rerun:
                 received_any = True
+
+            print(f"Abbiamo ricevuto un messaggio da: {event.role}")
             
             if isinstance(event, ChatMessageEvent) and event.role == "assistant":
                 break

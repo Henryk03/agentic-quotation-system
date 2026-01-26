@@ -1,3 +1,4 @@
 
 from backend.backend_utils.exceptions.login_failed import LoginFailedException
 from backend.backend_utils.exceptions.manual_fallback import ManualFallbackException
+from backend.backend_utils.exceptions.ui_login import UILoginException

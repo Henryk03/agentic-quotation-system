@@ -41,7 +41,54 @@ def get_event_loop() -> asyncio.AbstractEventLoop:
 #      Event handling
 # ==========================
 
-def handle_event(event: Event) -> bool:
+def __handle_login_required(
+        placeholder: DeltaGenerator,
+        event: Event
+    ) -> None:
+    """"""
+
+    login_url: str = event.login_url
+    login_message: str = event.message
+
+    with placeholder.container():
+        st.warning(login_message)
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("✅ Proceed", key="proceed_login"):
+                st.session_state.ui_state["show_login_warning"] = False
+
+                st.markdown("Opening...")
+
+                try:
+                    _ = get_event_loop().run_until_complete(
+                        st.session_state.ws_client.handle_login(login_url)
+                    )
+
+                    st.rerun()
+
+                except Exception as e:
+                    placeholder.error(f"Error during the login: {e}")
+
+        with col2:
+            if st.button("❌ Cancel", key="cancel_login"):
+                st.session_state.ui_state["show_login_warning"] = False
+
+                try:
+                    _ = get_event_loop().run_until_complete(
+                        st.session_state.ws_client.send_login_failed()
+                    )
+
+                    st.markdown("Login cancelled")
+
+                except Exception as e:
+                    placeholder.error(f"Error: {e}") 
+
+
+def handle_event(
+        event: Event
+    ) -> bool:
     """"""
 
     ephemeral: DeltaGenerator = st.session_state.ephemeral_container
@@ -50,14 +97,7 @@ def handle_event(event: Event) -> bool:
     #  Chat messages (persist)
     # ==========================
     if isinstance(event, ChatMessageEvent):
-        st.session_state.ui_state["login_in_progress"] = False
-        st.session_state.ui_state["login_message"] = None
-        st.session_state.ui_state["login_url"] = None
-
         content = event.content
-
-        if isinstance(content, list):
-            content = content[0].get("text")
 
         if ephemeral:
             ephemeral.markdown(content)       
@@ -90,25 +130,15 @@ def handle_event(event: Event) -> bool:
     #   Login flow (temporary)
     # ==========================
     if isinstance(event, LoginRequiredEvent):
-        st.session_state.ui_state["login_in_progress"] = True
-        st.session_state.ui_state["login_message"] = event.message
-        st.session_state.ui_state["login_url"] = str(event.login_url)
+        if ephemeral:
+            __handle_login_required(
+                ephemeral,
+                event
+            )
         
         return False
-
-    if isinstance(event, LoginCompletedEvent):
-        st.session_state.ui_state["login_in_progress"] = False
-        st.session_state.ui_state["login_message"] = None
-        st.session_state.ui_state["login_url"] = None
-
-        return False
-
-    if isinstance(event, LoginFailedEvent):
-        st.session_state.ui_state["login_in_progress"] = False
-        st.session_state.ui_state["login_message"] = None
-        st.session_state.ui_state["login_url"] = None
-        
-        return False
+    
+    return False
 
 
 def on_event(event: Event) -> None:
@@ -150,12 +180,6 @@ if "ws_client" not in st.session_state:
 
 if "ui_state" not in st.session_state:
     st.session_state.ui_state = {
-        "login_in_progress": False,
-        "login_message": None,
-        "login_url": None,
-
-        "sidebar_visible": True,
-
         "selected_stores": [],
         "store_dialog_open": False,
         "autologin_dialog_open": False,
@@ -372,19 +396,26 @@ def store_selector_dialog() -> None:
 
     st.session_state.ui_state["store_dialog_open"] = False
 
+
 if st.session_state.ui_state["store_dialog_open"]:
     store_selector_dialog()
 
 if st.session_state.ui_state["autologin_dialog_open"]:
     insert_autologin_credentials()
 
+
+# ==========================
+#     Send credentials
+# ==========================
+
 if st.session_state.ui_state["send_credentials_now"]:
-    for _ in range(2):
-        received_event = get_event_loop().run_until_complete(
-            st.session_state.ws_client.send_credentials(
+    # for _ in range(2):
+    #     received_event = get_event_loop().run_until_complete(
+    #         st.session_state.ws_client.send_credentials(
                 
-            )
-        )
+    #         )
+    #     )
+    pass              
 
 
 # ==========================

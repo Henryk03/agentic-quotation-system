@@ -22,7 +22,8 @@ class WSClient:
             session_id: str,
             websocket_uri: str,
             logger: logging.Logger = logging.getLogger("agent-frontend")
-        ):
+        ) -> None:
+        """"""
 
         self.websocket = websocket
         self.session_id = session_id
@@ -30,7 +31,9 @@ class WSClient:
         self.logger = logger
 
     
-    async def connect(self) -> ClientConnection:
+    async def connect(
+            self
+        ) -> ClientConnection:
         """"""
 
         ws_uri = self.websocket_uri
@@ -57,7 +60,9 @@ class WSClient:
         raise Exception("Unable to connect to server")
 
 
-    async def get_websocket(self) -> ClientConnection:
+    async def get_websocket(
+            self
+        ) -> ClientConnection:
         """"""
 
         self.logger.debug("connecting to server...")
@@ -122,6 +127,24 @@ class WSClient:
             session_id: str,
             credentials: dict
         ) -> None:
+        """"""
+
+        pass
+
+
+    async def send_context() -> None:
+        """"""
+
+        pass
+
+
+    async def handle_login() -> None:
+        """"""
+
+        pass
+
+
+    async def send_login_failed() -> None:
         """"""
 
         pass
