@@ -50,3 +50,12 @@ def support_autologin(provider: str) -> bool:
         return instance.has_auto_login()
     
     return False
+
+
+def get_provider(provider_name: str) -> BaseProvider | None:
+    """"""
+
+    if provider_name in PROVIDER_REGISTRY:
+        return PROVIDER_REGISTRY[provider_name]
+    
+    return None
