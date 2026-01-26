@@ -8,19 +8,18 @@ from shared.provider.providers import comet, gruppo_comet
 PROVIDER_REGISTRY: dict[str, BaseProvider] = {}
 
 
-def register_provider(provider_cls: BaseProvider) -> None:
+def register_provider(provider_instance: BaseProvider) -> None:
     """"""
 
-    istance = provider_cls()
-    name = istance.name
-    PROVIDER_REGISTRY[name] = provider_cls
+    name: str = provider_instance.name
+    PROVIDER_REGISTRY[name] = provider_instance
 
 
 # =========================
 #  providers' registration 
 # =========================
-register_provider(comet.Comet)
-register_provider(gruppo_comet.GruppoComet)
+register_provider(comet.Comet())
+register_provider(gruppo_comet.GruppoComet())
 
 
 def all_providers() -> list[BaseProvider]:
@@ -45,7 +44,7 @@ def support_autologin(provider: str) -> bool:
     """"""
 
     if provider in PROVIDER_REGISTRY:
-        instance: BaseProvider = PROVIDER_REGISTRY[provider]()
+        instance: BaseProvider = PROVIDER_REGISTRY[provider]
 
         return instance.has_auto_login()
     
