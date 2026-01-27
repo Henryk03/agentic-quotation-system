@@ -2,11 +2,7 @@
 from fastapi import WebSocket
 from langchain_core.runnables import Runnable
 from langchain_core.runnables import RunnableConfig
-from langchain_core.messages import (
-    HumanMessage, 
-    ToolMessage,
-    BaseMessage
-)
+from langchain_core.messages import HumanMessage, BaseMessage
 
 from backend.backend_utils.events.emitter import EventEmitter
 from backend.backend_utils.exceptions import UILoginException

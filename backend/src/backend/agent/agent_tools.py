@@ -49,8 +49,6 @@ async def search_products(
             A formatted string containing the information found 
             for each product.
     """
-
-    print(f"La ricerca sara' fatta su questi siti: {providers}")
     
     web_search_results_list: SafeAsyncList
     browser_context_manager: AsyncBrowserContextMaganer
@@ -84,8 +82,6 @@ async def search_products(
                     await __format_block(provider_instance, [str(lfe)])
                 )
 
-        print("Avviamo la ricerca...")
-
         await asyncio.gather(
             *(__search_in_website(
                 provider, 
@@ -95,8 +91,6 @@ async def search_products(
             )
         )
 
-        print("Ricerca completata!")
-
         # clean up
         for _, page in provider_page:
             await AsyncBrowserContextMaganer.close_page_resources(page)
@@ -104,8 +98,6 @@ async def search_products(
     web_search_results_str = "\n\n".join(
         [result for result in await web_search_results_list.get_all()]
     )
-
-    print(f"Risultato della ricerca: {web_search_results_str}")
 
     return web_search_results_str
 

@@ -106,7 +106,7 @@ class WSClient:
         ) -> bool:
         """"""
 
-        ws = await self.get_websocket()
+        ws: ClientConnection = await self.get_websocket()
 
         if not await self.ensure_alive(ws):
             self.logger.debug("connection dead, reconnecting...")
@@ -114,10 +114,10 @@ class WSClient:
 
             ws = await self.get_websocket()
 
-        event = to_chat_message_event(role, message, metadata)
+        event: Event = to_chat_message_event(role, message, metadata)
 
         await ws.send(event.model_dump_json())
-        received = await receive_events(ws, on_event, on_error)
+        received: bool = await receive_events(ws, on_event, on_error)
 
         return received
     

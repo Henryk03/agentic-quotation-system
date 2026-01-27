@@ -15,7 +15,7 @@ async def receive_events(
         websocket: ClientConnection, 
         on_event: Callable[[Event], None],
         on_error: Callable[[Exception], None] | None = None,
-        timeout: float = 5.0
+        timeout: float = 60.0
     ) -> bool:
     """"""
     
@@ -38,13 +38,16 @@ async def receive_events(
             try:
                 event = parse_event(raw)
 
+                print("Evento crudo parsato correttamente")
+
             except Exception as e:
                 if on_error:
-                    on_error(f"Event partse error: {e}")
+                    on_error(e)
 
             needs_rerun = on_event(event)
                 
             if needs_rerun:
+                print("C'e' bisogno del re-run")
                 received_any = True
 
             print(f"Abbiamo ricevuto un messaggio da: {event.role}")

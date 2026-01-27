@@ -5,7 +5,7 @@ from shared.events.chat import ChatMessageEvent
 def to_chat_message_event(
         role: str,
         message: str,
-        metadata: dict[str, list[str]]
+        metadata: dict[str, list[str] | str]
     ) -> ChatMessageEvent:
     """"""
 
