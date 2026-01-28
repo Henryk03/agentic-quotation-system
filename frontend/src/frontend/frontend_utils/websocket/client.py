@@ -5,6 +5,7 @@ from typing import Callable
 
 import websockets
 from websockets import ClientConnection
+from playwright.async_api import async_playwright
 
 from frontend.frontend_utils.events.converter import to_chat_message_event
 from frontend.frontend_utils.websocket.protocol import receive_events
@@ -101,7 +102,7 @@ class WSClient:
             role: str,
             message: str,
             metadata: dict[str, list[str] | str],
-            on_event: Callable[[Event], None],
+            on_event: Callable[[Event], bool],
             on_error: Callable[[Exception], None] | None = None
         ) -> bool:
         """"""
@@ -109,7 +110,6 @@ class WSClient:
         ws: ClientConnection = await self.get_websocket()
 
         if not await self.ensure_alive(ws):
-            self.logger.debug("connection dead, reconnecting...")
             self.websocket = None
 
             ws = await self.get_websocket()
@@ -138,10 +138,27 @@ class WSClient:
         pass
 
 
-    async def handle_login() -> None:
+    async def handle_login(
+            self,
+            login_url: str
+        ) -> bool:
         """"""
 
-        pass
+        async with async_playwright() as apw:
+            browser = await apw.chromium.launch(
+                headless=False,
+                channel="chrome"
+            )
+            page = await browser.new_page()
+
+            await page.goto(login_url)
+
+            await asyncio.sleep(5)
+
+            await page.close()
+            await browser.close()
+
+        return True
 
 
     async def send_login_failed() -> None:

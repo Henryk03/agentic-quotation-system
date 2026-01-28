@@ -19,7 +19,6 @@ from backend.config import settings
 from backend.database.engine import AsyncSessionLocal
 from backend.database.repositories import credential_repo
 from backend.database.repositories import browser_context_repo
-from backend.backend_utils.signals.login_required import LoginRequiredSignal
 from backend.backend_utils.exceptions import (
     LoginFailedException,
     ManualFallbackException,
@@ -552,8 +551,6 @@ class AsyncBrowserContextMaganer:
 
         try:
             login_required: bool = provider.login_required
-
-            print(f"TIPO DI LOGIN_REQUIRED: {type(login_required)}")
 
             if not state and login_required:
                 await AsyncBrowserContextMaganer.__handle_failure(

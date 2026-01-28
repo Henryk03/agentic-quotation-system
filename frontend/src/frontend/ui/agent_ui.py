@@ -1,4 +1,5 @@
 
+import time
 import uuid
 import asyncio
 import logging
@@ -38,53 +39,28 @@ def get_event_loop() -> asyncio.AbstractEventLoop:
 
 
 # ==========================
-#      Event handling
+#     Message animation
 # ==========================
 
-def __handle_login_required(
-        placeholder: DeltaGenerator,
-        event: Event
+def stream_data(
+        text: str, 
+        placeholder: DeltaGenerator
     ) -> None:
     """"""
 
-    login_url: str = event.login_url
-    login_message: str = event.message
+    full_response = ""
 
-    with placeholder.container():
-        st.warning(login_message)
+    for chunk in text.split(" "):
+        full_response += chunk + " "
+        time.sleep(0.05)
+        placeholder.markdown(full_response + "▌")
 
-        col1, col2 = st.columns(2)
+    placeholder.markdown(full_response)
 
-        with col1:
-            if st.button("✅ Proceed", key="proceed_login"):
-                st.session_state.ui_state["show_login_warning"] = False
 
-                st.markdown("Opening...")
-
-                try:
-                    _ = get_event_loop().run_until_complete(
-                        st.session_state.ws_client.handle_login(login_url)
-                    )
-
-                    st.rerun()
-
-                except Exception as e:
-                    placeholder.error(f"Error during the login: {e}")
-
-        with col2:
-            if st.button("❌ Cancel", key="cancel_login"):
-                st.session_state.ui_state["show_login_warning"] = False
-
-                try:
-                    _ = get_event_loop().run_until_complete(
-                        st.session_state.ws_client.send_login_failed()
-                    )
-
-                    st.markdown("Login cancelled")
-
-                except Exception as e:
-                    placeholder.error(f"Error: {e}") 
-
+# ==========================
+#      Event handling
+# ==========================
 
 def handle_event(
         event: Event
@@ -100,7 +76,7 @@ def handle_event(
         content = event.content
 
         if ephemeral:
-            ephemeral.markdown(content)       
+            stream_data(content, ephemeral)       
 
         st.session_state.messages.append(
             {
@@ -130,21 +106,25 @@ def handle_event(
     #   Login flow (temporary)
     # ==========================
     if isinstance(event, LoginRequiredEvent):
-        if ephemeral:
-            __handle_login_required(
-                ephemeral,
-                event
-            )
+        st.session_state.ui_state["login_dialog"].update(
+            {
+                "open": True,
+                "status": "waiting",
+                "provider": event.provider,
+                "login_url": event.login_url,
+                "message": "Manual login is required to continue"
+            }
+        )
         
-        return False
+        return True
     
     return False
 
 
-def on_event(event: Event) -> None:
+def on_event(event: Event) -> bool:
     """"""
 
-    handle_event(event)
+    return handle_event(event)
 
 
 def on_error(exception: Exception) -> None:
@@ -183,6 +163,14 @@ if "ui_state" not in st.session_state:
         "selected_stores": [],
         "store_dialog_open": False,
         "autologin_dialog_open": False,
+
+        "login_dialog": {
+            "open": False,
+            "status": "idle",   # idle | waiting | in_progress | success | error
+            "provider": None,
+            "login_url": None,
+            "_close_next_run": False
+        },
 
         "autologin": {
             "pending_stores": [],
@@ -281,6 +269,117 @@ with st.sidebar:
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+
+
+# ==========================
+#    Login related dialog
+# ==========================
+
+@st.dialog("Login required")
+def login_dialog() -> None:
+    """"""
+
+    login = st.session_state.ui_state["login_dialog"]
+
+    st.markdown(f"### Manual login required for **{login["provider"]}**")
+
+    status = st.empty()
+
+    match login["status"]:
+        case "waiting":
+            status.info("Waiting for confirmation")
+
+        case "in_progress":
+            status.warning("🔄 Login in progress...")
+
+        case "success":
+            status.success("✅ Login completed successfully")
+
+        case "error":
+            status.error(f"❌ Login failed: {login["message"]}")
+
+        case _:
+            status.error("❌ Invalid status")
+
+    col1, col2 = st.columns(2)
+
+    if login["status"] == "waiting":
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("✅ Proceed"):
+                st.session_state.ui_state["login_dialog"]["status"] = "in_progress"
+                st.rerun()
+
+        with col2:
+            if st.button("❌ Cancel"):
+                # mandare segnale al server
+                st.session_state.ui_state["login_dialog"].update(
+                    {
+                        "open": False,
+                        "status": "idle",
+                        "provider": None,
+                        "login_url": None
+                    }
+                )
+                st.rerun()
+
+
+if st.session_state.ui_state["login_dialog"]["open"]:
+    login_dialog()
+
+if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
+    try:
+        ok: bool = get_event_loop().run_until_complete(
+            st.session_state.ws_client.handle_login(
+                st.session_state.ui_state["login_dialog"]["login_url"]
+            )
+        )
+
+        if ok:
+            st.session_state.ws_client.logger.info("Login avvenuto con successo")
+            st.session_state.ui_state["login_dialog"]["status"] = "success"
+
+        else:
+            st.session_state.ws_client.logger.info("Login fallito")
+            st.session_state.ui_state["login_dialog"].update(
+                {
+                    "status": "error",
+                    "message": "Invalid credentials or timeout triggered"
+                }
+            )
+
+    except Exception as e:
+        st.session_state.ws_client.logger.info("Qualcosa e' andato storto")
+        st.session_state.ui_state["login_dialog"].update(
+            {
+                "status": "error",
+                "message": str(e)
+            }
+        )
+
+    st.session_state.ws_client.logger.info("facciamo il rerun...")
+    st.rerun()
+
+if st.session_state.ui_state["login_dialog"]["_close_next_run"]:
+    st.session_state.ws_client.logger.info("il pop up si dovrebbe chiudere")
+    st.session_state.ui_state["login_dialog"].update(
+        {
+            "open": False,
+            "status": "idle",
+            "provider": None,
+            "login_url": None,
+            "message": None,
+            "_close_next_run": False,
+        }
+    )
+    st.rerun()
+
+if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
+    st.session_state.ws_client.logger.info("adesso facciamo in modo che al prossimo rerun venga chiuso il pop up")
+    st.session_state.ui_state["login_dialog"]["_close_next_run"] = True
+    st.rerun()
+
 
 
 # ==========================
@@ -392,6 +491,7 @@ def store_selector_dialog() -> None:
     with col2:
         if st.button("❌ Cancel"):
             st.session_state.ui_state["store_dialog_open"] = False
+
             st.rerun()
 
     st.session_state.ui_state["store_dialog_open"] = False
@@ -445,10 +545,11 @@ if prompt:
         "chat_id": st.session_state.chat_id
     }
 
-    try:
-        with placeholder:
-            placeholder.markdown("Thinking...")
-            received_events = get_event_loop().run_until_complete(
+    with placeholder:
+        placeholder.markdown("Thinking...")
+
+        try:
+            received_events: bool = get_event_loop().run_until_complete(
                 st.session_state.ws_client.send(
                     role="user",
                     message=prompt,
@@ -458,12 +559,14 @@ if prompt:
                 )
             )
 
-        if received_events:
-            st.rerun()
+            if received_events:
+                st.rerun()
         
-    except Exception as e:
-        err = f"WebSocket Error: {e}"
+        except Exception as e:
+            err = f"WebSocket Error: {e}"
 
-        st.session_state.messages.append(
-            {"role": "assistant", "content": f"⚠️ {err}"}
-        )
+            st.session_state.messages.append(
+                {"role": "assistant", "content": f"⚠️ {err}"}
+            )
+
+            placeholder.error(err)
