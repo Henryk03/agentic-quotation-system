@@ -2,6 +2,8 @@
 from typing import Literal
 from pydantic import BaseModel
 
+from playwright.async_api import StorageState
+
 
 class LoginRequiredEvent(BaseModel):
     """"""
@@ -12,28 +14,27 @@ class LoginRequiredEvent(BaseModel):
     message: str
 
 
-class LoginCompletedEvent(BaseModel):
+class LoginResultEvent(BaseModel):
     """"""
 
-    event: Literal["login.completed"] = "login.completed"
-    provider: str
-    metadata: str
-    state: str
-
-
-class LoginFailedEvent(BaseModel):
-    """"""
-
-    event: Literal["login.failed"] = "login.failed"
+    event: Literal[
+        "login.success",
+        "login.failed",
+        "login.cancelled",
+        "login.timeout",
+        "login.error"
+    ]
     provider: str
     metadata: dict
-    state: str = "LOGIN_FAILED"
+    state: StorageState | str
     reason: str | None = None
 
 
 class AutoLoginCredentialsEvent(BaseModel):
     """"""
 
-    event: Literal["autologin.credential.provided", "autologin.credentials.received"]
-    provider: str
+    event: Literal[
+        "autologin.credential.provided", 
+        "autologin.credentials.received"
+    ]
     credentials: dict | None

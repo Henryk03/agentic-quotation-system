@@ -1,7 +1,11 @@
 
-import requests
-from playwright.async_api import Page
+import re
 
+import requests
+from playwright.async_api import Page, ElementHandle
+
+from shared.playwright.page_utilities import find_elements_with_attr_pattern
+from shared.playwright.captcha_detection import detect_captcha
 from shared.shared_utils.common.dictionaries import AvailabilityDict
 
 
@@ -100,7 +104,7 @@ class BaseProvider:
             response = requests.head(url)
             return response.status_code < 400 
              
-        except requests.RequestException:       # invalid URL
+        except requests.RequestException:
             return False
 
         
@@ -138,3 +142,57 @@ class BaseProvider:
         """
 
         return False
+    
+
+    async def is_logged_in(
+            self,
+            page: Page
+        ) -> bool:
+        """
+        Check if the user is logged-in into the website in
+        the given webpage.
+
+        Args:
+            page (Page):
+                A page at the given provider's website.
+
+        Returns:
+            bool
+            - `True` if the user is logged-in.
+            - `False` otherwise.
+        """
+
+        try:
+            logout_texts: re.Pattern[str] = re.compile(
+                r"(?:log|sign)[- ]?out",
+                re.IGNORECASE
+            )
+
+            results: list[ElementHandle] = (
+                await find_elements_with_attr_pattern(
+                    page,
+                    self.logout_selectors,
+                    logout_texts,
+                    early_end=True
+                )
+            )
+
+            if results == []:
+                return False
+            
+            else:
+                return True
+            
+        except:
+            pass
+
+        return False
+    
+
+    async def has_captcha(
+            self,
+            page: Page
+        ) -> bool:
+        """"""
+
+        return await detect_captcha(page)
