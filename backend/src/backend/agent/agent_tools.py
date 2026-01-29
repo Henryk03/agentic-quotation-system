@@ -26,6 +26,7 @@ from backend.backend_utils.computer_use.functions import (
 
 from shared.provider.base_provider import BaseProvider
 from shared.provider.registry import get_provider
+from shared.playwright.page_utilities import close_page_resources
 
 
 async def search_products(
@@ -93,7 +94,7 @@ async def search_products(
 
         # clean up
         for _, page in provider_page:
-            await AsyncBrowserContextMaganer.close_page_resources(page)
+            await close_page_resources(page)
 
     web_search_results_str = "\n\n".join(
         [result for result in await web_search_results_list.get_all()]

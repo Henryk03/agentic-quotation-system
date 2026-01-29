@@ -7,10 +7,7 @@ from playwright.async_api import (
     BrowserContext, 
     Page, 
     ElementHandle,
-    Locator,
 )
-
-from shared.provider.base_provider import BaseProvider
 
 
 async def find_elements_with_attr_pattern(
@@ -174,68 +171,3 @@ async def close_page_resources(
 
     except:
         pass
-
-
-async def close_popup(
-        provider: BaseProvider,
-        page: Page
-    ) -> None:
-    """
-    Close all pop-ups related to cookies and advertising in a webpage. 
-    By default all the cookies are rejected if possible, otherwise they are accepted.
-
-    Args:
-        provider (BaseProvider):
-            A provider of professional items.
-
-        page (Page):
-            A page at the given provider's website.
-
-    Returns:
-        None
-    """
-
-    decline_texts: re.Pattern[str] = re.compile(
-        (
-            "rifiuta|rifiuto|declina|decline|refuse|deny|reject"
-            "necessary|essential only|essenziali|chiudi|chiudere"
-            "close|\u00d7|\u0078"
-        ),
-        re.IGNORECASE
-    )
-
-    accept_texts: re.Pattern[str] = re.compile(
-        "accetta|accettare|accept",
-        re.IGNORECASE
-    )
-
-    for sel in provider.popup_selectors:
-        try:
-            elements: Locator = page.locator(sel)
-            count: int = await elements.count()
-            accept_cookie: Locator | None = None
-
-            for i in range(count):
-                elem: Locator = elements.nth(i)
-
-                if await elem.is_visible():
-                    # we return the text content or an empty string, 
-                    # cause the if-statemente could fail with a NoneType
-                    text: str = await elem.text_content() or ""
-
-                    if re.search(decline_texts, text):
-                        await elem.click()
-
-                    elif re.search(accept_texts, text):
-                        accept_cookie = elem
-
-            # we click on accept when there is no reject button
-            if (accept_cookie is not None) and (await accept_cookie.is_visible()):
-                await accept_cookie.click()
-                
-        except:
-            continue
-
-    # in order to get rid of those pop-ups that 
-    # do not contain ASCII safe characters
-    await page.keyboard.press("Escape")

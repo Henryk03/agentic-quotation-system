@@ -1,5 +1,5 @@
 
-from sqlalchemy import String, DateTime, func, ForeignKey
+from sqlalchemy import String, DateTime, func, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -25,6 +25,12 @@ class BrowserContext(Base):
     fail_reason: Mapped[str | None] = mapped_column(
         String,
         nullable=True
+    )
+
+    attempts_history: Mapped[list[dict[str, str]] | None] = mapped_column(
+        JSON,
+        nullable=True,
+        default=list
     )
 
     updated_at: Mapped[str] = mapped_column(

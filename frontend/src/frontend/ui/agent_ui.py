@@ -7,18 +7,19 @@ import logging
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
-from frontend.frontend_utils.browser import *
 from frontend.frontend_utils.websocket.client import WSClient
 
-from shared.provider.registry import all_provider_names, support_autologin
+from shared.provider.registry import (
+    all_provider_names,
+    support_autologin
+)
 
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
 from shared.events.auth import (
     LoginRequiredEvent,
-    LoginCompletedEvent,
-    LoginFailedEvent,
+    AutoLoginCredentialsEvent
 )
 
 
@@ -313,7 +314,11 @@ def login_dialog() -> None:
 
         with col2:
             if st.button("❌ Cancel"):
-                # mandare segnale al server
+                get_event_loop().run_until_complete(
+                    st.session_state.ws_client.handle_login_cancelled(
+                        login["provider"]
+                    )
+                )
                 st.session_state.ui_state["login_dialog"].update(
                     {
                         "open": False,
@@ -325,61 +330,53 @@ def login_dialog() -> None:
                 st.rerun()
 
 
-if st.session_state.ui_state["login_dialog"]["open"]:
-    login_dialog()
-
 if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
     try:
         ok: bool = get_event_loop().run_until_complete(
             st.session_state.ws_client.handle_login(
-                st.session_state.ui_state["login_dialog"]["login_url"]
+                st.session_state.ui_state["login_dialog"]["provider"],
+                st.session_state.ui_state["login_dialog"]["login_url"],
+                st.session_state.chat_id,
+                st.session_state.ui_state["selected_stores"]
             )
         )
 
         if ok:
-            st.session_state.ws_client.logger.info("Login avvenuto con successo")
             st.session_state.ui_state["login_dialog"]["status"] = "success"
 
         else:
-            st.session_state.ws_client.logger.info("Login fallito")
-            st.session_state.ui_state["login_dialog"].update(
-                {
-                    "status": "error",
-                    "message": "Invalid credentials or timeout triggered"
-                }
+            st.session_state.ui_state["login_dialog"]["status"] = "error",
+            st.session_state.ui_state["login_dialog"]["message"] = (
+                "Login failed or timeout"
             )
 
     except Exception as e:
-        st.session_state.ws_client.logger.info("Qualcosa e' andato storto")
-        st.session_state.ui_state["login_dialog"].update(
-            {
-                "status": "error",
-                "message": str(e)
-            }
-        )
+        st.session_state.ui_state["login_dialog"]["status"] = "error"
+        st.session_state.ui_state["login_dialog"]["message"] = str(e)
 
-    st.session_state.ws_client.logger.info("facciamo il rerun...")
-    st.rerun()
-
-if st.session_state.ui_state["login_dialog"]["_close_next_run"]:
-    st.session_state.ws_client.logger.info("il pop up si dovrebbe chiudere")
-    st.session_state.ui_state["login_dialog"].update(
-        {
-            "open": False,
-            "status": "idle",
-            "provider": None,
-            "login_url": None,
-            "message": None,
-            "_close_next_run": False,
-        }
-    )
     st.rerun()
 
 if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
-    st.session_state.ws_client.logger.info("adesso facciamo in modo che al prossimo rerun venga chiuso il pop up")
-    st.session_state.ui_state["login_dialog"]["_close_next_run"] = True
-    st.rerun()
+    if not st.session_state.ui_state["login_dialog"]["_close_next_run"]:
+        st.session_state.ui_state["login_dialog"]["_close_next_run"] = True
+        time.sleep(2)
+        st.rerun()
 
+    else:
+        st.session_state.ui_state["login_dialog"].update(
+            {
+                "open": False,
+                "status": "idle",
+                "provider": None,
+                "login_url": None,
+                "message": None,
+                "_close_next_run": False,
+            }
+        )
+        st.rerun()
+
+if st.session_state.ui_state["login_dialog"]["open"]:
+    login_dialog()
 
 
 # ==========================
@@ -503,19 +500,18 @@ if st.session_state.ui_state["store_dialog_open"]:
 if st.session_state.ui_state["autologin_dialog_open"]:
     insert_autologin_credentials()
 
-
-# ==========================
-#     Send credentials
-# ==========================
-
 if st.session_state.ui_state["send_credentials_now"]:
-    # for _ in range(2):
-    #     received_event = get_event_loop().run_until_complete(
-    #         st.session_state.ws_client.send_credentials(
-                
-    #         )
-    #     )
-    pass              
+    for _ in range(2):
+        received_event = get_event_loop().run_until_complete(
+            st.session_state.ws_client.send_credentials(
+                st.session_state.ui_state["autologin"]["credentials"]
+            )
+        )
+
+        if received_event:
+            break
+
+    st.session_state.ui_state["send_credentials_now"] = False      
 
 
 # ==========================

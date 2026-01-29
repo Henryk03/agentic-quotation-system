@@ -138,7 +138,7 @@ class EventEmitter:
         ) -> None:
         """"""
 
-        pass
+        await websocket.send_text(event.model_dump_json())
 
 
     @staticmethod

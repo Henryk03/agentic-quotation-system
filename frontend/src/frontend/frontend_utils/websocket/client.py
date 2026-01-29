@@ -5,12 +5,20 @@ from typing import Callable
 
 import websockets
 from websockets import ClientConnection
-from playwright.async_api import async_playwright
+from playwright.async_api import StorageState
 
+from frontend.frontend_utils.browser.manual_login import run_manual_login
 from frontend.frontend_utils.events.converter import to_chat_message_event
-from frontend.frontend_utils.websocket.protocol import receive_events
+from frontend.frontend_utils.websocket.protocol import (
+    receive_events,
+    receive_credentials_ack
+)
 
 from shared.events import Event
+from shared.events.login import (
+    LoginResultEvent,
+    AutoLoginCredentialsEvent
+)
 
 
 class WSClient:
@@ -95,6 +103,21 @@ class WSClient:
 
         except:
             return False
+        
+
+    async def __get_active_websocket(
+            self
+        ) -> ClientConnection:
+        """"""
+
+        ws: ClientConnection = await self.get_websocket()
+
+        if not await self.ensure_alive(ws):
+            self.websocket = None
+
+            ws = await self.get_websocket()
+
+        return ws
     
 
     async def send(
@@ -107,12 +130,7 @@ class WSClient:
         ) -> bool:
         """"""
 
-        ws: ClientConnection = await self.get_websocket()
-
-        if not await self.ensure_alive(ws):
-            self.websocket = None
-
-            ws = await self.get_websocket()
+        ws: ClientConnection = await self.__get_active_websocket()
 
         event: Event = to_chat_message_event(role, message, metadata)
 
@@ -120,48 +138,104 @@ class WSClient:
         received: bool = await receive_events(ws, on_event, on_error)
 
         return received
-    
 
-    async def send_credentials(
+
+    async def send_event(
             self,
-            session_id: str,
-            credentials: dict
+            event: Event
         ) -> None:
         """"""
 
-        pass
+        ws: ClientConnection = await self.__get_active_websocket()
+        await ws.send(event.model_dump_json())
 
 
-    async def send_context() -> None:
+    async def send_credentials(
+            self,
+            credentials: dict
+        ) -> bool:
         """"""
 
-        pass
+        ws: ClientConnection = await self.__get_active_websocket()
+        
+        event: Event = AutoLoginCredentialsEvent(
+            event="autologin.credential.provided",
+            credentials=credentials
+        )
+
+        await ws.send(event.model_dump_json())
+        received_ack: bool = await receive_credentials_ack(ws)
+
+        return received_ack
+
+        
+
+
+    async def handle_login_cancelled(
+            self,
+            provider: str
+        ) -> None:
+        """"""
+
+        ws: ClientConnection = await self.__get_active_websocket()
+        await ws.send(
+            LoginResultEvent(
+                event="login.cancelled",
+                provider=provider,
+                state="LOGIN_CANCELLED",
+                reason="Login process cancelled by user"
+            )
+        )
 
 
     async def handle_login(
             self,
-            login_url: str
+            provider: str,
+            login_url: str,
+            chat_id: str,
+            selected_stores: list[str]
         ) -> bool:
         """"""
 
-        async with async_playwright() as apw:
-            browser = await apw.chromium.launch(
-                headless=False,
-                channel="chrome"
+        metadata: dict = {
+            "chat_id": chat_id,
+            "selected_stores": selected_stores
+        }
+
+        try:
+            storage: StorageState | None = await run_manual_login(
+                provider,
+                login_url
             )
-            page = await browser.new_page()
 
-            await page.goto(login_url)
+            if storage:
+                event: Event = LoginResultEvent(
+                    event="login.success",
+                    provider=provider,
+                    metadata=metadata,
+                    state=storage
+                )
+                await self.send_event(event)
+                return True
 
-            await asyncio.sleep(5)
+            else:
+                event: Event = LoginResultEvent(
+                    event="login.failed",
+                    provider=provider,
+                    metadata=metadata,
+                    state="LOGIN_FAILED"
+                )
+                await self.send_event(event)
+                return False
 
-            await page.close()
-            await browser.close()
-
-        return True
-
-
-    async def send_login_failed() -> None:
-        """"""
-
-        pass
+        except Exception as e:
+            await self.send_event(
+                LoginResultEvent(
+                    event="login.error",
+                    provider=provider,
+                    metadata=metadata,
+                    state="LOGIN_ERROR",
+                    reason=str(e)
+                )
+            )
+            return False

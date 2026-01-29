@@ -18,6 +18,7 @@ from backend.database.repositories import (
 )
 
 from shared.events import Event
+from shared.events.error import ErrorEvent
 from shared.events.auth import AutoLoginCredentialsEvent
 
 
@@ -65,8 +66,9 @@ class EventHandler:
         event_type: Literal[
             "autologin.credentials.provided",
             "chat.message",
-            "login.completed",
+            "login.success",
             "login.failed",
+            "login.error",
             "error"
         ] = getattr(event, "event", "error")
 
@@ -89,7 +91,7 @@ class EventHandler:
                     websocket
                 )
             
-            case "login.completed":
+            case "login.succeess":
                 return await EventHandler.__handle_browser_context(
                     db, 
                     event, 
@@ -98,15 +100,28 @@ class EventHandler:
                 )
 
             case "login.failed":
-                return await EventHandler.__handle_failed_login(
+                return await EventHandler.__handle_login_failed(
                     db,
                     event,
                     session_id,
                     websocket
                 )
 
-            case "error":
-                pass
+            case "login.error":
+                return await EventHandler.__handle_login_failed(
+                    db,
+                    event,
+                    session_id,
+                    websocket
+                )
+
+            case "login.cancelled":
+                return await EventHandler.__handle_login_cancelled(
+                    db,
+                    event,
+                    session_id,
+                    websocket
+                )
 
             case _:
                 pass
@@ -126,14 +141,17 @@ class EventHandler:
 
         for store, creds in event.credentials.items():
             await credential_repo.upsert_credentials(
-                db, session_id, store, creds["username"], creds["password"]
+                db, 
+                session_id, 
+                store, 
+                creds["username"], 
+                creds["password"]
             )
 
         await EventEmitter.emit_event(
             websocket,
             AutoLoginCredentialsEvent(
                 event="autologin.credentials.received",
-                provider=event.provider,
                 credentials=None
             )
         )
@@ -187,16 +205,24 @@ class EventHandler:
         ) -> None:
         """"""
 
-        if event.event != "login.completed":
+        if event.event != "login.success":
             return None
         
         chat_id: str = event.metadata.get("chat_id")
         selected_stores: list[str] = event.metadata.get("selected_stores")
     
+        await browser_context_repo.add_login_attempt(
+            db,
+            session_id,
+            event.provider,
+            "success",
+            None
+        )
+
         await browser_context_repo.upsert_browser_context(
             db,
             session_id,
-            event.store,
+            event.provider,
             event.state,
             None
         )
@@ -219,7 +245,7 @@ class EventHandler:
 
 
     @staticmethod
-    async def __handle_failed_login(
+    async def __handle_login_failed(
             db: AsyncSession,
             event: Event,
             session_id: str,
@@ -234,27 +260,120 @@ class EventHandler:
         selected_stores: list[str] = event.metadata.get("selected_stores")
         fail_reason: str | None = event.reason
 
-        if event.state == "LOGIN_FAILED":
+        await browser_context_repo.add_login_attempt(
+            db,
+            session_id,
+            event.provider,
+            "failed",
+            fail_reason
+        )
+
+        can_retry, block_reason = await browser_context_repo.can_attempt_login(
+            db,
+            session_id,
+            event.provider
+        )
+
+        if not can_retry:
             await browser_context_repo.upsert_browser_context(
                 db,
                 session_id,
                 event.provider,
-                event.state,
-                fail_reason
+                "BLOCKED",
+                block_reason
             )
 
-        last_message = await message_repo.get_last_user_message(
+            if selected_stores and len(selected_stores) > 0:
+                last_message = await message_repo.get_last_user_message(
+                    db, 
+                    session_id, 
+                    chat_id
+                )
+
+                if last_message:
+                    await dispatch_chat(
+                        agent,
+                        last_message,
+                        session_id,
+                        chat_id,
+                        selected_stores,
+                        websocket
+                    )
+
+            else:
+                await EventEmitter.emit_event(
+                    websocket,
+                    ErrorEvent(
+                        message="No providers available. All login attemps failed."
+                    )
+                )
+
+        else:
+            last_message = await message_repo.get_last_user_message(
+                db, 
+                session_id, 
+                chat_id
+            )
+
+            if last_message:
+                await dispatch_chat(
+                    agent,
+                    last_message,
+                    session_id,
+                    chat_id,
+                    selected_stores,
+                    websocket
+                )
+
+
+    @staticmethod
+    async def __handle_login_cancelled(
+            db: AsyncSession,
+            event: Event,
+            session_id: str,
+            websocket: WebSocket
+        ) -> None:
+        """"""
+
+        if event.event != "login.cancelled":
+            return None
+
+        chat_id: str = event.metadata.get("chat_id")
+        selected_stores: list[str] = event.metadata.get("selected_stores", [])
+
+        await browser_context_repo.add_login_attempt(
             db, 
             session_id, 
-            chat_id
+            event.provider,
+            status="cancelled", 
+            reason="User cancelled"
         )
 
-        if last_message:
-            await dispatch_chat(
-                agent,
-                last_message,
+        if event.provider in selected_stores:
+            selected_stores.remove(event.provider)
+        
+        if selected_stores:
+            last_message = await message_repo.get_last_user_message(
+                db,
                 session_id,
-                chat_id,
-                selected_stores,
-                websocket
+                chat_id
+            )
+
+            if last_message:
+                await dispatch_chat(
+                    agent,
+                    last_message,
+                    session_id,
+                    chat_id,
+                    selected_stores,
+                    websocket
+                )
+
+        else:
+            await EventEmitter.emit_event(
+                websocket,
+                {
+                    "event": "error",
+                    "message": "All providers cancelled."
+                }
             )
