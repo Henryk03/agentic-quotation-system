@@ -48,8 +48,10 @@ async def run_manual_login(
                 check_func=provider_instance.is_logged_in,
                 timeout=120000
             ):
-                storage: StorageState = await context.storage_state()
+                await page.wait_for_load_state("networkidle")
                 await asyncio.sleep(1)
+                
+                storage: StorageState = await context.storage_state()
                 await close_page_resources(page)
 
                 return storage

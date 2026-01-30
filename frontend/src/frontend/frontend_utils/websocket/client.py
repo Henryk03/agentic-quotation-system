@@ -173,19 +173,27 @@ class WSClient:
 
     async def handle_login_cancelled(
             self,
-            provider: str
-        ) -> None:
+            provider: str,
+            metadata: dict,
+            on_event: Callable[[Event], bool],
+            on_error: Callable[[Exception], None] | None = None
+        ) -> bool:
         """"""
 
         ws: ClientConnection = await self.__get_active_websocket()
-        await ws.send(
-            LoginResultEvent(
+
+        event: Event = LoginResultEvent(
                 event="login.cancelled",
                 provider=provider,
+                metadata=metadata,
                 state="LOGIN_CANCELLED",
                 reason="Login process cancelled by user"
             )
-        )
+        
+        await ws.send(event.model_dump_json())
+        received: bool = await receive_events(ws, on_event, on_error)
+
+        return received
 
 
     async def handle_login(
@@ -193,7 +201,9 @@ class WSClient:
             provider: str,
             login_url: str,
             chat_id: str,
-            selected_stores: list[str]
+            selected_stores: list[str],
+            on_event: Callable[[Event], bool],
+            on_error: Callable[[Exception], None] | None = None
         ) -> bool:
         """"""
 
@@ -208,14 +218,24 @@ class WSClient:
                 login_url
             )
 
+            ws: ClientConnection = await self.__get_active_websocket()
+
             if storage:
                 event: Event = LoginResultEvent(
                     event="login.success",
                     provider=provider,
                     metadata=metadata,
                     state=storage
+                ) 
+
+                await ws.send(event.model_dump_json())
+
+                _ = await receive_events(
+                    ws,
+                    on_event,
+                    on_error
                 )
-                await self.send_event(event)
+                
                 return True
 
             else:
@@ -226,16 +246,15 @@ class WSClient:
                     state="LOGIN_FAILED"
                 )
                 await self.send_event(event)
+
+                _ =  await receive_events(
+                    ws,
+                    on_event,
+                    on_error
+                )
+                
                 return False
 
         except Exception as e:
-            await self.send_event(
-                LoginResultEvent(
-                    event="login.error",
-                    provider=provider,
-                    metadata=metadata,
-                    state="LOGIN_ERROR",
-                    reason=str(e)
-                )
-            )
+                
             return False

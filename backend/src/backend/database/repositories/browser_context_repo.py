@@ -104,7 +104,7 @@ async def add_login_attempt(
     context = result.scalar_one_or_none()
     
     new_attempt = {
-        "timestamp": datetime.now(),
+        "timestamp": datetime.now().isoformat(),
         "status": status,
         "reason": reason
     }

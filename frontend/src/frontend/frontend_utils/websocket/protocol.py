@@ -10,6 +10,7 @@ from frontend.frontend_utils.events.parser import parse_event
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
 from shared.events.login import LoginRequiredEvent
+from shared.events.error import ErrorEvent
 
 
 async def receive_events(
@@ -50,7 +51,14 @@ async def receive_events(
             if needs_rerun:
                 received_any = True
             
-            if event:    
+            if isinstance(
+                event, 
+                (
+                    ChatMessageEvent, 
+                    ErrorEvent,
+                    LoginRequiredEvent
+                )
+            ):    
                 break
 
     except ConnectionClosed:

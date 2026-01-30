@@ -77,6 +77,3 @@ async def dispatch_chat(
             uile.provider.name,
             uile.provider.url
         )
-                
-    except Exception as e:
-        pass                    # decidere cosa fare...

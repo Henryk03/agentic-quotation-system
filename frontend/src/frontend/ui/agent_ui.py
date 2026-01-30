@@ -17,10 +17,7 @@ from shared.provider.registry import (
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
-from shared.events.auth import (
-    LoginRequiredEvent,
-    AutoLoginCredentialsEvent
-)
+from shared.events.login import LoginRequiredEvent
 
 
 # ==========================
@@ -69,22 +66,25 @@ def handle_event(
     """"""
 
     ephemeral: DeltaGenerator = st.session_state.ephemeral_container
+    login_open: bool = st.session_state.ui_state["login_dialog"]["open"]
         
     # ==========================
     #  Chat messages (persist)
     # ==========================
     if isinstance(event, ChatMessageEvent):
-        content = event.content
-
-        if ephemeral:
-            stream_data(content, ephemeral)       
-
+        if login_open:
+            st.session_state.deferred_events.append(event)
+            return True
+        
         st.session_state.messages.append(
             {
                 "role": event.role,
-                "content": content,
+                "content": event.content,
             }
         )
+
+        if ephemeral:
+            stream_data(event.content, ephemeral)  
 
         st.session_state.ephemeral_container = None
 
@@ -100,6 +100,9 @@ def handle_event(
                 "content": f"⚠️ {event.message}",
             }
         )
+
+        if ephemeral:
+            ephemeral.error(event.message)
 
         return True
     
@@ -143,6 +146,9 @@ if "chat_id" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "deferred_events" not in st.session_state:
+    st.session_state.deferred_events = []
 
 if "ephemeral_container" not in st.session_state:
     st.session_state.ephemeral_container = None
@@ -314,9 +320,17 @@ def login_dialog() -> None:
 
         with col2:
             if st.button("❌ Cancel"):
-                get_event_loop().run_until_complete(
+                metadata: dict = {
+                    "chat_id": st.session_state.chat_id,
+                    "selected_stores": st.session_state.ui_state["selected_stores"]
+                }
+
+                _ = get_event_loop().run_until_complete(
                     st.session_state.ws_client.handle_login_cancelled(
-                        login["provider"]
+                        login["provider"],
+                        metadata,
+                        on_event,
+                        on_error
                     )
                 )
                 st.session_state.ui_state["login_dialog"].update(
@@ -330,6 +344,9 @@ def login_dialog() -> None:
                 st.rerun()
 
 
+if st.session_state.ui_state["login_dialog"]["open"]:
+    login_dialog()
+
 if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
     try:
         ok: bool = get_event_loop().run_until_complete(
@@ -337,7 +354,9 @@ if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
                 st.session_state.ui_state["login_dialog"]["provider"],
                 st.session_state.ui_state["login_dialog"]["login_url"],
                 st.session_state.chat_id,
-                st.session_state.ui_state["selected_stores"]
+                st.session_state.ui_state["selected_stores"],
+                on_event,
+                on_error
             )
         )
 
@@ -359,7 +378,6 @@ if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
 if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
     if not st.session_state.ui_state["login_dialog"]["_close_next_run"]:
         st.session_state.ui_state["login_dialog"]["_close_next_run"] = True
-        time.sleep(2)
         st.rerun()
 
     else:
@@ -375,8 +393,22 @@ if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
         )
         st.rerun()
 
-if st.session_state.ui_state["login_dialog"]["open"]:
-    login_dialog()
+
+if len(st.session_state.deferred_events) > 0:
+    placeholder: DeltaGenerator | None = st.session_state.ephemeral_container
+
+    if not placeholder:
+        st.session_state.ephemeral_container = None
+        assistant_msg = st.chat_message("assistant")
+        placeholder = assistant_msg.empty()
+
+    st.session_state.ephemeral_container = placeholder
+
+    for event in st.session_state.deferred_events:
+        _ = handle_event(event)
+
+    st.session_state.deferred_events.clear()
+    st.rerun()
 
 
 # ==========================

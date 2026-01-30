@@ -19,7 +19,7 @@ from backend.database.repositories import (
 
 from shared.events import Event
 from shared.events.error import ErrorEvent
-from shared.events.auth import AutoLoginCredentialsEvent
+from shared.events.login import AutoLoginCredentialsEvent
 
 
 class EventHandler:
@@ -68,6 +68,7 @@ class EventHandler:
             "chat.message",
             "login.success",
             "login.failed",
+            "login.cancelled",
             "login.error",
             "error"
         ] = getattr(event, "event", "error")
@@ -91,7 +92,7 @@ class EventHandler:
                     websocket
                 )
             
-            case "login.succeess":
+            case "login.success":
                 return await EventHandler.__handle_browser_context(
                     db, 
                     event, 
@@ -372,8 +373,7 @@ class EventHandler:
         else:
             await EventEmitter.emit_event(
                 websocket,
-                {
-                    "event": "error",
-                    "message": "All providers cancelled."
-                }
+                ErrorEvent(
+                    message="All providers cancelled"
+                )
             )

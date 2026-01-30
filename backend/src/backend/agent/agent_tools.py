@@ -202,106 +202,106 @@ async def __search_in_website(
         await result_list.add(formatted_block)
 
 
-async def __search_with_computer_use(
-        product_list: list[str],
-        website: str
-    ) -> str:
-    """
-    Navigates the given website to search for products based on a user's request.
-    The function simulates realistic browsing behavior, visits the specified site,
-    analyzes the provided product list, and returns a synthesized summary of the
-    discovered information.
+# async def __search_with_computer_use(
+#         product_list: list[str],
+#         website: str
+#     ) -> str:
+#     """
+#     Navigates the given website to search for products based on a user's request.
+#     The function simulates realistic browsing behavior, visits the specified site,
+#     analyzes the provided product list, and returns a synthesized summary of the
+#     discovered information.
 
-    Args:
-        user_request (str):
-            A natural-language description of what the user wants to find.
+#     Args:
+#         user_request (str):
+#             A natural-language description of what the user wants to find.
 
-        website (str):
-            The URL of the website to navigate and inspect.
+#         website (str):
+#             The URL of the website to navigate and inspect.
 
-        products (list[str]):
-            A list of product names or identifiers to look for on the website.
+#         products (list[str]):
+#             A list of product names or identifiers to look for on the website.
 
-    Returns:
-        str:
-            A textual summary describing the results of the product search 
-            performed on the site.
-    """
+#     Returns:
+#         str:
+#             A textual summary describing the results of the product search 
+#             performed on the site.
+#     """
 
-    _, _, page = await AsyncBrowserContextMaganer.create_browser_context(
-        headless=False,
-        start_url="https://google.com"
-    )
+#     _, _, page = await AsyncBrowserContextMaganer.create_browser_context(
+#         headless=False,
+#         start_url="https://google.com"
+#     )
 
-    try:
-        client = genai.Client()
+#     try:
+#         client = genai.Client()
 
-        generate_content_config = genai.types.GenerateContentConfig(
-            tools=[
-                types.Tool(
-                    computer_use=types.ComputerUse(
-                        environment=types.Environment.ENVIRONMENT_BROWSER
-                    )
-                )
-            ]
-        )
+#         generate_content_config = genai.types.GenerateContentConfig(
+#             tools=[
+#                 types.Tool(
+#                     computer_use=types.ComputerUse(
+#                         environment=types.Environment.ENVIRONMENT_BROWSER
+#                     )
+#                 )
+#             ]
+#         )
 
-        initial_screenshot = await page.screenshot(type="png")
+#         initial_screenshot = await page.screenshot(type="png")
 
-        products = "\n".join(f"- {p}" for p in product_list)
+#         products = "\n".join(f"- {p}" for p in product_list)
 
-        prompt_filled = USER_PROMPT.format(
-            products_list=products,
-            website=website
-        )
+#         prompt_filled = USER_PROMPT.format(
+#             products_list=products,
+#             website=website
+#         )
 
-        contents = [
-            Content(
-                role="user",
-                parts=[
-                    Part(text=prompt_filled),
-                    Part.from_bytes(data=initial_screenshot, mime_type='image/png')
-                ]
-            )
-        ]
+#         contents = [
+#             Content(
+#                 role="user",
+#                 parts=[
+#                     Part(text=prompt_filled),
+#                     Part.from_bytes(data=initial_screenshot, mime_type='image/png')
+#                 ]
+#             )
+#         ]
 
-        max_iter = 10
+#         max_iter = 10
 
-        for _ in range(max_iter):
-            model_response = client.models.generate_content(
-                model='gemini-2.5-computer-use-preview-10-2025',
-                contents=contents,
-                config=generate_content_config,
-            )
+#         for _ in range(max_iter):
+#             model_response = client.models.generate_content(
+#                 model='gemini-2.5-computer-use-preview-10-2025',
+#                 contents=contents,
+#                 config=generate_content_config,
+#             )
 
-            candidate = model_response.candidates[0]
-            contents.append(candidate)
+#             candidate = model_response.candidates[0]
+#             contents.append(candidate)
 
-            has_function_calls = any(
-                part.function_call for part in candidate.content.parts
-            )
+#             has_function_calls = any(
+#                 part.function_call for part in candidate.content.parts
+#             )
 
-            if not has_function_calls:
-                response_text = " ".join(
-                    [part.text for part in candidate.content.parts if part.text]
-                )
-                break
+#             if not has_function_calls:
+#                 response_text = " ".join(
+#                     [part.text for part in candidate.content.parts if part.text]
+#                 )
+#                 break
 
-            results = execute_function_calls(candidate, page)
-            function_responses = get_function_responses(page, results)
+#             results = execute_function_calls(candidate, page)
+#             function_responses = get_function_responses(page, results)
 
-            contents.append(
-                Content(
-                    role="user",
-                    parts=[
-                        Part(function_response=fr) for fr in function_responses
-                    ]
-                )
-            )
+#             contents.append(
+#                 Content(
+#                     role="user",
+#                     parts=[
+#                         Part(function_response=fr) for fr in function_responses
+#                     ]
+#                 )
+#             )
 
-    finally:
-        await AsyncBrowserContextMaganer.close_page_resources(page)
-        return response_text
+#     finally:
+#         await AsyncBrowserContextMaganer.close_page_resources(page)
+#         return response_text
 
 
 

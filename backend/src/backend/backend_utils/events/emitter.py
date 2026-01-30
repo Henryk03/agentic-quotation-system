@@ -16,11 +16,7 @@ from backend.database.repositories import message_repo
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
-from shared.events.auth import (
-    LoginRequiredEvent,
-    LoginCompletedEvent,
-    LoginFailedEvent,
-)
+from shared.events.login import LoginRequiredEvent
 
 
 class EventEmitter:
@@ -157,24 +153,24 @@ class EventEmitter:
         await websocket.send_text(event.model_dump_json())
 
 
-    @staticmethod
-    async def emit_login_completed(
-            websocket: WebSocket,
-            provider: str
-        ) -> None:
-        """"""
+    # @staticmethod
+    # async def emit_login_completed(
+    #         websocket: WebSocket,
+    #         provider: str
+    #     ) -> None:
+    #     """"""
 
-        event = LoginCompletedEvent(provider=provider)
-        await websocket.send_text(event.model_dump_json())
+    #     event = LoginCompletedEvent(provider=provider)
+    #     await websocket.send_text(event.model_dump_json())
 
 
-    @staticmethod
-    async def emit_login_failed(
-            websocket: WebSocket,
-            provider: str,
-            reason: str | None = None
-        ) -> None:
-        """"""
+    # @staticmethod
+    # async def emit_login_failed(
+    #         websocket: WebSocket,
+    #         provider: str,
+    #         reason: str | None = None
+    #     ) -> None:
+    #     """"""
 
-        event = LoginFailedEvent(provider=provider, reason=reason)
-        await websocket.send_text(event.model_dump_json())
+    #     event = LoginFailedEvent(provider=provider, reason=reason)
+    #     await websocket.send_text(event.model_dump_json())

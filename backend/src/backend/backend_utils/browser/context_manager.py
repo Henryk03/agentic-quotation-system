@@ -22,7 +22,7 @@ from backend.backend_utils.exceptions import (
 
 from shared.provider.base_provider import BaseProvider
 from shared.playwright.waiter import wait_until_logged_in
-from shared.playwright.page_utilities import close_page_resources, close_popup
+from shared.playwright.page_utilities import close_page_resources
 
 
 if settings.CLI_MODE:
@@ -275,10 +275,7 @@ class AsyncBrowserContextMaganer:
             start_url=provider.url
         )
 
-        await close_popup(
-            provider,
-            page
-        )
+        await provider.close_popup(page)
 
         return browser, context, page
 
@@ -333,7 +330,7 @@ class AsyncBrowserContextMaganer:
                 state
             )
 
-            logged_in = await provider.is_logged_in(
+            logged_in: bool = await provider.is_logged_in(
                 page
             ) 
             
@@ -341,7 +338,7 @@ class AsyncBrowserContextMaganer:
                 await page.close()
                 return context
             
-            if await provider.has_auto_login():
+            if provider.has_auto_login():
                 if await provider.has_captcha(page):
                     raise ManualFallbackException(
                         provider,
