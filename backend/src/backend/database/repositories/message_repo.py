@@ -47,3 +47,25 @@ async def save_message(
 
     db.add(msg)
     await db.commit()
+
+
+async def get_all_messages(
+        db: AsyncSession,
+        session_id: str,
+        chat_id: str
+    ) -> list[Message]:
+    """"""
+
+    stmt = (
+        select(Message)
+        .where(
+            Message.session_id == session_id,
+            Message.chat_id == chat_id
+        )
+        .order_by(
+            Message.created_at.asc()
+        )
+    )
+
+    result = await db.execute(stmt)
+    return list(result.scalars().all())

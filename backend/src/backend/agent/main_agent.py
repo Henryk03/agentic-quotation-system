@@ -2,11 +2,12 @@
 import asyncio
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
-from langgraph.checkpoint.memory import InMemorySaver       # mettere uno persistente
+from langgraph.checkpoint.memory import InMemorySaver
 
+from backend.config import settings
 from backend.agent.prompts import SYSTEM_PROMPT
 from backend.agent.agent_tools import search_products
 
@@ -47,14 +48,9 @@ workflow = StateGraph(MessagesState)
 workflow.add_node("agent", agent_node)
 
 workflow.add_node(
-    "supported_website_search",
+    "website_search",
     ToolNode([search_products])
 )
-
-# workflow.add_node(
-#     "user_specified_website_seach",
-#     ToolNode([search_products_with_computer_use])
-# )
 
 workflow.add_edge(START, "agent")
 
@@ -62,16 +58,16 @@ workflow.add_conditional_edges(
     "agent",
     tools_condition,
     {
-        "tools": "supported_website_search", 
-        # "tools": "user_specified_website_seach",
+        "tools": "website_search", 
         END: END
     }
 )
 
-workflow.add_edge("supported_website_search", "agent")
-# workflow.add_edge("user_specified_website_seach", "agent")
+workflow.add_edge("website_search", "agent")
 
-graph = workflow.compile(checkpointer=InMemorySaver())
+graph = workflow.compile(
+    checkpointer=InMemorySaver() if settings.CLI_MODE else None
+)
 
 
 
@@ -105,20 +101,13 @@ async def main():
 
         async for chunk in graph.astream(
             {
-                "messages": [
-                    {"role": "user", "content": user_input}
-                ]
+                "messages": [HumanMessage(content=user_input)]
             },
             {
                 "configurable": {"thread_id": 1}
             }
         ):
             for _, update in chunk.items():
-
-                print(f"{"=" * 34} Message Format {"=" * 34}\n")
-                print(update)
-                print("\n")
-
                 response = update["messages"][-1].content
 
                 if isinstance(response, list):

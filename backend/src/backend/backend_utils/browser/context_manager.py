@@ -29,7 +29,7 @@ if settings.CLI_MODE:
     BACKEND_ROOT = Path(__file__).resolve().parents[4]
 
     LOG_IN_STATES_DIR = BACKEND_ROOT / ".logins"
-    LOG_IN_STATES_DIR.mkdir(0o600, exist_ok=True)
+    LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
 
 SCREEN_WIDTH = 1440
 SCREEN_HEIGHT = 900
@@ -100,7 +100,7 @@ class AsyncBrowserContextMaganer:
 
         if AsyncBrowserContextMaganer.is_cli_mode():
             path: Path = AsyncBrowserContextMaganer.__state_path(provider)
-            return path, None if path.exists() else None
+            return (path, None) if path.exists() else (None, None)
 
         else:
             async with AsyncSessionLocal() as db:
@@ -184,7 +184,8 @@ class AsyncBrowserContextMaganer:
     async def create_browser_context(
         self,
         state: Path | StorageState | str | None = None,
-        start_url: str | None = None
+        start_url: str | None = None,
+        headless: bool = True
         ) -> tuple[Browser, BrowserContext, Page]:
         """
         Create a new browser, context, and page.
@@ -209,12 +210,14 @@ class AsyncBrowserContextMaganer:
         page: Page
 
         browser = await self.async_playwright.chromium.launch(
-            headless=AsyncBrowserContextMaganer.is_headless_mode()
+            headless=(
+                headless if not headless else AsyncBrowserContextMaganer.is_headless_mode()
+            )
         )
 
         storage_state_param = None
 
-        if not state:
+        if state:
             if isinstance(state, Path):
                 if state.exists():
                     storage_state_param = state
@@ -241,7 +244,8 @@ class AsyncBrowserContextMaganer:
     async def __prepare_provider_context(
             self,
             provider: BaseProvider,
-            state: Path | StorageState | str | None
+            state: Path | StorageState | str | None,
+            headless: bool
         ) -> tuple[Browser, BrowserContext, Page]:
         """
         Create and initialize a new browser context for the given provider.
@@ -272,7 +276,8 @@ class AsyncBrowserContextMaganer:
 
         browser, context, page = await self.create_browser_context(
             state=state,
-            start_url=provider.url
+            start_url=provider.url,
+            headless=headless
         )
 
         await provider.close_popup(page)
@@ -327,7 +332,8 @@ class AsyncBrowserContextMaganer:
 
             _, context, page = await self.__prepare_provider_context(
                 provider,
-                state
+                state,
+                True
             )
 
             logged_in: bool = await provider.is_logged_in(
@@ -375,11 +381,12 @@ class AsyncBrowserContextMaganer:
 
             if AsyncBrowserContextMaganer.is_cli_mode():
                 try:
-                    if isinstance(state, Path):
-                        await self.__manual_login(provider, state)
+                    if not state:
+                        await self.__manual_login(provider)
                         _, context, _ = await self.__prepare_provider_context(
                             provider,
-                            state
+                            state,
+                            True
                         )
 
                 except:
@@ -390,8 +397,7 @@ class AsyncBrowserContextMaganer:
 
     async def __manual_login(
             self,
-            provider: BaseProvider,
-            state_path: Path
+            provider: BaseProvider
         ) -> None:
         """
         Open a non-headless browser so the user can manually perform
@@ -404,9 +410,6 @@ class AsyncBrowserContextMaganer:
             provider (Provider):
                 The provider whose website requires manual authentication.
 
-            state_path (Path):
-                Path where the authenticated browser state should be saved.
-
         Returns:
             None
         
@@ -416,15 +419,17 @@ class AsyncBrowserContextMaganer:
                 cannot be initialized correctly.
         """
 
+        state_path: Path = AsyncBrowserContextMaganer.__state_path(provider)
+
         context: BrowserContext | None = None
         page: Page | None = None
 
         async with self._manual_login_lock:
-            if isinstance(state_path, Path):
-                _, context, page = await self.__prepare_provider_context(
-                    provider=provider,
-                    state=state_path
-                )
+            _, context, page = await self.__prepare_provider_context(
+                provider=provider,
+                state=state_path,
+                headless=False
+            )
 
             if await wait_until_logged_in(
                 page=page,
@@ -433,6 +438,7 @@ class AsyncBrowserContextMaganer:
             ):
                 await context.storage_state(path=state_path)
                 await close_page_resources(page)
+
             else:
                 await close_page_resources(page)
                 raise LoginFailedException(provider)

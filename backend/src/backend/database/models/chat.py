@@ -1,5 +1,5 @@
 
-from sqlalchemy import String, DateTime, func, ForeignKey, JSON
+from sqlalchemy import String, DateTime, func, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -20,10 +20,7 @@ class Chat(Base):
         primary_key=True
     )
 
-    state: Mapped[dict | None] = mapped_column(
-        JSON, 
-        nullable=True
-    )
+    needs_rerun: Mapped[bool] = mapped_column(default=False)
 
     created_at: Mapped[str] = mapped_column(
         DateTime, 

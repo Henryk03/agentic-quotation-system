@@ -73,7 +73,12 @@ def handle_event(
     # ==========================
     if isinstance(event, ChatMessageEvent):
         if login_open:
-            st.session_state.deferred_events.append(event)
+            st.session_state.messages.append(
+                {
+                    "role": event.role,
+                    "content": event.content,
+                }
+            )
             return True
         
         st.session_state.messages.append(
@@ -85,8 +90,7 @@ def handle_event(
 
         if ephemeral:
             stream_data(event.content, ephemeral)  
-
-        st.session_state.ephemeral_container = None
+            st.session_state.ephemeral_container = None
 
         return True
 
@@ -147,9 +151,6 @@ if "chat_id" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "deferred_events" not in st.session_state:
-    st.session_state.deferred_events = []
-
 if "ephemeral_container" not in st.session_state:
     st.session_state.ephemeral_container = None
 
@@ -173,7 +174,7 @@ if "ui_state" not in st.session_state:
 
         "login_dialog": {
             "open": False,
-            "status": "idle",   # idle | waiting | in_progress | success | error
+            "status": "idle",   # idle | waiting | in_progress | success | error | cancelled
             "provider": None,
             "login_url": None,
             "_close_next_run": False
@@ -270,15 +271,6 @@ with st.sidebar:
 
 
 # ==========================
-#    Render chat history
-# ==========================
-
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-
-# ==========================
 #    Login related dialog
 # ==========================
 
@@ -305,6 +297,9 @@ def login_dialog() -> None:
         case "error":
             status.error(f"❌ Login failed: {login["message"]}")
 
+        case "cancelled":
+            status.warning("⚠️ Login cancelled by user")
+
         case _:
             status.error("❌ Invalid status")
 
@@ -320,24 +315,11 @@ def login_dialog() -> None:
 
         with col2:
             if st.button("❌ Cancel"):
-                metadata: dict = {
-                    "chat_id": st.session_state.chat_id,
-                    "selected_stores": st.session_state.ui_state["selected_stores"]
-                }
-
-                _ = get_event_loop().run_until_complete(
-                    st.session_state.ws_client.handle_login_cancelled(
-                        login["provider"],
-                        metadata,
-                        on_event,
-                        on_error
-                    )
-                )
                 st.session_state.ui_state["login_dialog"].update(
                     {
-                        "open": False,
-                        "status": "idle",
-                        "provider": None,
+                        "open": True,
+                        "status": "cancelled",
+                        "provider": login["provider"],
                         "login_url": None
                     }
                 )
@@ -346,6 +328,32 @@ def login_dialog() -> None:
 
 if st.session_state.ui_state["login_dialog"]["open"]:
     login_dialog()
+
+if st.session_state.ui_state["login_dialog"]["status"] == "cancelled":
+    metadata: dict = {
+        "chat_id": st.session_state.chat_id,
+        "selected_stores": st.session_state.ui_state["selected_stores"]
+    }
+
+    _ = get_event_loop().run_until_complete(
+        st.session_state.ws_client.handle_login_cancelled(
+            st.session_state.ui_state["login_dialog"]["provider"],
+            metadata,
+            on_event,
+            on_error
+        )
+    )
+
+    st.session_state.ui_state["login_dialog"].update(
+        {
+            "open": False,
+            "status": "idle",
+            "provider": None,
+            "login_url": None
+        }
+    )
+
+    st.rerun()
 
 if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
     try:
@@ -381,6 +389,8 @@ if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
         st.rerun()
 
     else:
+        time.sleep(2)
+
         st.session_state.ui_state["login_dialog"].update(
             {
                 "open": False,
@@ -391,24 +401,8 @@ if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
                 "_close_next_run": False,
             }
         )
+
         st.rerun()
-
-
-if len(st.session_state.deferred_events) > 0:
-    placeholder: DeltaGenerator | None = st.session_state.ephemeral_container
-
-    if not placeholder:
-        st.session_state.ephemeral_container = None
-        assistant_msg = st.chat_message("assistant")
-        placeholder = assistant_msg.empty()
-
-    st.session_state.ephemeral_container = placeholder
-
-    for event in st.session_state.deferred_events:
-        _ = handle_event(event)
-
-    st.session_state.deferred_events.clear()
-    st.rerun()
 
 
 # ==========================
@@ -543,7 +537,16 @@ if st.session_state.ui_state["send_credentials_now"]:
         if received_event:
             break
 
-    st.session_state.ui_state["send_credentials_now"] = False      
+    st.session_state.ui_state["send_credentials_now"] = False
+
+
+# ==========================
+#    Render chat history
+# ==========================
+
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])    
 
 
 # ==========================

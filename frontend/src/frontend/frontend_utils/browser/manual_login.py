@@ -49,7 +49,6 @@ async def run_manual_login(
                 timeout=120000
             ):
                 await page.wait_for_load_state("networkidle")
-                await asyncio.sleep(1)
                 
                 storage: StorageState = await context.storage_state()
                 await close_page_resources(page)

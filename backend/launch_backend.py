@@ -47,8 +47,9 @@ def main() -> Literal[1, 0]:
         target_module = "backend.agent.main_agent"
         print("🤖 Starting Agent in CLI mode...\n")
 
-    target_module = "backend"
-    print("\n🚀 Starting Backend Server...\n")
+    else:
+        target_module = "backend"
+        print("\n🚀 Starting Backend Server...\n")
     
     try:
         result: subprocess.CompletedProcess = subprocess.run(

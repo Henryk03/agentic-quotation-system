@@ -183,12 +183,12 @@ class WSClient:
         ws: ClientConnection = await self.__get_active_websocket()
 
         event: Event = LoginResultEvent(
-                event="login.cancelled",
-                provider=provider,
-                metadata=metadata,
-                state="LOGIN_CANCELLED",
-                reason="Login process cancelled by user"
-            )
+            event="login.cancelled",
+            provider=provider,
+            metadata=metadata,
+            state="LOGIN_CANCELLED",
+            reason="Login process cancelled by user"
+        )
         
         await ws.send(event.model_dump_json())
         received: bool = await receive_events(ws, on_event, on_error)
