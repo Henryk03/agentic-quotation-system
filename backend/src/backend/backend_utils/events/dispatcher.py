@@ -84,14 +84,11 @@ async def dispatch_chat(
         previous_messages
     )
 
-    config: RunnableConfig = {
-        "configurable": {"thread_id": f"{session_id}_{chat_id}"}
-    }
-
     try:
         messages: dict = await agent.ainvoke(
-            input={"messages": lc_messages + [HumanMessage(user_message)]},
-            config=config
+            input={
+                "messages": lc_messages + [HumanMessage(user_message)]
+            }
         )
 
         ai_response: BaseMessage = messages["messages"][-1]

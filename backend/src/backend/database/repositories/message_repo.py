@@ -3,6 +3,7 @@ from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.message import Message
+from backend.database.actions.client_touch import touch_client
 
 
 async def get_last_user_message(
@@ -46,6 +47,8 @@ async def save_message(
     )
 
     db.add(msg)
+
+    await touch_client(db, session_id)
     await db.commit()
 
 

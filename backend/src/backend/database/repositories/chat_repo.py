@@ -1,9 +1,9 @@
 
-
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.chat import Chat
+from backend.database.actions.client_touch import touch_client
 
 
 async def get_or_create_chat(
@@ -22,8 +22,9 @@ async def get_or_create_chat(
         )
         
         db.add(chat)
+
+        await touch_client(db, session_id)
         await db.commit()
-        await db.refresh(chat)
 
     return chat
 
@@ -41,6 +42,8 @@ async def mark_needs_rerun(
         .where(Chat.chat_id == chat_id)
         .values(needs_rerun=True)
     )
+
+    await touch_client(db, session_id)
     await db.commit()
 
 
@@ -67,6 +70,8 @@ async def consume_rerun_flag(
             .where(Chat.chat_id == chat_id)
             .values(needs_rerun=False)
         )
+
+        await touch_client(db, session_id)
         await db.commit()
 
     return needs

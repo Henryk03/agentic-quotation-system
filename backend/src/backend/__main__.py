@@ -49,7 +49,7 @@ def main():
         return asyncio.run(async_main())
         
     except KeyboardInterrupt:
-        print("\n\n👋 Shutdown requested")
+        print("\n👋 Shutdown requested")
         return 0
 
 

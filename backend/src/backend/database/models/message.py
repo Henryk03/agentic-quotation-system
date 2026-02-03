@@ -1,5 +1,6 @@
 
-from sqlalchemy import String, Text, DateTime, ForeignKeyConstraint, func
+from datetime import datetime, timezone
+from sqlalchemy import String, Text, DateTime, ForeignKeyConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -20,9 +21,10 @@ class Message(Base):
 
     content: Mapped[str] = mapped_column(Text)
 
-    created_at: Mapped[str] = mapped_column(
-        DateTime, 
-        server_default=func.now()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
 
     __table_args__ = (

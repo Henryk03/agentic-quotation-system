@@ -1,5 +1,6 @@
 
-from sqlalchemy import String, DateTime, func, ForeignKey, JSON
+from datetime import datetime, timezone
+from sqlalchemy import String, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -33,10 +34,11 @@ class BrowserContext(Base):
         default=list
     )
 
-    updated_at: Mapped[str] = mapped_column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False
     )
 
     client = relationship(

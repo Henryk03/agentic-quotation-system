@@ -145,12 +145,6 @@ def on_error(exception: Exception) -> None:
 #        Session state
 # ==========================
 
-if "chat_id" not in st.session_state:
-    st.session_state.chat_id = uuid.uuid4().hex
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
 if "ephemeral_container" not in st.session_state:
     st.session_state.ephemeral_container = None
 
@@ -167,6 +161,8 @@ if "ws_client" not in st.session_state:
     )
 
 if "ui_state" not in st.session_state:
+    chat_id: str = uuid.uuid4().hex
+
     st.session_state.ui_state = {
         "selected_stores": [],
         "store_dialog_open": False,
@@ -189,11 +185,19 @@ if "ui_state" not in st.session_state:
         "send_credentials_now": False,
 
         "chats": {
-            "Chat - 1": st.session_state.messages
+            "Chat - 1": {
+                "chat_id": chat_id,
+                "messages": []
+            }
         },
 
         "current_chat": "Chat - 1",
     }
+
+    st.session_state.chat_id = chat_id
+    st.session_state.messages = (
+        st.session_state.ui_state["chats"]["Chat - 1"]["messages"]
+    )
 
 
 # ==========================
@@ -226,46 +230,59 @@ with st.sidebar:
     st.title("Chats")
 
     if st.button("\u2795 New Chat", use_container_width=True):
-        chat_name = f"Chat - {len(st.session_state.ui_state["chats"]) + 1}"
+        chats = st.session_state.ui_state["chats"]
+        chat_number = len(chats) + 1
 
+        chat_name = f"Chat - {chat_number}"
         new_chat_id = uuid.uuid4().hex
 
-        st.session_state.chat_id = new_chat_id
-        st.session_state.ui_state["chats"][chat_name] = []
+        chats[chat_name] = {
+            "chat_id": new_chat_id,
+            "messages": []
+        }
+
         st.session_state.ui_state["current_chat"] = chat_name
-        st.session_state.messages = st.session_state.ui_state["chats"][chat_name]
+        st.session_state.chat_id = new_chat_id
+        st.session_state.messages = chats[chat_name]["messages"]
 
         st.rerun()
 
     if st.button("🧹 Clear Chat", use_container_width=True):
         current = st.session_state.ui_state["current_chat"]
+        chat = st.session_state.ui_state["chats"][current]
 
-        st.session_state.ui_state["chats"][current].clear()
-        st.session_state.messages = st.session_state.ui_state["chats"][current]
+        chat["messages"].clear()
+        st.session_state.messages = chat["messages"]
+
+        # mandare evento cancellazione messaggi di una chat...
 
         st.rerun()
 
     if st.button("🗑️ Delete All Chats", use_container_width=True):
         new_chat_id = uuid.uuid4().hex
 
-        st.session_state.chat_id = new_chat_id
-        st.session_state.messages = []
-
-        st.session_state.ui_state["chats"] = {
-            "Chat - 1": st.session_state.messages
-        }
         st.session_state.ui_state["current_chat"] = "Chat - 1"
+        st.session_state.ui_state["chats"]["Chat - 1"] = {
+            "chat_id": new_chat_id,
+            "messages": []
+        }
+
+        st.session_state.chat_id = new_chat_id
+        st.session_state.messages = (
+            st.session_state.ui_state["chats"]["Chat - 1"]["messages"]
+        )
+
+        # mandare evento cancellazione tutte chat per client...
 
         st.rerun()
 
     st.divider()
 
-    for chat_name in st.session_state.ui_state["chats"]:
+    for chat_name, chat in st.session_state.ui_state["chats"].items():
         if st.button(f"💬 {chat_name}", use_container_width=True):
             st.session_state.ui_state["current_chat"] = chat_name
-            st.session_state.messages = (
-                st.session_state.ui_state["chats"][chat_name]
-            )
+            st.session_state.chat_id = chat["chat_id"]
+            st.session_state.messages = chat["messages"]
 
             st.rerun()
 

@@ -21,7 +21,7 @@ except ImportError:
 def get_venv_python() -> Path:
     """"""
 
-    venv_path = Path(__file__).parent / ".venv"
+    venv_path: Path = Path(__file__).parent / ".venv"
     
     if platform.system() == "Windows":
         return venv_path / "Scripts" / "python.exe"
@@ -57,10 +57,13 @@ def main() -> Literal[1, 0]:
             cwd=Path(__file__).parent
         )
 
-        result.returncode
+        if result.returncode != 0:
+            return 1
+        
+        return 0
         
     except KeyboardInterrupt:
-        print("\n👋 Backend server stopped by user")
+        print("\n👋 Backend server stopped by user\n")
         return 0
     
     except Exception as e:

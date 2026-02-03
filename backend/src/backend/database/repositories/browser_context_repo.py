@@ -1,11 +1,12 @@
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from playwright.async_api import StorageState
 
+from backend.database.actions.client_touch import touch_client
 from backend.database.models.browser_context import BrowserContext
 from backend.backend_utils.security.db_security import encrypt, decrypt
 
@@ -47,6 +48,7 @@ async def upsert_browser_context(
 
         db.add(context)
 
+    await touch_client(db, session_id)
     await db.commit()
 
 
@@ -104,7 +106,7 @@ async def add_login_attempt(
     context = result.scalar_one_or_none()
     
     new_attempt = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "reason": reason
     }
@@ -128,6 +130,7 @@ async def add_login_attempt(
         )
         db.add(context)
     
+    await touch_client(db, session_id)
     await db.commit()
 
 
@@ -153,7 +156,7 @@ async def count_recent_failures(
     if not context or not context.attempts_history:
         return 0
     
-    cutoff_time = datetime.now() - timedelta(hours=hours)
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
     
     count = 0
     for attempt in context.attempts_history:
@@ -199,7 +202,7 @@ async def can_attempt_login(
         if context and context.attempts_history:
             last_attempt = context.attempts_history[-1]
             last_time = datetime.fromisoformat(last_attempt["timestamp"])
-            time_since = datetime.now() - last_time
+            time_since = datetime.now(timezone.utc) - last_time
             
             if time_since < timedelta(minutes=cooldown_minutes):
                 minutes_left = cooldown_minutes - int(time_since.total_seconds() / 60)

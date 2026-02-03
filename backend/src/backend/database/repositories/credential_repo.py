@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.credential import Credential
+from backend.database.actions.client_touch import touch_client
 from backend.backend_utils.security.db_security import encrypt, decrypt
 
 
@@ -43,6 +44,7 @@ async def upsert_credentials(
 
         db.add(cred)
 
+    await touch_client(db, session_id)
     await db.commit()
 
 

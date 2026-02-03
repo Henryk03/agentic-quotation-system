@@ -2,13 +2,15 @@
 import asyncio
 import logging
 from typing import Any
+from datetime import datetime
 
 from uvicorn import Config, Server
 from starlette.types import Message
 from fastapi import WebSocket, FastAPI
 from contextlib import asynccontextmanager
 
-
+from backend.config import settings
+from backend.background.db_cleanup import cleanup_inactive_clients_task
 from backend.backend_utils.events.parser import parse_event
 from backend.backend_utils.events.handler import EventHandler
 from backend.backend_utils.connection.connection_manager import ConnectionManager
@@ -18,43 +20,71 @@ from shared.events import Event
 
 
 logger = logging.getLogger("agent-server")
-LOGGER_FORMAT = "%(levelname)s:     %(message)s"
+LOGGER_FORMAT = "%(levelname)s | %(asctime)s | %(message)s"
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(
+        app: FastAPI
+    ):
     """"""
 
-    logging.basicConfig(level=logging.INFO, format=LOGGER_FORMAT)
+    logging.basicConfig(
+        level=settings.LOG_LEVEL, 
+        format=LOGGER_FORMAT,
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
     logger.info("server started")
 
+    app.state.timezone = datetime.now().astimezone().tzinfo
     app.state.manager = ConnectionManager(logger)
 
-    yield
+    logger.info(f"server timezone: {app.state.timezone}")
 
-    logger.info("server shutting down...")
+    cleanup_task: asyncio.Task = asyncio.create_task(
+        cleanup_inactive_clients_task(
+            every_seconds=1800,
+            inactive_for_hours=24
+        )
+    )
 
-    manager: ConnectionManager = app.state.manager
+    try:
+        yield
 
-    for ws in manager.get_active():
+    finally:
+        logger.info("server shutting down...")
+
+        cleanup_task.cancel()
+
         try:
-            await manager.disconnect(
-                ws,
-                code=1001,
-                reason="server shutdown"
-            )
-            
-        except:
+            await cleanup_task
+
+        except asyncio.CancelledError:
             pass
 
-    logger.info("shutdown complete")
+        manager: ConnectionManager = app.state.manager
+
+        for ws in manager.get_active():
+            try:
+                await manager.disconnect(
+                    ws,
+                    code=1001,
+                    reason="server shutdown"
+                )
+                
+            except:
+                pass
+
+        logger.info("shutdown complete")
 
 
 app = FastAPI(lifespan=lifespan)
 
 
 @app.websocket("/ws/chat")
-async def websocket_chat(ws: WebSocket) -> None:
+async def websocket_chat(
+        ws: WebSocket
+    ) -> None:
     """"""
 
     manager: ConnectionManager = app.state.manager
@@ -107,7 +137,10 @@ async def websocket_chat(ws: WebSocket) -> None:
         await manager.disconnect(ws)
 
 
-async def start_server(host: str, port: int) -> None:
+async def start_server(
+        host: str,
+        port: int
+    ) -> None:
     """"""
     
     config: Config = Config(

@@ -302,7 +302,7 @@ def ensure_alembic() -> bool:
         try:
             alembic_template: Path = Path("alembic_template")
 
-            print("📦 Initializing Alembic from template...", end=" ", flush=True)
+            print("\n📦 Initializing Alembic from template...", end=" ", flush=True)
 
             shutil.copytree(alembic_template / "alembic", alembic_dir)
             shutil.copy(alembic_template / "alembic.ini", Path("alembic.ini"))
@@ -313,8 +313,6 @@ def ensure_alembic() -> bool:
         
         except:
             return False
-        
-    print("Alembic found!")
     
     return True
 
@@ -326,8 +324,7 @@ def upgrade_database(
 
     return run_command(
         [str(python), "-m", "alembic", "upgrade", "head"],
-        "⬆️ Applying database migrations",
-        silent=False
+        "⬆️ Applying database migrations"
     )
 
 
@@ -365,8 +362,7 @@ def ensure_initial_migration(
             "revision", "--autogenerate",
             "-m", "initial schema"
         ],
-        "🧱 No migrations found, generating initial schema",
-        silent=False
+        "🧱 No migrations found, generating initial schema"
     )
 
 
@@ -389,6 +385,7 @@ def main() -> Literal[1, 0]:
 
     # 1. Create venv
     venv_path: Path = Path(".venv")
+
     if venv_path.exists():
         overwrite = input(
             "⚠️  Virtual environment already exists.\n"
@@ -416,7 +413,7 @@ def main() -> Literal[1, 0]:
     if not run_command(
         [str(venv_python), "-m", "pip", "install", "--upgrade", "pip"], 
         "📦 Pip upgrade"
-        ):
+    ):
 
         return 1
     
@@ -425,7 +422,7 @@ def main() -> Literal[1, 0]:
     if not run_command(
         [str(venv_python), "-m", "pip", "install", "-e", "."], 
         "📦 Package installation (this may take a while)"
-        ):
+    ):
 
         return 1
     
@@ -466,10 +463,11 @@ def main() -> Literal[1, 0]:
 
     if is_database_initialized(venv_python):
         choice = input(
+            "\n"
             "⚠️  Database already initialized.\n\n"
-            "   [U] Upgrade migrations\n"
-            "   [S] Skip database setup\n\n"
-            "   Choice (U/S) [U]: "
+            "    [U] Upgrade migrations\n"
+            "    [S] Skip database setup\n\n\n"
+            "    Choice (U/S) [U]: "
         ).lower()
 
         if choice in ("", "u", "upgrade"):
@@ -477,10 +475,10 @@ def main() -> Literal[1, 0]:
                 return 1
             
         else:
-            print("⏭️  Skipping database migrations")
+            print("\n" + "⏭️  Skipping database migrations")
 
     else:
-        print("📦 Initializing database schema...")
+        print("\n📦 Initializing database schema...")
 
         if not upgrade_database(venv_python):
             return 1

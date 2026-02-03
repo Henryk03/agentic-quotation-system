@@ -5,6 +5,7 @@ import platform
 import subprocess
 from pathlib import Path
 
+
 def run_command(cmd, description):
     """Run a command and print status."""
     print(f"📦 {description}...")
