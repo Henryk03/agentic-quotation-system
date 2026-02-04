@@ -1,11 +1,8 @@
 
 from typing import Union
 
+from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
-from shared.events.chat import (
-    ChatMessageEvent, 
-    ChatCreatedEvent
-)
 from shared.events.clean import (
     ClearClientChatsEvent,
     ClearChatMessagesEvent
@@ -19,7 +16,6 @@ from shared.events.login import (
 
 Event = Union[
     ChatMessageEvent,
-    ChatCreatedEvent,
     LoginRequiredEvent,
     LoginResultEvent,
     AutoLoginCredentialsEvent,

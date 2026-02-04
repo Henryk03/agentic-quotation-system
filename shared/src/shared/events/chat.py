@@ -10,10 +10,3 @@ class ChatMessageEvent(BaseModel):
     role: Literal["user", "assistant", "tool"]
     content: str
     metadata: dict[str, list[str] | str] | None = None
-
-
-class ChatCreatedEvent(BaseModel):
-    """"""
-
-    event: Literal["chat.created"] = "chat.created"
-    chat_id: str
