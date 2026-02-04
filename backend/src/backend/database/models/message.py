@@ -30,11 +30,13 @@ class Message(Base):
     __table_args__ = (
         ForeignKeyConstraint(
             ["chat_id", "session_id"],
-            ["chats.chat_id", "chats.session_id"]
+            ["chats.chat_id", "chats.session_id"],
+            ondelete="CASCADE"
         ),
         ForeignKeyConstraint(
             ["session_id"],
-            ["clients.session_id"]
+            ["clients.session_id"],
+            ondelete="CASCADE"
         ),
     )
 

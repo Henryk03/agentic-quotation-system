@@ -9,15 +9,14 @@ from streamlit.delta_generator import DeltaGenerator
 
 from frontend.frontend_utils.websocket.client import WSClient
 
-from shared.provider.registry import (
-    all_provider_names,
-    support_autologin
-)
-
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
 from shared.events.login import LoginRequiredEvent
+from shared.provider.registry import (
+    all_provider_names,
+    support_autologin
+)
 
 
 # ==========================
@@ -254,25 +253,33 @@ with st.sidebar:
         chat["messages"].clear()
         st.session_state.messages = chat["messages"]
 
-        # mandare evento cancellazione messaggi di una chat...
+        get_event_loop().run_until_complete(
+            st.session_state.ws_client.send_clear_messages(
+                st.session_state.chat_id
+            )
+        )
 
         st.rerun()
 
     if st.button("🗑️ Delete All Chats", use_container_width=True):
         new_chat_id = uuid.uuid4().hex
 
-        st.session_state.ui_state["current_chat"] = "Chat - 1"
-        st.session_state.ui_state["chats"]["Chat - 1"] = {
-            "chat_id": new_chat_id,
-            "messages": []
+        st.session_state.ui_state["chats"] = {
+            "Chat - 1": {
+                "chat_id": new_chat_id,
+                "messages": []
+            }
         }
 
+        st.session_state.ui_state["current_chat"] = "Chat - 1"
         st.session_state.chat_id = new_chat_id
         st.session_state.messages = (
             st.session_state.ui_state["chats"]["Chat - 1"]["messages"]
         )
 
-        # mandare evento cancellazione tutte chat per client...
+        get_event_loop().run_until_complete(
+            st.session_state.ws_client.send_clear_chats()
+        )
 
         st.rerun()
 

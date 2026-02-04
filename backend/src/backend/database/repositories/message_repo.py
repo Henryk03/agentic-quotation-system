@@ -1,5 +1,5 @@
 
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.message import Message
@@ -72,3 +72,22 @@ async def get_all_messages(
 
     result = await db.execute(stmt)
     return list(result.scalars().all())
+
+
+async def delete_messages_for_chat(
+        db: AsyncSession,
+        session_id: str,
+        chat_id: str
+    ) -> None:
+    """"""
+
+    await db.execute(
+        delete(Message)
+        .where(
+            Message.session_id == session_id,
+            Message.chat_id == chat_id
+        )
+    )
+
+    await touch_client(db, session_id)
+    await db.commit()

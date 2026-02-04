@@ -1,5 +1,4 @@
 
-from typing import Literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import WebSocket
@@ -63,15 +62,7 @@ class EventHandler:
         ) -> None:
         """"""
 
-        event_type: Literal[
-            "autologin.credentials.provided",
-            "chat.message",
-            "login.success",
-            "login.failed",
-            "login.cancelled",
-            "login.error",
-            "error"
-        ] = getattr(event, "event", "error")
+        event_type: str = getattr(event, "event", "error")
 
         _ = await EventHandler.__ensure_client(db, session_id)
 
@@ -123,6 +114,21 @@ class EventHandler:
                     session_id,
                     websocket
                 )
+            
+            case "chat.clear_messages":
+                return await EventHandler.__handle_clear_messages(
+                    db,
+                    event,
+                    session_id,
+                    websocket
+                )
+            
+            case "client.clear_chats":
+                return await EventHandler.__handle_delete_chats(
+                    db,
+                    session_id,
+                    websocket
+                )
 
             case _:
                 pass
@@ -136,9 +142,6 @@ class EventHandler:
             websocket: WebSocket
         ) -> None:
         """"""
-
-        if event.event != "autologin.credential.provided":
-            return None
 
         for store, creds in event.credentials.items():
             await credential_repo.upsert_credentials(
@@ -166,9 +169,6 @@ class EventHandler:
             websocket: WebSocket
         ) -> None:
         """"""
-
-        if event.event != "chat.message":
-            return None
 
         role = event.role
         message = event.content
@@ -205,9 +205,6 @@ class EventHandler:
             websocket: WebSocket
         ) -> None:
         """"""
-
-        if event.event != "login.success":
-            return None
         
         chat_id: str = event.metadata.get("chat_id")
         selected_stores: list[str] = event.metadata.get("selected_stores")
@@ -253,9 +250,6 @@ class EventHandler:
             websocket: WebSocket
         ) -> None:
         """"""
-
-        if event.event != "login.failed":
-            return None
 
         chat_id: str = event.metadata.get("chat_id")
         selected_stores: list[str] = event.metadata.get("selected_stores")
@@ -336,9 +330,6 @@ class EventHandler:
         ) -> None:
         """"""
 
-        if event.event != "login.cancelled":
-            return None
-
         chat_id: str = event.metadata.get("chat_id")
         selected_stores: list[str] = event.metadata.get("selected_stores", [])
 
@@ -375,5 +366,56 @@ class EventHandler:
                 websocket,
                 ErrorEvent(
                     message="All providers cancelled"
+                )
+            )
+
+
+    @staticmethod
+    async def __handle_clear_messages(
+            db: AsyncSession,
+            event: Event,
+            session_id: str,
+            websocket: WebSocket
+        ) -> None:
+        """"""
+
+        chat_id: str = event.chat_id
+
+        try:
+            await message_repo.delete_messages_for_chat(
+                db,
+                session_id,
+                chat_id,
+            )
+
+        except Exception as e:
+            await EventEmitter.emit_event(
+                websocket,
+                ErrorEvent(
+                    message=str(e)
+                )
+            )
+
+
+    @staticmethod
+    async def __handle_delete_chats(
+            db: AsyncSession,
+            session_id: str,
+            websocket: WebSocket
+        ) -> None:
+        """"""
+
+        try:
+            await chat_repo.delete_all_chats_for_client(
+                db,
+                session_id
+            )
+
+        except Exception as e:
+            print(str(e))
+            await EventEmitter.emit_event(
+                websocket,
+                ErrorEvent(
+                    message=str(e)
                 )
             )

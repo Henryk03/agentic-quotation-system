@@ -17,8 +17,11 @@ class Chat(Base):
     )
 
     session_id: Mapped[str] = mapped_column(
-        ForeignKey("clients.session_id"),
-        primary_key=True
+        ForeignKey(
+            "clients.session_id",
+            ondelete="CASCADE"
+        ),
+        primary_key=True,
     )
 
     needs_rerun: Mapped[bool] = mapped_column(default=False)

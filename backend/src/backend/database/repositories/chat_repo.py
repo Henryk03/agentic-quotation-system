@@ -1,5 +1,5 @@
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.chat import Chat
@@ -75,3 +75,18 @@ async def consume_rerun_flag(
         await db.commit()
 
     return needs
+
+
+async def delete_all_chats_for_client(
+        db: AsyncSession,
+        session_id: str
+    ) -> None:
+    """"""
+
+    await db.execute(
+        delete(Chat)
+        .where(Chat.session_id == session_id)
+    )
+
+    await touch_client(db, session_id)
+    await db.commit()

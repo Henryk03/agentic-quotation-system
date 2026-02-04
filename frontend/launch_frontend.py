@@ -1,56 +1,53 @@
 
 import sys
+import platform
 import subprocess
 from pathlib import Path
+from typing import Literal
 
-def get_venv_python():
-    """Get the path to Python in venv."""
-    venv_path = Path(__file__).parent / ".venv"
+
+def get_venv_python() -> Path:
+    """"""
+
+    venv_path: Path = Path(__file__).parent / ".venv"
     
-    if sys.platform == "win32":
+    if platform.system() == "Windows":
         return venv_path / "Scripts" / "python.exe"
+    
     return venv_path / "bin" / "python"
 
-def check_python_version():
-    """Quick Python version check"""
-    version = sys.version_info
-    if version.major != 3 or version.minor != 13:
-        print("❌ Python 3.13.x is required to run the frontend")
-        print(f"   Current: {version.major}.{version.minor}.{version.micro}")
-        return False
-    return True
 
-def main():
-    """Launch frontend using venv"""
+
+def main() -> Literal[1, 0]:
+    """"""
     
-    # Check Python version
-    if not check_python_version():
-        return 1
-    
-    # Check if venv exists
-    venv_python = get_venv_python()
+    venv_python: Path = get_venv_python()
     
     if not venv_python.exists():
         print("❌ Virtual environment not found!")
         print("   Please run 'python setup_frontend.py' first")
+
         return 1
     
-    print("🚀 Starting frontend...\n")
-    
     try:
-        # Execute frontend module using venv's Python
-        result = subprocess.run(
+        result: subprocess.CompletedProcess = subprocess.run(
             [str(venv_python), "-m", "frontend"],
             cwd=Path(__file__).parent
         )
-        return result.returncode
+
+        if result.returncode != 0:
+            return 1
+        
+        return 0
         
     except KeyboardInterrupt:
-        print("\n\n👋 Frontend stopped by user")
+        print("\n👋 Frontend stopped by user\n")
         return 0
+    
     except Exception as e:
         print(f"\n❌ Error launching frontend: {e}")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

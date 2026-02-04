@@ -15,6 +15,10 @@ from frontend.frontend_utils.websocket.protocol import (
 )
 
 from shared.events import Event
+from shared.events.clean import (
+    ClearClientChatsEvent,
+    ClearChatMessagesEvent
+)
 from shared.events.login import (
     LoginResultEvent,
     AutoLoginCredentialsEvent
@@ -167,10 +171,31 @@ class WSClient:
         received_ack: bool = await receive_credentials_ack(ws)
 
         return received_ack
+    
 
+    async def send_clear_messages(
+            self,
+            chat_id: str
+        ) -> None:
+        """"""
+
+        event: Event = ClearChatMessagesEvent(
+            chat_id = chat_id
+        )
+
+        await self.send_event(event)
+
+
+    async def send_clear_chats(
+            self
+        ) -> None:
+        """"""
+
+        event: Event = ClearClientChatsEvent()
         
-
-
+        await self.send_event(event)
+        
+        
     async def handle_login_cancelled(
             self,
             provider: str,

@@ -372,6 +372,8 @@ def main() -> Literal[1, 0]:
 
     print("\n🔧 Setting up backend environment...\n")
 
+    venv_existed: bool = False
+
 
     # initial cleanup
     if not clean_cache():
@@ -397,6 +399,7 @@ def main() -> Literal[1, 0]:
             shutil.rmtree(venv_path)
 
         else:
+            venv_existed = True
             print("✅ Keeping existing virtual environment")
 
     if not venv_path.exists():
@@ -409,31 +412,32 @@ def main() -> Literal[1, 0]:
     venv_python: Path = get_venv_python()
     
 
-    # 2. Upgrade pip
-    if not run_command(
-        [str(venv_python), "-m", "pip", "install", "--upgrade", "pip"], 
-        "📦 Pip upgrade"
-    ):
-
-        return 1
-    
-
-    # 3. Install package in editable mode
-    if not run_command(
-        [str(venv_python), "-m", "pip", "install", "-e", "."], 
-        "📦 Package installation (this may take a while)"
-    ):
-
-        return 1
-    
-
-    # 4. Install Playwright browsers
-    if not run_command(
-        [str(venv_python), "-m", "playwright", "install", "chromium"],
-        "🌐 Playwright browser installation (this may take a while)"
+    if not venv_existed:
+        # 2. Upgrade pip
+        if not run_command(
+            [str(venv_python), "-m", "pip", "install", "--upgrade", "pip"], 
+            "📦 Pip upgrade"
         ):
 
-        return 1
+            return 1
+        
+
+        # 3. Install package in editable mode
+        if not run_command(
+            [str(venv_python), "-m", "pip", "install", "-e", "."], 
+            "📦 Package installation (this may take a while)"
+        ):
+
+            return 1
+    
+
+        # 4. Install Playwright browsers
+        if not run_command(
+            [str(venv_python), "-m", "playwright", "install", "chromium"],
+            "🌐 Playwright browser installation (this may take a while)"
+            ):
+
+            return 1
     
 
     # 5. Configure .env
@@ -466,7 +470,7 @@ def main() -> Literal[1, 0]:
             "\n"
             "⚠️  Database already initialized.\n\n"
             "    [U] Upgrade migrations\n"
-            "    [S] Skip database setup\n\n\n"
+            "    [S] Skip database setup\n\n"
             "    Choice (U/S) [U]: "
         ).lower()
 
@@ -475,7 +479,7 @@ def main() -> Literal[1, 0]:
                 return 1
             
         else:
-            print("\n" + "⏭️  Skipping database migrations")
+            print("\n\n" + "⏭️  Skipping database migrations")
 
     else:
         print("\n📦 Initializing database schema...")

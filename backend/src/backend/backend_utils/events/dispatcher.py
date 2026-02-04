@@ -1,7 +1,6 @@
 
 from fastapi import WebSocket
 from langchain_core.runnables import Runnable
-from langchain_core.runnables import RunnableConfig
 from langchain_core.messages import HumanMessage, BaseMessage
 
 from backend.agent.history.message_adapter import to_langchain_messages

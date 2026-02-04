@@ -11,7 +11,10 @@ class Credential(Base):
     __tablename__ = "credentials"
 
     session_id: Mapped[str] = mapped_column(
-        ForeignKey("clients.session_id"),
+        ForeignKey(
+            "clients.session_id",
+            ondelete="CASCADE"
+        ),
         primary_key=True
     )
 

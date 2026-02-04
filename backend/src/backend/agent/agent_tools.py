@@ -17,7 +17,6 @@ from playwright.async_api import (
 from backend.agent.prompts import USER_PROMPT
 from backend.backend_utils.common.lists import SafeAsyncList
 from backend.backend_utils.exceptions import LoginFailedException
-from backend.backend_utils.signals.login_required import LoginRequiredSignal
 from backend.backend_utils.browser.context_manager import AsyncBrowserContextMaganer
 from backend.backend_utils.computer_use.functions import (
     execute_function_calls,
@@ -33,7 +32,7 @@ async def search_products(
         session_id: str | None, 
         products: list[str],
         providers: list[str]
-    ) -> str | LoginRequiredSignal:
+    ) -> str:
     """
     Perform web search for each product in the given list.
 
