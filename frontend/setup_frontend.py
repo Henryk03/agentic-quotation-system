@@ -152,7 +152,7 @@ def create_env_file_interactive() -> bool:
         "# Frontend Environment Variables\n"
         "\n"
         "# Server Connection\n"
-        f"HOST={config["HOST"]}\n"
+        f"HOST={config["SERVER"]}\n"
         f"PORT={config["PORT"]}\n"
         "\n"
         "# Streamlit Configuration\n"
