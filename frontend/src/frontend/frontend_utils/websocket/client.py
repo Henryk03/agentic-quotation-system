@@ -163,7 +163,7 @@ class WSClient:
         ws: ClientConnection = await self.__get_active_websocket()
         
         event: Event = AutoLoginCredentialsEvent(
-            event="autologin.credential.provided",
+            event="autologin.credentials.provided",
             credentials=credentials
         )
 

@@ -487,7 +487,8 @@ def insert_autologin_credentials() -> None:
 
     if show_err_message:
         st.error(
-            "⛔️ Please set both **Username** and **Password** to save."
+            "⛔️ Please set both **Username** and "
+            "**Password** to save or press **Skip**."
         )
 
 
@@ -563,6 +564,8 @@ if st.session_state.ui_state["send_credentials_now"]:
             break
 
     st.session_state.ui_state["send_credentials_now"] = False
+
+    st.rerun()
 
 
 # ==========================

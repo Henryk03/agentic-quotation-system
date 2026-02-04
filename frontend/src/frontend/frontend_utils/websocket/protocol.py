@@ -97,8 +97,9 @@ async def receive_credentials_ack(
                 if event:
                     if event.event == "autologin.credentials.received":
                         received_any = True
+                        break
 
-            except Exception as e:
+            except:
                 break
 
     except ConnectionClosed:

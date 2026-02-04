@@ -25,10 +25,10 @@ async def upsert_credentials(
     )
 
     result = await db.execute(stmt)
-    cred = result.scalar_one_or_none()
+    cred: Credential | None = result.scalar_one_or_none()
 
-    enc_username = encrypt(username)
-    enc_password = encrypt(password)
+    enc_username: str = encrypt(username)
+    enc_password: str = encrypt(password)
 
     if cred:
         cred.username = enc_username

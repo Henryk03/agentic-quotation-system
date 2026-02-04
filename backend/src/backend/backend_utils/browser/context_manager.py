@@ -121,16 +121,18 @@ class AsyncBrowserContextMaganer:
     
     @staticmethod
     async def __save_current_state(
-        session_id: str | None,
-        provider: BaseProvider,
-        context: BrowserContext
-    ) -> None:
+            session_id: str | None,
+            provider: BaseProvider,
+            context: BrowserContext
+        ) -> None:
         """"""
 
         state_dict: StorageState = await context.storage_state()
 
         if AsyncBrowserContextMaganer.is_cli_mode():
-            pass        # fare caso per CLI
+            # you are free to store/upsert the 
+            # credentials where you want :)
+            pass
 
         else:
             async with AsyncSessionLocal() as db:
@@ -176,7 +178,9 @@ class AsyncBrowserContextMaganer:
                     )
 
         else:
-            pass    # fare caso per cli
+            # you are free to store the credentials 
+            # for a website where you want :)
+            pass
 
         return credentials
 
@@ -346,8 +350,8 @@ class AsyncBrowserContextMaganer:
             
             if provider.has_auto_login():
                 if await provider.has_captcha(page):
-                    raise ManualFallbackException(
-                        provider,
+                    await AsyncBrowserContextMaganer.__handle_failure(
+                        provider, 
                         "CAPTCHA_DETECTED"
                     )
                     
@@ -356,10 +360,7 @@ class AsyncBrowserContextMaganer:
                     provider
                 )
                 
-                await provider.auto_login(page, credentials)
-                await page.wait_for_load_state("networkidle")
-
-                if await provider.is_logged_in(page):
+                if await provider.auto_login(page, credentials):
                     await self.__save_current_state(
                         session_id,
                         provider,
@@ -370,8 +371,17 @@ class AsyncBrowserContextMaganer:
                     )
 
                     return context
-                    
-            raise ManualFallbackException(provider)             
+                
+                else:
+                    await AsyncBrowserContextMaganer.__handle_failure(
+                        provider, 
+                        "AUTOLOGIN_FAILED"
+                    )
+
+            await AsyncBrowserContextMaganer.__handle_failure(
+                provider, 
+                "MISSING_AUTOLOGIN"
+            )             
         
         except ManualFallbackException:
             if page:
@@ -391,6 +401,9 @@ class AsyncBrowserContextMaganer:
 
                 except:
                     raise LoginFailedException(provider)
+                
+            # there should be no else statement here,
+            # because this exception is CLI-only
                 
         return context
 
