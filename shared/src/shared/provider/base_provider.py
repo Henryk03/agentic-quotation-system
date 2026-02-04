@@ -128,7 +128,11 @@ class BaseProvider:
         return self.auto_login.__func__ is not BaseProvider.auto_login
         
     
-    async def auto_login(self, _: Page) -> bool:
+    async def auto_login(
+            self, 
+            page: Page,
+            credentials: dict
+        ) -> bool:
         """
         Default automatic login implementation, which performs no action.
         Subclasses of `BaseProvider` should override this method to

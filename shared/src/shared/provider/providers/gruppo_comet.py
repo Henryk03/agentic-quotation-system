@@ -1,6 +1,7 @@
 
-# import re
-# from dotenv import dotenv_values
+import re
+
+from playwright.async_api import Page
 
 from shared.provider.base_provider import BaseProvider
 
@@ -26,25 +27,30 @@ class GruppoComet(BaseProvider):
             price_classes = [".result-price"]
         )
 
-    # async def auto_login(self, page):
+    async def auto_login(
+            self, 
+            page: Page,
+            credentials: dict[str, str]
+        ) -> bool:
 
-    #     login_texts = re.compile(
-    #         "accedi",
-    #         re.IGNORECASE
-    #     )
+        login_texts: re.Pattern[str] = re.compile(
+            "accedi",
+            re.IGNORECASE
+        )
 
-    #     try:
-    #         await page.get_by_role("link", name=login_texts).click()
+        try:
+            await page.get_by_role("link", name=login_texts).click()
 
-    #         credentials = dotenv_values("/run/secrets/autologin-env")
+            username: str = credentials["username"]
+            password: str = credentials["password"]
 
-    #         username = credentials["GRUPPOCOMET_USERNAME"]
-    #         password = credentials["GRUPPOCOMET_PASSWORD"]
+            await page.locator("input[name='username']").fill(username)
+            await page.locator("input[name='password']").fill(password)
+            await page.keyboard.press("Enter")
 
-    #         await page.locator("input[name='username']").fill(username)
-    #         await page.locator("input[name='password']").fill(password)
-    #         await page.keyboard.press("Enter")
+            await page.wait_for_load_state("networkidle")
 
-    #         return True
-    #     except:
-    #         return False
+            return await self.is_logged_in(page)
+
+        except:
+            return False
