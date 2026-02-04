@@ -34,7 +34,7 @@ class AutoLoginCredentialsEvent(BaseModel):
     """"""
 
     event: Literal[
-        "autologin.credential.provided", 
+        "autologin.credentials.provided", 
         "autologin.credentials.received"
     ]
     credentials: dict | None
