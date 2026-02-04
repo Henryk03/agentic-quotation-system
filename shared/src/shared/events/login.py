@@ -37,4 +37,4 @@ class AutoLoginCredentialsEvent(BaseModel):
         "autologin.credentials.provided", 
         "autologin.credentials.received"
     ]
-    credentials: dict | None
+    credentials: dict[str, dict[str, str]] | None
