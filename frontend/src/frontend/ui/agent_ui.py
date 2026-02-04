@@ -7,6 +7,7 @@ import logging
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
+from frontend.config import settings
 from frontend.frontend_utils.websocket.client import WSClient
 
 from shared.events import Event
@@ -151,7 +152,7 @@ if "ws_client" not in st.session_state:
     st.session_state.ws_client = WSClient(
         websocket=None,
         session_id=uuid.uuid4().hex,
-        websocket_uri="ws://0.0.0.0:8080/ws/chat"
+        websocket_uri=f"ws://{settings.HOST}:{settings.PORT}/ws/chat"
     )
 
     logging.basicConfig(
