@@ -1,6 +1,7 @@
 
-import asyncio
+import re
 
+from shared.exceptions import ProviderNotSupportedException
 from shared.provider.base_provider import BaseProvider
 from shared.provider.providers import comet, gruppo_comet
 
@@ -51,10 +52,15 @@ def support_autologin(provider: str) -> bool:
     return False
 
 
-def get_provider(provider_name: str) -> BaseProvider | None:
+def get_provider(provider_name: str) -> BaseProvider:
     """"""
 
-    if provider_name in PROVIDER_REGISTRY:
-        return PROVIDER_REGISTRY[provider_name]
+    normalized_input: str = provider_name.strip().lower()
+
+    for registry_key, provider_instance in PROVIDER_REGISTRY.items():
+        pattern = re.sub(r'([a-z])([A-Z])', r'\1\\s*\2', registry_key)
+        
+        if re.fullmatch(pattern, normalized_input, re.IGNORECASE):
+            return provider_instance
     
-    return None
+    raise ProviderNotSupportedException(provider_name)
