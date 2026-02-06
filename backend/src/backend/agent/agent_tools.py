@@ -1,6 +1,7 @@
 
 import re
 import asyncio
+from typing import Coroutine, Any
 
 import bs4
 from google import genai
@@ -14,17 +15,19 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError
 )
 
-from backend.agent.prompts import USER_PROMPT
-from backend.backend_utils.common.lists import SafeAsyncList
+from backend.backend_utils.common import SafeAsyncList
 from backend.backend_utils.exceptions import LoginFailedException
-from backend.backend_utils.browser.context_manager import AsyncBrowserContextMaganer
-from backend.backend_utils.computer_use.functions import (
-    execute_function_calls,
-    get_function_responses
+from backend.backend_utils.browser import AsyncBrowserContextMaganer
+from backend.agent.prompts import USER_PROMPT, COMPUTER_USE_SYSTEM_PROMPT
+from backend.backend_utils.computer_use import (
+    ComputerUseSession,
+    run_computer_use_loop,
+    generate_content_config
 )
 
 from shared.provider.base_provider import BaseProvider
 from shared.provider.registry import get_provider
+from shared.exceptions import ProviderNotSupportedException
 from shared.playwright.page_utilities import close_page_resources
 
 
@@ -55,44 +58,59 @@ async def search_products(
 
     async with async_playwright() as apw:
         web_search_results_list = SafeAsyncList()
-        browser_context_manager = AsyncBrowserContextMaganer(
-            apw,
-            session_id if session_id else None
-        )
-        provider_page: list[tuple[BaseProvider, Page]] = []
+        browser_context_manager = AsyncBrowserContextMaganer(apw, session_id)
+
+        tasks: list[Coroutine[Any, Any, Any]] = []
+        pages_to_close: list[Page] = []
 
         for provider in providers:
-            provider_instance = get_provider(provider)
-
             try:
-                context_or_none: BrowserContext | None = (
+                provider_instance: BaseProvider = get_provider(provider)
+
+                context: BrowserContext | None = (
                     await browser_context_manager.ensure_provider_context(
                         session_id,
                         provider_instance
                     )
                 )
                 
-                if context_or_none:
-                    provider_page.append(
-                        (provider_instance, await context_or_none.new_page())
+                if context:
+                    page: Page = await context.new_page()
+                    pages_to_close.append(page)
+
+                    tasks.append(
+                        __search_in_website(
+                            provider_instance,
+                            page,
+                            products,
+                            web_search_results_list
+                        )
                     )
+
+            except ProviderNotSupportedException:
+                _, _, page = await browser_context_manager.create_browser_context(
+                    start_url="https://google.com"
+                )
+                pages_to_close.append(page)
+
+                tasks.append(
+                    __search_with_computer_use(
+                        provider,
+                        page,
+                        products,
+                        web_search_results_list
+                    )
+                )
 
             except LoginFailedException as lfe:
                 await web_search_results_list.add(
-                    await __format_block(provider_instance, [str(lfe)])
+                    await __format_block(provider, [str(lfe)])
                 )
 
-        await asyncio.gather(
-            *(__search_in_website(
-                provider, 
-                page,
-                products, 
-                web_search_results_list) for provider, page in provider_page
-            )
-        )
+        await asyncio.gather(*tasks)
 
         # clean up
-        for _, page in provider_page:
+        for page in pages_to_close:
             await close_page_resources(page)
 
     web_search_results_str = "\n\n".join(
@@ -129,178 +147,156 @@ async def __search_in_website(
     Returns:
         None | str
         - `None` if no problem was encountered during the execution.
-        - `str` with the error message if the something went wrong.
     """
 
-    await page.goto(provider.url)
-    await page.wait_for_load_state("load")
+    try:
+        await page.goto(provider.url)
+        await page.wait_for_load_state("load")
 
-    # insert here the aria-labels of the 
-    # textboxes used to search a product
-    search_texts = re.compile(
-        r"cerca (per attributo|un prodotto)|ricerca|search",
-        re.IGNORECASE
-    )
-    
-    for item in products:
+        # insert here the aria-labels of the 
+        # textboxes used to search a product
+        search_texts = re.compile(
+            r"cerca (per attributo|un prodotto)|ricerca|search",
+            re.IGNORECASE
+        )
+        
+        for item in products:
 
-        item = item.strip()
-        try:
-            await page.get_by_role("textbox", name=search_texts).fill(item)
-            await page.keyboard.press("Enter")
+            item: str = item.strip()
 
-            found = await __wait_for_any_selector(page, provider.result_container)
-            if not found:
-                formatted_block = await __format_block(
-                    provider,
-                    [f"Nessun risultato trovato per '{item}'."] 
-                )
-                await result_list.add(formatted_block)
-
-                # let's check the next item...
+            if not item:
                 continue
 
-        except Exception as e:
-            return f"Unexpected error while searching '{item}': {e}"
-        
-        await __wait_for_any_selector(page, provider.title_classes)
-        await __wait_for_all_selectors(page, provider.availability_classes)
-        await __wait_for_any_selector(page, provider.price_classes)
+            try:
+                await page.get_by_role("textbox", name=search_texts).fill(item)
+                await page.keyboard.press("Enter")
 
-        html = await page.content()
-        soup = bs4.BeautifulSoup(html, "html.parser")
+                found: str | None = await __wait_for_any_selector(
+                    page, 
+                    provider.result_container
+                )
 
-        product_container = soup.select_one(found)
-        if not product_container:
-            continue
-        
-        product_name = await __select_text(
-            product_container, 
-            provider.title_classes
+                if not found:
+                    formatted_block = await __format_block(
+                        provider.name,
+                        [f"No result found for '{item}'."] 
+                    )
+                    await result_list.add(formatted_block)
+
+                    # let's check the next item...
+                    continue
+            
+                await __wait_for_any_selector(page, provider.title_classes)
+                await __wait_for_all_selectors(page, provider.availability_classes)
+                await __wait_for_any_selector(page, provider.price_classes)
+
+                html = await page.content()
+                soup = bs4.BeautifulSoup(html, "html.parser")
+
+                product_container = soup.select_one(found)
+                
+                if not product_container:
+                    continue
+                
+                product_name, product_availability, product_price = (
+                    await asyncio.gather(
+                        __select_text(
+                            product_container, 
+                            provider.title_classes
+                        ),
+                        __select_all_text(
+                            product_container,
+                            provider.availability_classes
+                        ),
+                            __select_text(
+                            product_container,
+                            provider.price_classes
+                        )
+                    )
+                )
+
+                await result_list.add(
+                    await __format_block(
+                        provider.name,
+                        [
+                            product_name,
+                            product_availability,
+                            product_price
+                        ]            
+                    )
+                )
+
+            except Exception as e:
+                await result_list.add(
+                    await __format_block(
+                        provider.name,
+                        [f"Error searching '{item}': {e}"] 
+                    )
+                )
+
+    except Exception as e:
+        await result_list.add(
+            await __format_block(
+                provider.name,
+                [f"Fatal error: {str(e)}"]
+            )
         )
-    
-        product_availability = await __select_all_text(
-            product_container,
-            provider.availability_classes
+
+
+async def __search_with_computer_use(
+        provider: str,
+        page: Page,
+        products: list[str],
+        result_list: SafeAsyncList
+    ) -> None:
+    """"""
+
+    response_text: str | None = None
+
+    try:
+        client = genai.Client()
+
+        config: genai.types.GenerateContentConfig = (
+            await generate_content_config(COMPUTER_USE_SYSTEM_PROMPT)
         )
-        
-        product_price = await __select_text(
-            product_container,
-            provider.price_classes
+
+        initial_screenshot: bytes = await page.screenshot(type="png")
+
+        formatted_products: str = "\n".join(f"- {p}" for p in products)
+
+        prompt_filled: str = USER_PROMPT.format(
+            products=formatted_products,
+            store=provider
         )
 
-        formatted_block = await __format_block(
-            provider,
-            [
-                product_name,
-                product_availability,
-                product_price
-            ]            
+        session: ComputerUseSession = ComputerUseSession(
+            prompt_filled,
+            initial_screenshot
         )
 
-        await result_list.add(formatted_block)
+        response_text = await run_computer_use_loop(
+            client,
+            page,
+            session,
+            config
+        )
 
+    except Exception as e:
+        await result_list.add(
+            await __format_block(
+                provider,
+                [f"Error: {str(e)}"]
+            )
+        )
 
-# async def __search_with_computer_use(
-#         product_list: list[str],
-#         website: str
-#     ) -> str:
-#     """
-#     Navigates the given website to search for products based on a user's request.
-#     The function simulates realistic browsing behavior, visits the specified site,
-#     analyzes the provided product list, and returns a synthesized summary of the
-#     discovered information.
-
-#     Args:
-#         user_request (str):
-#             A natural-language description of what the user wants to find.
-
-#         website (str):
-#             The URL of the website to navigate and inspect.
-
-#         products (list[str]):
-#             A list of product names or identifiers to look for on the website.
-
-#     Returns:
-#         str:
-#             A textual summary describing the results of the product search 
-#             performed on the site.
-#     """
-
-#     _, _, page = await AsyncBrowserContextMaganer.create_browser_context(
-#         headless=False,
-#         start_url="https://google.com"
-#     )
-
-#     try:
-#         client = genai.Client()
-
-#         generate_content_config = genai.types.GenerateContentConfig(
-#             tools=[
-#                 types.Tool(
-#                     computer_use=types.ComputerUse(
-#                         environment=types.Environment.ENVIRONMENT_BROWSER
-#                     )
-#                 )
-#             ]
-#         )
-
-#         initial_screenshot = await page.screenshot(type="png")
-
-#         products = "\n".join(f"- {p}" for p in product_list)
-
-#         prompt_filled = USER_PROMPT.format(
-#             products_list=products,
-#             website=website
-#         )
-
-#         contents = [
-#             Content(
-#                 role="user",
-#                 parts=[
-#                     Part(text=prompt_filled),
-#                     Part.from_bytes(data=initial_screenshot, mime_type='image/png')
-#                 ]
-#             )
-#         ]
-
-#         max_iter = 10
-
-#         for _ in range(max_iter):
-#             model_response = client.models.generate_content(
-#                 model='gemini-2.5-computer-use-preview-10-2025',
-#                 contents=contents,
-#                 config=generate_content_config,
-#             )
-
-#             candidate = model_response.candidates[0]
-#             contents.append(candidate)
-
-#             has_function_calls = any(
-#                 part.function_call for part in candidate.content.parts
-#             )
-
-#             if not has_function_calls:
-#                 response_text = " ".join(
-#                     [part.text for part in candidate.content.parts if part.text]
-#                 )
-#                 break
-
-#             results = execute_function_calls(candidate, page)
-#             function_responses = get_function_responses(page, results)
-
-#             contents.append(
-#                 Content(
-#                     role="user",
-#                     parts=[
-#                         Part(function_response=fr) for fr in function_responses
-#                     ]
-#                 )
-#             )
-
-#     finally:
-#         await AsyncBrowserContextMaganer.close_page_resources(page)
-#         return response_text
+    finally:
+        if response_text:
+            await result_list.add(
+                await __format_block(
+                    provider,
+                    [response_text]
+                )
+            )
 
 
 
@@ -504,7 +500,7 @@ async def __select_all_text(
 
 
 async def __format_block(
-        provider: BaseProvider,
+        provider_name: str,
         lines: list[str]
     ) -> str:
     """
@@ -527,7 +523,7 @@ async def __format_block(
 
     return " | ".join(
         [
-            f"{provider.name.upper()}",
+            f"{provider_name.upper()}",
             *lines
         ]
     )

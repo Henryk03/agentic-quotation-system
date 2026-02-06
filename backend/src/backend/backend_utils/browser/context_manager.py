@@ -215,7 +215,8 @@ class AsyncBrowserContextMaganer:
 
         browser = await self.async_playwright.chromium.launch(
             headless=(
-                headless if not headless else AsyncBrowserContextMaganer.is_headless_mode()
+                headless 
+                if not headless else AsyncBrowserContextMaganer.is_headless_mode()
             )
         )
 

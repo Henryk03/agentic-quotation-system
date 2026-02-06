@@ -1,4 +1,6 @@
 
+import platform
+
 from playwright.async_api import Page
 from google.genai import types
 from google.genai.types import Candidate
@@ -25,7 +27,7 @@ async def denormalize_y(
 async def execute_function_calls(
         candidate: Candidate,
         page: Page
-    ) -> list[(str, dict[str, str])]:
+    ) -> list[tuple[str, dict]]:
     """"""
 
     results = []
@@ -63,21 +65,30 @@ async def execute_function_calls(
                 case "type_text_at":
                     actual_x = await denormalize_x(args["x"], page_viewport["width"])
                     actual_y = await denormalize_y(args["y"], page_viewport["height"])
+
                     text = args["text"]
+
                     press_enter = args.get("press_enter", False)
 
                     await page.mouse.click(actual_x, actual_y)
-                    # Simple clear (Command+A, Backspace for Mac)
-                    await page.keyboard.press("Meta+A")
+
+                    if platform.system().lower() == "darwin":
+                        await page.keyboard.press("Command+A")
+
+                    else:
+                        await page.keyboard.press("Meta+A")
+
                     await page.keyboard.press("Backspace")
+
                     await page.keyboard.type(text)
+                    
                     if press_enter:
                         await page.keyboard.press("Enter")
 
                 case _:
-                    pass
+                    print("Non so fare questa azione ancora...")
 
-            await page.wait_for_load_state("load")
+            await page.wait_for_load_state("networkidle")
 
         except Exception as e:
             action_result = {"error": str(e)}
@@ -89,11 +100,11 @@ async def execute_function_calls(
 
 async def get_function_responses(
         page: Page,
-        results: list[(str, dict[str, str])]
+        results: list[tuple[str, dict]]
     ) -> list[types.FunctionResponse]:
     """"""
 
-    screenshot_bytes = page.screenshot(type="png")
+    screenshot_bytes = await page.screenshot(type="png")
     current_url = page.url
     function_responses = []
 
