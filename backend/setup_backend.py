@@ -324,7 +324,7 @@ def upgrade_database(
 
     return run_command(
         [str(python), "-m", "alembic", "upgrade", "head"],
-        "⬆️ Applying database migrations"
+        "\n" + "⬆️ Applying database migrations"
     )
 
 
@@ -353,6 +353,9 @@ def ensure_initial_migration(
 
     versions = Path("alembic/versions")
 
+    if not versions.exists():
+        versions.mkdir(parents=True)
+
     if any(versions.iterdir()):
         return True
 
@@ -362,7 +365,7 @@ def ensure_initial_migration(
             "revision", "--autogenerate",
             "-m", "initial schema"
         ],
-        "🧱 No migrations found, generating initial schema"
+        "\n🧱 No migrations found, generating initial schema"
     )
 
 
