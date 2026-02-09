@@ -252,17 +252,29 @@ async def __search_with_computer_use(
     """"""
 
     response_text: str | None = None
+    excluded_functions: list[str] = [
+        "drag_and_drop", 
+        "open_web_browser",
+        "navigate"
+    ]
 
     try:
-        client = genai.Client()
+        client: genai.Client = genai.Client()
 
         config: genai.types.GenerateContentConfig = (
-            await generate_content_config(COMPUTER_USE_SYSTEM_PROMPT)
+            await generate_content_config(
+                COMPUTER_USE_SYSTEM_PROMPT,
+                excluded_functions
+            )
         )
 
-        initial_screenshot: bytes = await page.screenshot(type="png")
+        initial_screenshot: bytes = await page.screenshot(
+            type="png"
+        )
 
-        formatted_products: str = "\n".join(f"- {p}" for p in products)
+        formatted_products: str = "\n".join(
+            f"- {p}" for p in products
+        )
 
         prompt_filled: str = USER_PROMPT.format(
             products=formatted_products,

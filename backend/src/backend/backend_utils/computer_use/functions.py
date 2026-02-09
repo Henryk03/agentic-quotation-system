@@ -1,9 +1,13 @@
 
-import platform
+import asyncio
+from typing import Any
 
 from playwright.async_api import Page
 from google.genai import types
-from google.genai.types import Candidate
+from google.genai.types import (
+    Candidate,
+    FunctionCall
+)
 
 
 async def denormalize_x(
@@ -30,14 +34,14 @@ async def execute_function_calls(
     ) -> list[tuple[str, dict]]:
     """"""
 
-    results = []
-    function_calls = []
+    results: list[tuple[str, dict]] = []
+    function_calls: list[FunctionCall] = []
 
-    page_viewport = await page.evaluate(
+    page_viewport: dict[str, int] = await page.evaluate(
         """
         () => ({
-            innerWidth: window.innerWidth,
-            innerHeight: window.innerHeight
+            width: window.innerWidth,
+            height: window.innerHeight
         })
         """
     )
@@ -47,48 +51,53 @@ async def execute_function_calls(
             function_calls.append(part.function_call)
 
     for function_call in function_calls:
-        action_result = {}
-        fname = function_call.name
-        args = function_call.args
+        action_result: dict = {}
+        fname: str | None = function_call.name
+        args: dict[str, Any] | None = function_call.args
 
         try:
             match fname:
-                case "open_web_browser":
-                    pass
-
                 case "click_at":
-                    actual_x = await denormalize_x(args["x"], page_viewport["width"])
-                    actual_y = await denormalize_y(args["y"], page_viewport["height"])
+                    actual_x: int = await denormalize_x(args["x"], page_viewport["width"])
+                    actual_y: int = await denormalize_y(args["y"], page_viewport["height"])
 
+                    await asyncio.sleep(1)
                     await page.mouse.click(actual_x, actual_y)
 
                 case "type_text_at":
                     actual_x = await denormalize_x(args["x"], page_viewport["width"])
                     actual_y = await denormalize_y(args["y"], page_viewport["height"])
 
-                    text = args["text"]
-
-                    press_enter = args.get("press_enter", False)
+                    text: str = args["text"]
+                    press_enter: bool = args["press_enter"]
 
                     await page.mouse.click(actual_x, actual_y)
 
-                    if platform.system().lower() == "darwin":
-                        await page.keyboard.press("Command+A")
-
-                    else:
-                        await page.keyboard.press("Meta+A")
-
+                    await page.keyboard.press("ControlOrMeta+A")
+                    await asyncio.sleep(1)
                     await page.keyboard.press("Backspace")
 
-                    await page.keyboard.type(text)
+                    await page.keyboard.type(text, delay=500)
+                    await asyncio.sleep(1)
                     
                     if press_enter:
                         await page.keyboard.press("Enter")
 
+                case "wait_5_seconds":
+                    await asyncio.sleep(5)
+
+                case "go_back":
+                    await asyncio.sleep(1)
+                    await page.go_back()
+
+                case "go_forward":
+                    await asyncio.sleep(1)
+                    await page.go_forward()
+
                 case _:
                     print("Non so fare questa azione ancora...")
 
-            await page.wait_for_load_state("networkidle")
+            await page.wait_for_load_state("networkidle", timeout=10)
 
         except Exception as e:
             action_result = {"error": str(e)}

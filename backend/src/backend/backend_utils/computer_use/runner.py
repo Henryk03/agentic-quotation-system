@@ -1,6 +1,6 @@
 
 from google import genai
-from google.genai.types import Content
+from google.genai.types import Content, Candidate
 from playwright.async_api import Page
 
 from backend.backend_utils.computer_use.session import ComputerUseSession
@@ -30,7 +30,7 @@ async def run_computer_use_loop(
 
         print(f"COMPUTER USE: risposta dall'IA {response}")
 
-        candidate: Content = response.candidates[0]
+        candidate: Candidate = response.candidates[0]
         session.add_model_candidate(candidate)
 
         if is_final_response(candidate):

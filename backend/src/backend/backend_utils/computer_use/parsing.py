@@ -1,9 +1,9 @@
 
-from google.genai.types import Content
+from google.genai.types import Candidate
 
 
 def is_final_response(
-        candidate: Content
+        candidate: Candidate
     ) -> bool:
     """"""
 
@@ -13,7 +13,7 @@ def is_final_response(
 
 
 def extract_text(
-        candidate: Content
+        candidate: Candidate
     ) -> str:
     """"""
     

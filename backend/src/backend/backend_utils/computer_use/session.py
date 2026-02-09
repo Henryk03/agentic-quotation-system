@@ -1,5 +1,9 @@
 
+from typing import Iterable
+
 from google.genai.types import (
+    FunctionResponse,
+    Candidate,
     Content, 
     Part
 )
@@ -40,22 +44,26 @@ class ComputerUseSession:
 
     def add_model_candidate(
             self, 
-            candidate: Content
+            candidate: Candidate
         ) -> None:
         """"""
 
-        self._contents.append(candidate)
+        if candidate.content:
+            self._contents.append(candidate.content)
 
 
     def add_function_responses(
             self, 
-            responses: list
+            responses: Iterable[FunctionResponse]
         ) -> None:
         """"""
         
         self._contents.append(
             Content(
                 role="user",
-                parts=[Part(function_response=r) for r in responses]
+                parts=[
+                    Part(function_response=response) 
+                    for response in responses
+                ]
             )
         )

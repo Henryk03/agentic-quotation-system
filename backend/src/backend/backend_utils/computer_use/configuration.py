@@ -4,7 +4,8 @@ from google.genai import types
 
 
 async def generate_content_config(
-        system_prompt: str | None = None
+        system_prompt: str | None = None,
+        excluded_functions: list[str] | None = None
     ) -> genai.types.GenerateContentConfig:
     """"""
 
@@ -13,7 +14,8 @@ async def generate_content_config(
         tools=[
             types.Tool(
                 computer_use=types.ComputerUse(
-                    environment=types.Environment.ENVIRONMENT_BROWSER
+                    environment=types.Environment.ENVIRONMENT_BROWSER,
+                    excluded_predefined_functions=excluded_functions
                 )
             )
         ]
