@@ -87,6 +87,9 @@ async def dispatch_chat(
         messages: dict = await agent.ainvoke(
             input={
                 "messages": lc_messages + [HumanMessage(user_message)]
+            },
+            config={
+                "configurable": {"client_id": session_id}
             }
         )
 

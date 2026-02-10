@@ -35,6 +35,11 @@ class Settings:
         # Playwright / Browser
         self.HEADLESS: bool = os.getenv("HEADLESS", "true").lower() == "true"
 
+        # Login mode
+        self.AUTO_LOGIN_ONLY: bool = (
+            os.getenv("AUTO_LOGIN_ONLY", "true").lower() == "true"
+        )
+
         # Secret key
         self.SECRET_KEY: str | None = os.getenv("SECRET_KEY", None)
 

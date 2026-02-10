@@ -160,13 +160,17 @@ def create_env_file_interactive() -> bool:
     port = prompt("Server port", default="8080")
     config["PORT"] = port
 
-    print("\n" + "🗄️ Database configuration")
+    print("\n" + "🗄️ Database Configuration")
     db_url = prompt("Database URL")
     config["DB_URL"] = db_url or "protocol://user:password@host:port/db_name"
 
     print("\n🎭 Playwright Configuration")
     headless = prompt("Run browser in headless mode? (true/false)", default="true")
     config["HEADLESS"] = headless.lower() if headless else None
+
+    print("\n👤 Login Mode")
+    auto_login_only = prompt("Enable auto-login? (true/false)", default="true")
+    config["AUTO_LOGIN_ONLY"] = auto_login_only.lower() if auto_login_only else None
 
     print("\n🔐 Security configuration")
     gen_key = input("Generate a new SECRET_KEY? (Y/n): ").lower()

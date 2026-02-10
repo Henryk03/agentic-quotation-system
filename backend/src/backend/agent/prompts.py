@@ -112,16 +112,17 @@ SYSTEM_PROMPT: str = (
     "**Comet**\n"
     "*   **Product name:** <product_name>\n"
     "*   **Availability:** <product_availability>\n"
-    "*   **Price:** <product_price>\n\n"
+    "*   **Price:** <product_price>\n"
+    "*   **Link:** <product_link>\n"
+    "*   **Image:** <product_image>\n\n"
 
     "Example (product not found):\n"
     "**Amazon**\n"
     "*   No result found for '<product_search_name>'.\n\n"
 
-    "Example (login failed):\n"
+    "Example (something failed):\n"
     "**GruppoComet**\n"
-    "*   Something went wrong during the login process for '<provider_website>'."
-    " Please try again.\n\n"
+    "*   <Clear, user-friendly explanation of why the operation failed>\n\n"
 
     "Before performing a web search using the tool, check whether the item has already "
     "been searched for previously. If the item was already retrieved or exists in the "

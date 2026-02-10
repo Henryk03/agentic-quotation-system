@@ -28,7 +28,7 @@ class BaseProvider:
         availability_classes (AvailabilityDict):
             CSS classes or selectors used to detect product availability.
 
-        availability_pattern (Pattern[str] | None):
+        availability_texts (Pattern[str] | None):
             Regular expression used to identify availability based on specific 
             actionable text (e.g., "Add to cart"). If `None`, availability is 
             determined solely via CSS classes.
@@ -80,7 +80,7 @@ class BaseProvider:
     def __init__(
         self,
         availability_classes: AvailabilityDict,
-        availability_pattern: Pattern[str] | None,
+        availability_texts: Pattern[str] | None,
         login_required: bool,
         logout_selectors: list[str] | None,
         logout_texts: Pattern[str] | None,
@@ -93,7 +93,7 @@ class BaseProvider:
         title_classes: list[str],
     ):
         self.availability_classes = availability_classes
-        self.availability_pattern = availability_pattern
+        self.availability_texts = availability_texts
         self.login_required = login_required
         self.logout_selectors = logout_selectors
         self.logout_texts = logout_texts

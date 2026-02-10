@@ -5,11 +5,9 @@ from typing import Coroutine, Any
 
 import bs4
 from google import genai
-from google.genai import types
-from google.genai.types import Content, Part
+from langchain_core.runnables import RunnableConfig
 from playwright.async_api import (
     async_playwright,
-    Browser,
     BrowserContext,
     Page,
     TimeoutError as PlaywrightTimeoutError
@@ -32,7 +30,7 @@ from shared.playwright.page_utilities import close_page_resources
 
 
 async def search_products(
-        session_id: str | None, 
+        config: RunnableConfig,
         products: list[str],
         providers: list[str]
     ) -> str:
@@ -53,10 +51,12 @@ async def search_products(
             for each product.
     """
     
+    session_id: str | None
     web_search_results_list: SafeAsyncList
     browser_context_manager: AsyncBrowserContextMaganer
 
     async with async_playwright() as apw:
+        session_id = config.get("configurable", {}).get("client_id", None)
         web_search_results_list = SafeAsyncList()
         browser_context_manager = AsyncBrowserContextMaganer(apw, session_id)
 
@@ -103,8 +103,14 @@ async def search_products(
                 )
 
             except LoginFailedException as lfe:
+                print(str(lfe))
                 await web_search_results_list.add(
                     await __format_block(provider, [str(lfe)])
+                )
+
+            except Exception as e:
+                await web_search_results_list.add(
+                    await __format_block(provider, [str(e)])
                 )
 
         await asyncio.gather(*tasks)
@@ -152,13 +158,6 @@ async def __search_in_website(
     try:
         await page.goto(provider.url)
         await page.wait_for_load_state("load")
-
-        # insert here the aria-labels of the 
-        # textboxes used to search a product
-        search_texts = re.compile(
-            r"cerca (per attributo|un prodotto)|ricerca|search",
-            re.IGNORECASE
-        )
         
         for item in products:
 
@@ -168,7 +167,12 @@ async def __search_in_website(
                 continue
 
             try:
-                await page.get_by_role("textbox", name=search_texts).fill(item)
+                await page.get_by_role(
+                    "textbox", 
+                    name=provider.search_texts
+                ).fill(
+                    item
+                )
                 await page.keyboard.press("Enter")
 
                 found: str | None = await __wait_for_any_selector(
@@ -206,9 +210,10 @@ async def __search_in_website(
                         ),
                         __select_all_text(
                             product_container,
-                            provider.availability_classes
+                            provider.availability_classes,
+                            provider.availability_pattern     # cambiare con nome aggiornato  
                         ),
-                            __select_text(
+                        __select_text(
                             product_container,
                             provider.price_classes
                         )
@@ -428,7 +433,7 @@ async def __select_text(
             The BeautifulSoup tag to search within.
 
         selectors (list[str] | AvailabilityDict):
-            A list of CSS selectors or an AvailabilityDict containing
+            A list of CSS selectors or an `AvailabilityDict` containing
             'available' and 'not_available' lists.
 
     Returns:
@@ -450,7 +455,8 @@ async def __select_text(
 
 async def __select_all_text(
         tag: bs4.element.Tag,
-        selectors: list[str] | dict
+        selectors: list[str] | dict,
+        availability_alt_texts: re.Pattern[str] | None
     ) -> str:
     """
     Extract and concatenate text content from all elements matching
@@ -458,7 +464,7 @@ async def __select_all_text(
 
     If `selectors` is an `AvailabilityDict`, both "available" and 
     "not_available" selectors are processed. When an element matches
-    an "available" selector but has no text, the fallback "Disponibile"
+    an "available" selector but has no text, the fallback "In Stock"
     is used as text.
 
     Args:
@@ -475,14 +481,6 @@ async def __select_all_text(
             elements, separated by newlines.
     """
 
-    # in some websites the availability of a product
-    # is espressed only as a button that let the user buy
-    # that product.
-    availability_alt_texts: re.Pattern[str] = re.compile(
-        r"aggiungi al carrello|add to cart", 
-        re.IGNORECASE
-    )
-
     texts: list[str] = []
 
     if isinstance(selectors, dict):
@@ -494,8 +492,9 @@ async def __select_all_text(
                 for elem in tag.select(sel):
                     text: str = elem.get_text(strip=True)
 
-                    if re.search(availability_alt_texts, text) and state == "available":
-                        text = "Disponibile"
+                    if availability_alt_texts:
+                        if re.search(availability_alt_texts, text) and state == "available":
+                            text = "In Stock"
 
                     if text:
                         texts.append(text)

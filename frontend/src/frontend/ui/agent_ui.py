@@ -3,6 +3,7 @@ import time
 import uuid
 import asyncio
 import logging
+from functools import partial
 
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
@@ -35,6 +36,13 @@ def get_event_loop() -> asyncio.AbstractEventLoop:
 
     return st.session_state.loop
 
+
+def close_dialog(
+        flag_key: str
+    ) -> None:
+    """"""
+
+    st.session_state.ui_state[flag_key] = False
 
 # ==========================
 #     Message animation
@@ -434,7 +442,13 @@ if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
 #   Store related dialogs
 # ==========================
 
-@st.dialog("Auto-login credentials")
+@st.dialog(
+    "Auto-login credentials", 
+    on_dismiss=partial(
+        close_dialog, 
+        "autologin_dialog_open"
+    )
+)
 def insert_autologin_credentials() -> None:
     """"""
 
@@ -492,7 +506,13 @@ def insert_autologin_credentials() -> None:
         )
 
 
-@st.dialog("Select Store")
+@st.dialog(
+    "Select Store",
+    on_dismiss=partial(
+        close_dialog,
+        "store_dialog_open"
+    )
+)
 def store_selector_dialog() -> None:
     """"""
 

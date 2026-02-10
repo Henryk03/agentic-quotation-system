@@ -12,7 +12,7 @@ class Comet(BaseProvider):
                 "available": [".c-btn-primary"], 
                 "not_available": [".text-h5-semibold"]
             },
-            availability_pattern = re.compile(
+            availability_texts = re.compile(
                 r"aggiungi al carrello", 
                 re.IGNORECASE
             ),

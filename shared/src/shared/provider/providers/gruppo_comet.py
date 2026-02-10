@@ -14,7 +14,7 @@ class GruppoComet(BaseProvider):
                 "available": [".disp-ok"], 
                 "not_available": [".disp-no"]
             },
-            availability_pattern = None,
+            availability_texts = None,
             login_required = True,
             logout_selectors = [
                 "a"

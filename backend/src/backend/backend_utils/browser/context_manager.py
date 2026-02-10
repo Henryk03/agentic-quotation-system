@@ -155,7 +155,7 @@ class AsyncBrowserContextMaganer:
 
         if AsyncBrowserContextMaganer.is_cli_mode():
             raise ManualFallbackException(provider, reason)
-        
+
         raise UILoginException(provider, reason)
     
 
@@ -220,7 +220,7 @@ class AsyncBrowserContextMaganer:
             )
         )
 
-        storage_state_param = None
+        storage_state_param: Path | StorageState | str | None = None
 
         if state:
             if isinstance(state, Path):
@@ -285,9 +285,192 @@ class AsyncBrowserContextMaganer:
             headless=headless
         )
 
-        await provider.close_popup(page)
+        await provider.close_all_popups(page)
 
         return browser, context, page
+    
+
+    async def __ensure_autologin_context(
+            self,
+            session_id: str | None,
+            provider: BaseProvider
+        ) -> BrowserContext | None:
+        """"""
+
+        if (
+            not provider.has_auto_login() 
+            and 
+            provider.login_required
+        ):
+            raise LoginFailedException(
+                provider, 
+                (
+                    "The provider requires login, but the autologin "
+                    "implementation is missing or not supported."
+                )
+            )
+
+        _, context, page = await self.__prepare_provider_context(
+            provider=provider,
+            state=None,
+            headless=True
+        )
+
+        try:
+            if (
+                await provider.is_logged_in(page) 
+                or 
+                not provider.login_required
+            ):
+                await page.close()
+                return context
+
+            if await provider.has_captcha(page):
+                raise LoginFailedException(
+                    provider, 
+                    (
+                        "Authentication blocked by CAPTCHA: automated access "
+                        "is restricted by the provider's security policies."
+                    )
+                )
+
+            credentials: dict[str, str] | None = (
+                await AsyncBrowserContextMaganer.__get_creds_by_mode(
+                    session_id,
+                    provider
+                )
+            )
+
+            if not credentials:
+                raise LoginFailedException(
+                    provider, 
+                    (
+                        "No valid credentials found for the selected store. "
+                        "Please verify your settings and try again."
+                    )
+                )
+
+
+            if not await provider.auto_login(page, credentials):
+                # aggiornare la flag nel db (tabella credenziali) circa la prova...
+                # far reinserire le credenziali (fino a blocco obv )
+                raise LoginFailedException(
+                    provider, 
+                    (
+                        "Autologin process failed. This may be due to incorrect "
+                        "credentials or unexpected UI changes on the provider's website."
+                    )
+                )
+
+            await self.__save_current_state(
+                session_id,
+                provider,
+                context
+            )
+
+            await page.close()
+            return context
+
+        except Exception:
+            if page:
+                await close_page_resources(page)
+
+            raise
+
+
+    async def __ensure_standard_context(
+            self,
+            session_id: str | None,
+            provider: BaseProvider
+        ) -> BrowserContext | None:
+        """"""
+
+        state, fail_reason = (
+            await AsyncBrowserContextMaganer.__get_current_state(
+                session_id,
+                provider
+            )
+        )
+
+        if state == "BLOCKED":
+            raise LoginFailedException(provider, fail_reason)
+
+        context: BrowserContext | None = None
+        page: Page | None = None
+
+        try:
+            if not state and provider.login_required:
+                await AsyncBrowserContextMaganer.__handle_failure(
+                    provider,
+                    "MISSING_STATE"
+                )
+
+            _, context, page = await self.__prepare_provider_context(
+                provider,
+                state,
+                True
+            )
+
+            if (
+                await provider.is_logged_in(page) 
+                or 
+                not provider.login_required
+            ):
+                await page.close()
+                return context
+
+            if provider.has_auto_login():
+                if await provider.has_captcha(page):
+                    await AsyncBrowserContextMaganer.__handle_failure(
+                        provider,
+                        "CAPTCHA_DETECTED"
+                    )
+
+                credentials = await AsyncBrowserContextMaganer.__get_creds_by_mode(
+                    session_id,
+                    provider
+                )
+
+                if await provider.auto_login(page, credentials):
+                    await self.__save_current_state(
+                        session_id,
+                        provider,
+                        context
+                    )
+                    await page.close()
+                    return context
+
+                await AsyncBrowserContextMaganer.__handle_failure(
+                    provider,
+                    "AUTOLOGIN_FAILED"
+                )
+
+            await AsyncBrowserContextMaganer.__handle_failure(
+                provider,
+                "MISSING_AUTOLOGIN"
+            )
+
+        except ManualFallbackException:
+            if page:
+                await close_page_resources(page)
+
+            if AsyncBrowserContextMaganer.is_cli_mode():
+                try:
+                    if not state:
+                        await self.__manual_login(provider)
+                        _, context, _ = await self.__prepare_provider_context(
+                            provider,
+                            state,
+                            True
+                        )
+
+                except:
+                    raise LoginFailedException(provider)
+                
+            # there should be no else statement here,
+            # because this exception is CLI-only
+                
+        return context
 
 
     async def ensure_provider_context(
@@ -309,104 +492,19 @@ class AsyncBrowserContextMaganer:
                 The provider for whom a login is required.
 
         Returns:
-            BrowserContext
+            BrowserContext | None
         """
 
-        state: Path | StorageState | str | None
-        fail_reason: str | None
-
-        state, fail_reason = await AsyncBrowserContextMaganer.__get_current_state(
-            session_id,
-            provider
-        )
-
-        if state == "BLOCKED":
-            raise LoginFailedException(provider, fail_reason)
-
-        context: BrowserContext | None = None
-        page: Page | None = None
-
-        try:
-            login_required: bool = provider.login_required
-
-            if not state and login_required:
-                await AsyncBrowserContextMaganer.__handle_failure(
-                    provider, 
-                    "MISSING_STATE"
-                )
-
-            _, context, page = await self.__prepare_provider_context(
-                provider,
-                state,
-                True
+        if settings.AUTO_LOGIN_ONLY:
+            return await self.__ensure_autologin_context(
+                session_id,
+                provider
             )
-
-            logged_in: bool = await provider.is_logged_in(
-                page
-            ) 
-            
-            if logged_in or not login_required:
-                await page.close()
-                return context
-            
-            if provider.has_auto_login():
-                if await provider.has_captcha(page):
-                    await AsyncBrowserContextMaganer.__handle_failure(
-                        provider, 
-                        "CAPTCHA_DETECTED"
-                    )
-                    
-                credentials = await AsyncBrowserContextMaganer.__get_creds_by_mode(
-                    session_id,
-                    provider
-                )
-                
-                if await provider.auto_login(page, credentials):
-                    await self.__save_current_state(
-                        session_id,
-                        provider,
-                        context
-                    )
-                    await close_page_resources(
-                        page
-                    )
-
-                    return context
-                
-                else:
-                    await AsyncBrowserContextMaganer.__handle_failure(
-                        provider, 
-                        "AUTOLOGIN_FAILED"
-                    )
-
-            await AsyncBrowserContextMaganer.__handle_failure(
-                provider, 
-                "MISSING_AUTOLOGIN"
-            )             
         
-        except ManualFallbackException:
-            if page:
-                await close_page_resources(
-                    page
-                )
-
-            if AsyncBrowserContextMaganer.is_cli_mode():
-                try:
-                    if not state:
-                        await self.__manual_login(provider)
-                        _, context, _ = await self.__prepare_provider_context(
-                            provider,
-                            state,
-                            True
-                        )
-
-                except:
-                    raise LoginFailedException(provider)
-                
-            # there should be no else statement here,
-            # because this exception is CLI-only
-                
-        return context
+        return await self.__ensure_standard_context(
+            provider,
+            provider
+        ) 
 
 
     async def __manual_login(
