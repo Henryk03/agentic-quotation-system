@@ -10,21 +10,38 @@ class GruppoComet(BaseProvider):
 
     def __init__(self):
         super().__init__(
-            provider_name = "GruppoComet",
-            provider_url = "https://gruppocomet.it/simevignuda",
-            login_required = True,
-            result_container = [".result-block-v2"],
-            popup_selectors = [
-                "button.iubenda-cs-close-btn",
-                "a#eu-privacy-close"
-            ],
-            logout_selectors = ["a"],
-            title_classes = [".result-title"], 
             availability_classes = {
                 "available": [".disp-ok"], 
                 "not_available": [".disp-no"]
             },
-            price_classes = [".result-price"]
+            availability_pattern = None,
+            login_required = True,
+            logout_selectors = [
+                "a"
+            ],
+            logout_texts = re.compile(
+                r"(?:log|sign)[- ]?out",
+                re.IGNORECASE
+            ),
+            popup_selectors = [
+                "button.iubenda-cs-close-btn",
+                "a#eu-privacy-close"
+            ],
+            price_classes = [
+                ".result-price"
+            ],
+            provider_name = "GruppoComet",
+            provider_url = "https://gruppocomet.it/simevignuda",
+            result_container = [
+                ".result-block-v2"
+            ],
+            search_texts = re.compile(
+                "cerca per attributo", 
+                re.IGNORECASE
+            ),
+            title_classes = [
+                ".result-title"
+            ] 
         )
 
     async def auto_login(
@@ -54,3 +71,5 @@ class GruppoComet(BaseProvider):
 
         except:
             return False
+        
+provider: BaseProvider = GruppoComet()

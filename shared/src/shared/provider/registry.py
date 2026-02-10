@@ -1,9 +1,12 @@
 
 import re
+import types
+import pkgutil
+import importlib
 
 from shared.exceptions import ProviderNotSupportedException
 from shared.provider.base_provider import BaseProvider
-from shared.provider.providers import comet, gruppo_comet
+from shared.provider import providers as providers_pkg
 
 
 PROVIDER_REGISTRY: dict[str, BaseProvider] = {}
@@ -13,14 +16,36 @@ def register_provider(provider_instance: BaseProvider) -> None:
     """"""
 
     name: str = provider_instance.name
+
+    if name in PROVIDER_REGISTRY:
+        raise RuntimeError(
+            f"Duplicate provider name detected: {name}"
+        )
+    
     PROVIDER_REGISTRY[name] = provider_instance
 
 
-# =========================
-#  providers' registration 
-# =========================
-register_provider(comet.Comet())
-register_provider(gruppo_comet.GruppoComet())
+def autodiscover_providers() -> None:
+    """
+    Automatically discover and register all provider instances
+    defined in the `shared.provider.providers` package.
+
+    Each provider module must expose a variable named `provider`
+    containing an instance of `BaseProvider`.
+    """
+
+    for module_info in pkgutil.iter_modules(providers_pkg.__path__):
+        module_name: str = f"{providers_pkg.__name__}.{module_info.name}"
+        module: types.ModuleType = importlib.import_module(module_name)
+
+        provider: BaseProvider | None = getattr(module, "provider", None)
+
+        if isinstance(provider, BaseProvider):
+            register_provider(provider)
+
+
+# providers' registration at import time
+autodiscover_providers()
 
 
 def all_providers() -> list[BaseProvider]:
