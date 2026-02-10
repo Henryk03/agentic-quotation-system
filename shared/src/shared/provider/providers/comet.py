@@ -32,7 +32,7 @@ class Comet(BaseProvider):
                 ".c-cd-prodotto"
             ],
             search_texts = re.compile(
-                "cercca un prodotto", 
+                "cerca un prodotto", 
                 re.IGNORECASE
             ),
             title_classes = [
