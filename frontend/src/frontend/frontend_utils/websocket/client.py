@@ -128,7 +128,7 @@ class WSClient:
             self,
             role: str,
             message: str,
-            metadata: dict[str, list[str] | str],
+            metadata: dict[str, list[str] | str | int],
             on_event: Callable[[Event], bool],
             on_error: Callable[[Exception], None] | None = None
         ) -> bool:

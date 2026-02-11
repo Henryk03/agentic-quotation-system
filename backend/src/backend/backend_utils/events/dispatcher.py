@@ -13,8 +13,8 @@ from backend.database.engine import AsyncSessionLocal
 
 async def __format_message(
         message: str,
-        session_id: str,
         selected_stores: list[str],
+        items_per_store: int,
         is_rerun: bool
     ) -> str:
     """"""
@@ -41,7 +41,7 @@ async def __format_message(
         "\n"
         f"{store_list}"
         "\n"
-        "For each product, search 2 items."
+        f"For each product, search {items_per_store} items."
         "\n"
         f"{rerun_msg}"
     )
@@ -55,6 +55,7 @@ async def dispatch_chat(
         session_id: str,
         chat_id: str,
         selected_stores: list[str],
+        items_per_store: int,
         websocket: WebSocket,
     ) -> None:
     """"""
@@ -74,8 +75,8 @@ async def dispatch_chat(
 
     user_message: str = await __format_message(
         user_input,
-        session_id,
         selected_stores,
+        items_per_store,
         needs_rerun
     )
 

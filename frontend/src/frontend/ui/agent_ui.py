@@ -172,13 +172,15 @@ if "ui_state" not in st.session_state:
     chat_id: str = uuid.uuid4().hex
 
     st.session_state.ui_state = {
-        "selected_stores": [],
+        "selected_stores": [],          # list for supported stores (automation)
+        "custom_urls": [],              # list for non supported stores (computer use)
+        "results_per_item": 1,
         "store_dialog_open": False,
         "autologin_dialog_open": False,
 
         "login_dialog": {
             "open": False,
-            "status": "idle",   # idle | waiting | in_progress | success | error | cancelled
+            "status": "idle",           # idle | waiting | in_progress | success | error | cancelled
             "provider": None,
             "login_url": None,
             "_close_next_run": False
@@ -363,7 +365,7 @@ if st.session_state.ui_state["login_dialog"]["open"]:
     login_dialog()
 
 if st.session_state.ui_state["login_dialog"]["status"] == "cancelled":
-    metadata: dict = {
+    metadata = {
         "chat_id": st.session_state.chat_id,
         "selected_stores": st.session_state.ui_state["selected_stores"]
     }
@@ -522,27 +524,52 @@ def store_selector_dialog() -> None:
     full_options: list[str] = list(set(base_options + current_selection))
 
     st.multiselect(
-        "Select one or more stores or type to add new ones...",
+        "Supported Stores",
         options=full_options,
         default=current_selection,
-        key="store_multiselect",
+        key="store_multiselect"
+    )
+
+    st.multiselect(
+        "Custom Store URLs",
+        options="https://amazon.com",
+        key="store_multiselect_computer_use",
+        placeholder="https://store-example.com",
         accept_new_options=True
     )
-    st.caption((
-        "⚠️ *Note: Searching within manually added stores "
-        "take longer to process.*"
-    ))
+
+    st.caption(
+        (
+            "⚠️ **Note**: Official integrations are fully optimized. "
+            "Custom links use experimental technology and may have "
+            "inconsistent results."
+        )
+    )
+
+    results_per_item: int = st.select_slider(
+        "Items to retrieve per store",
+        options = list(range(1, 11)),
+        value = st.session_state.ui_state["results_per_item"],
+        help = (
+            "Define how many products to search for in each store. "
+            "Note that higher values will significantly increase total "
+            "execution time."
+        )
+    )
 
     col1, col2 = st.columns(2)
 
     with col1:
         if st.button("✅ Confirm"):
-            selected = st.session_state.store_multiselect
+            selected_stores = st.session_state.store_multiselect
+            custom_urls = st.session_state.store_multiselect_computer_use
 
-            st.session_state.ui_state["selected_stores"] = selected
+            st.session_state.ui_state["selected_stores"] = selected_stores
+            st.session_state.ui_state["custom_urls"] = custom_urls
+            st.session_state.ui_state["results_per_item"] = results_per_item
 
             autologin_stores: list[str] = [
-                s for s in selected if support_autologin(s)
+                s for s in selected_stores if support_autologin(s)
             ]
 
             st.session_state.ui_state["autologin"]["pending_stores"] = autologin_stores
@@ -619,9 +646,11 @@ if prompt:
 
     st.session_state.ephemeral_container = placeholder
 
-    metadata = {
+    metadata: dict[str, list[str] | str | int] = {
         "selected_stores": st.session_state.ui_state["selected_stores"],
-        "chat_id": st.session_state.chat_id
+        "custom_urls": st.session_state.ui_state["custom_urls"],
+        "chat_id": st.session_state.chat_id,
+        "items_per_store": st.session_state.ui_state["results_per_item"]
     }
 
     with placeholder:

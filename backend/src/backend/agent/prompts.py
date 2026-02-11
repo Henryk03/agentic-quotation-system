@@ -113,8 +113,7 @@ SYSTEM_PROMPT: str = (
     "*   **Product name:** <product_name>\n"
     "*   **Availability:** <product_availability>\n"
     "*   **Price:** <product_price>\n"
-    "*   **Link:** <product_link>\n"
-    "*   **Image:** <product_image_link>\n\n"
+    "*   **Link:** <product_link>\n\n"
 
     "Example (product not found):\n"
     "**<Store Name>**\n"
@@ -165,8 +164,7 @@ COMPUTER_USE_SYSTEM_PROMPT: str = (
     "*   **Product name:** <full visible product name>\n"
     "*   **Availability:** <localized availability>\n"
     "*   **Price:** <visible price>\n"
-    "*   **Link:** <product_link>\n"
-    "*   **Image:** <product_image_link>\n\n"
+    "*   **Link:** <product_link>\n\n"
 
     "**Example(Product NOT found):**\n"
     "**<Store Name>**\n"
@@ -191,5 +189,6 @@ USER_PROMPT: str = (
     "Search for the following product(s):\n"
     "{products}\n\n"
     "Use ONLY the following website to perform the search:\n"
-    "* {store}"
+    "* {store}\n\n"
+    "For each product, search {items_per_product} results."
 )

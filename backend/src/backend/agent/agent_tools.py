@@ -37,7 +37,7 @@ async def search_products(
         config: RunnableConfig,
         products: list[str],
         providers: list[str],
-        limit_per_product: int
+        limit_per_product: int = 1
     ) -> str:
     """
     Searches for multiple products across specified providers.
@@ -150,7 +150,7 @@ async def __search_in_website(
         page: Page,
         products: list[str],
         result_list: SafeAsyncList,
-        limit_per_product: int
+        limit_per_product: int = 1
     ) -> None | str:
     """
     Perform web actions on the given provider's website to gather informations 
@@ -238,9 +238,8 @@ async def __search_in_website(
                 availabilities: list[str]
                 prices: list[str]
                 links: list[str]
-                images: list[str]
                 
-                titles, availabilities, prices, links, images = (
+                titles, availabilities, prices, links = (
                     await asyncio.gather(
                         __select_text(
                             product_containers, 
@@ -259,30 +258,23 @@ async def __search_in_website(
                             product_containers,
                             provider.product_link_selectors,
                            ["href"] 
-                        ),
-                        __extract_attribute_from_selectors(
-                            product_containers,
-                            provider.image_selectors,
-                           ["src"] 
-                        ),
+                        )
                     )
                 )
 
                 products_data: list[dict[str, str]] = []
 
-                for name, avail, price, link, image in zip(
+                for name, avail, price, link in zip(
                     titles, 
                     availabilities, 
                     prices,
-                    links,
-                    images
+                    links
                 ):
                     products_data.append({
                         "name": name,
                         "availability": avail,
                         "price": price,
-                        "link": link,
-                        "image": image
+                        "link": link
                     })
 
                 await result_list.add(
@@ -314,7 +306,7 @@ async def __search_with_computer_use(
         page: Page,
         products: list[str],
         result_list: SafeAsyncList,
-        limit_per_product: int = 2
+        limit_per_product: int = 1
     ) -> None:
     """"""
 
@@ -344,8 +336,9 @@ async def __search_with_computer_use(
         )
 
         prompt_filled: str = USER_PROMPT.format(
-            products=formatted_products,
-            store=provider
+            products = formatted_products,
+            store = provider,
+            items_per_product = limit_per_product
         )
 
         session: ComputerUseSession = ComputerUseSession(
@@ -630,8 +623,7 @@ async def __format_block(
                 p.get("name", "N/A"),
                 p.get("availability", "N/A"),
                 p.get("price", "N/A"),
-                p.get("link", "N/A"),
-                p.get("image", "N/A")
+                p.get("link", "N/A")
             ])
 
             formatted_lines.append(line)

@@ -170,11 +170,15 @@ class EventHandler:
         ) -> None:
         """"""
 
-        role = event.role
-        message = event.content
+        role: str = event.role
+        message: str = event.content
 
-        chat_id = event.metadata.get("chat_id")
-        selected_stores = event.metadata.get("selected_stores")
+        chat_id: str = event.metadata.get("chat_id")
+        selected_stores: list[str] = event.metadata.get("selected_stores")
+        custom_stores: list[str] = event.metadata.get("custom_urls")
+        items_per_store: int = event.metadata.get("items_per_store")
+
+        all_selected_stores: list[str] = selected_stores + custom_stores
 
         _ = await EventHandler.__ensure_chat(db, chat_id, session_id)
 
@@ -192,7 +196,8 @@ class EventHandler:
                 message,
                 session_id,
                 chat_id,
-                selected_stores,
+                all_selected_stores,
+                items_per_store,
                 websocket
             )
 
