@@ -24,6 +24,10 @@ class BaseProvider:
     results are parsed, and whether authentication is required to
     access the website.
 
+    [UNIQUENESS REQUIREMENT]
+        To ensure data accuracy, selectors provided for images, links and 
+        other fields must be as specific as possible.
+
     Attributes:
         availability_classes (AvailabilityDict):
             CSS classes or selectors used to detect product availability.
@@ -32,6 +36,11 @@ class BaseProvider:
             Regular expression used to identify availability based on specific 
             actionable text (e.g., "Add to cart"). If `None`, availability is 
             determined solely via CSS classes.
+
+        image_selectors (list[str] | None):
+            HTML selectors used to locate the product's image. Can point directly
+            to an 'img' tag or to a container (e.g., a 'div') holding the image. 
+            Can be `None` if images are not available.
 
         login_required (bool):
             Indicates whether authentication is required to browse
@@ -57,6 +66,10 @@ class BaseProvider:
         price_classes (list[str]):
             CSS classes used to extract the product's price.
 
+        product_link_selectors (list[str]):
+            HTML selectors used to locate the product's detail page link. 
+            Can point directly to an 'a' tag or to a parent container.
+
         result_container (list[str]):
             HTML selectors identifying the container of search results.
 
@@ -81,11 +94,13 @@ class BaseProvider:
         self,
         availability_classes: AvailabilityDict,
         availability_texts: Pattern[str] | None,
+        image_selectors: list[str] | None,
         login_required: bool,
         logout_selectors: list[str] | None,
         logout_texts: Pattern[str] | None,
         popup_selectors: list[str],
         price_classes: list[str],
+        product_link_selectors: list[str],
         provider_name: str,
         provider_url: str,
         result_container: list[str],
@@ -94,12 +109,14 @@ class BaseProvider:
     ):
         self.availability_classes = availability_classes
         self.availability_texts = availability_texts
+        self.image_selectors = image_selectors
         self.login_required = login_required
         self.logout_selectors = logout_selectors
         self.logout_texts = logout_texts
         self.name = provider_name
         self.popup_selectors = popup_selectors
         self.price_classes = price_classes
+        self.product_link_selectors = product_link_selectors
         self.result_container = result_container
         self.search_texts = search_texts
         self.title_classes = title_classes

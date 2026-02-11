@@ -37,11 +37,11 @@ async def __format_message(
     final_message: str = (
         f"This is my message to you: {message}"
         "\n"
-        f"This is my Session ID: {session_id}"
-        "\n"
         "If I am asking you to perform a search, then do it in these websites:"
         "\n"
         f"{store_list}"
+        "\n"
+        "For each product, search 2 items."
         "\n"
         f"{rerun_msg}"
     )

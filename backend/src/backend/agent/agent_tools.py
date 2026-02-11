@@ -3,9 +3,13 @@ import re
 import asyncio
 from typing import Coroutine, Any
 
-import bs4
 from google import genai
 from langchain_core.runnables import RunnableConfig
+from bs4 import (
+    BeautifulSoup,
+    ResultSet,
+    Tag
+)
 from playwright.async_api import (
     async_playwright,
     BrowserContext,
@@ -32,23 +36,36 @@ from shared.playwright.page_utilities import close_page_resources
 async def search_products(
         config: RunnableConfig,
         products: list[str],
-        providers: list[str]
+        providers: list[str],
+        limit_per_product: int
     ) -> str:
     """
-    Perform web search for each product in the given list.
+    Searches for multiple products across specified providers.
+
+    This function iterates through the list of products and retrieves details
+    from each provider, respecting a maximum number of results for each 
+    individual product search.
 
     Args:
-        products (list[str]):
-            A list of product names or keywords to search for.
+        config (RunnableConfig): 
+            Configuration for the LangChain runnable, containing callbacks, 
+            tags, and other execution metadata.
 
-        providers (list[str]):
-            A list of specific provider names where the search 
-            should be restricted.
+        products (list[str]): 
+            A list of product names, models, or keywords to investigate.
+
+        providers (list[str]): 
+            A list of platforms, websites, or data sources to include in 
+            the search.
+
+        limit_per_product (int): 
+            The maximum number of search results to retrieve for each item 
+            in the products list.
 
     Returns:
-        str:
-            A formatted string containing the information found 
-            for each product.
+        str: 
+            A concatenated and formatted string containing the aggregated 
+            search results, structured for easy parsing or LLM consumption.
     """
     
     session_id: str | None
@@ -83,7 +100,8 @@ async def search_products(
                             provider_instance,
                             page,
                             products,
-                            web_search_results_list
+                            web_search_results_list,
+                            limit_per_product
                         )
                     )
 
@@ -98,19 +116,20 @@ async def search_products(
                         provider,
                         page,
                         products,
-                        web_search_results_list
+                        web_search_results_list,
+                        limit_per_product
                     )
                 )
 
             except LoginFailedException as lfe:
                 print(str(lfe))
                 await web_search_results_list.add(
-                    await __format_block(provider, [str(lfe)])
+                    await __format_block(provider, str(lfe))
                 )
 
             except Exception as e:
                 await web_search_results_list.add(
-                    await __format_block(provider, [str(e)])
+                    await __format_block(provider, str(e))
                 )
 
         await asyncio.gather(*tasks)
@@ -130,7 +149,8 @@ async def __search_in_website(
         provider: BaseProvider,
         page: Page,
         products: list[str],
-        result_list: SafeAsyncList
+        result_list: SafeAsyncList,
+        limit_per_product: int
     ) -> None | str:
     """
     Perform web actions on the given provider's website to gather informations 
@@ -183,51 +203,92 @@ async def __search_in_website(
                 if not found:
                     formatted_block = await __format_block(
                         provider.name,
-                        [f"No result found for '{item}'."] 
+                        f"No result found for '{item}'."
                     )
                     await result_list.add(formatted_block)
 
                     # let's check the next item...
                     continue
             
-                await __wait_for_any_selector(page, provider.title_classes)
-                await __wait_for_all_selectors(page, provider.availability_classes)
-                await __wait_for_any_selector(page, provider.price_classes)
+                _ = await __wait_for_any_selector(
+                    page, 
+                    provider.title_classes
+                )
+                _ = await __wait_for_all_selectors(
+                    page, 
+                    provider.availability_classes
+                )
+                _ = await __wait_for_any_selector(
+                    page, 
+                    provider.price_classes
+                )
 
-                html = await page.content()
-                soup = bs4.BeautifulSoup(html, "html.parser")
+                html: str = await page.content()
+                soup: BeautifulSoup = BeautifulSoup(html, "html.parser")
 
-                product_container = soup.select_one(found)
+                product_containers: ResultSet[Tag] = soup.select(
+                    found, 
+                    limit = limit_per_product
+                )
                 
-                if not product_container:
+                if not product_containers:
                     continue
+
+                titles: list[str]
+                availabilities: list[str]
+                prices: list[str]
+                links: list[str]
+                images: list[str]
                 
-                product_name, product_availability, product_price = (
+                titles, availabilities, prices, links, images = (
                     await asyncio.gather(
                         __select_text(
-                            product_container, 
+                            product_containers, 
                             provider.title_classes
                         ),
                         __select_all_text(
-                            product_container,
+                            product_containers,
                             provider.availability_classes,
-                            provider.availability_pattern     # cambiare con nome aggiornato  
+                            provider.availability_texts
                         ),
                         __select_text(
-                            product_container,
+                            product_containers,
                             provider.price_classes
-                        )
+                        ),
+                        __extract_attribute_from_selectors(
+                            product_containers,
+                            provider.product_link_selectors,
+                           ["href"] 
+                        ),
+                        __extract_attribute_from_selectors(
+                            product_containers,
+                            provider.image_selectors,
+                           ["src"] 
+                        ),
                     )
                 )
+
+                products_data: list[dict[str, str]] = []
+
+                for name, avail, price, link, image in zip(
+                    titles, 
+                    availabilities, 
+                    prices,
+                    links,
+                    images
+                ):
+                    products_data.append({
+                        "name": name,
+                        "availability": avail,
+                        "price": price,
+                        "link": link,
+                        "image": image
+                    })
 
                 await result_list.add(
                     await __format_block(
                         provider.name,
-                        [
-                            product_name,
-                            product_availability,
-                            product_price
-                        ]            
+                        products_data            
                     )
                 )
 
@@ -235,7 +296,7 @@ async def __search_in_website(
                 await result_list.add(
                     await __format_block(
                         provider.name,
-                        [f"Error searching '{item}': {e}"] 
+                        f"Error searching '{item}': {e}"
                     )
                 )
 
@@ -243,7 +304,7 @@ async def __search_in_website(
         await result_list.add(
             await __format_block(
                 provider.name,
-                [f"Fatal error: {str(e)}"]
+                f"Fatal error: {str(e)}"
             )
         )
 
@@ -252,7 +313,8 @@ async def __search_with_computer_use(
         provider: str,
         page: Page,
         products: list[str],
-        result_list: SafeAsyncList
+        result_list: SafeAsyncList,
+        limit_per_product: int = 2
     ) -> None:
     """"""
 
@@ -302,7 +364,7 @@ async def __search_with_computer_use(
         await result_list.add(
             await __format_block(
                 provider,
-                [f"Error: {str(e)}"]
+                f"Error: {str(e)}"
             )
         )
 
@@ -311,10 +373,9 @@ async def __search_with_computer_use(
             await result_list.add(
                 await __format_block(
                     provider,
-                    [response_text]
+                    response_text
                 )
             )
-
 
 
 async def __normalize_selectors(
@@ -372,6 +433,7 @@ async def __wait_for_any_selector(
                 timeout=timeout
             )
             return sel
+        
         except PlaywrightTimeoutError:
             continue
 
@@ -421,20 +483,20 @@ async def __wait_for_all_selectors(
 
 
 async def __select_text(
-        tag: bs4.element.Tag,
+        tags: ResultSet[Tag],
         selectors: list[str] | dict
-    ) -> str:
+    ) -> list[str]:
     """
     Extract text content from the first element matching any of the
     provided selectors.
 
     Args:
-        tag (bs4.element.Tag):
+        tag (ResultSet[Tag]):
             The BeautifulSoup tag to search within.
 
         selectors (list[str] | AvailabilityDict):
             A list of CSS selectors or an `AvailabilityDict` containing
-            'available' and 'not_available' lists.
+            'available' and 'not_available' lists of selectors.
 
     Returns:
         str:
@@ -442,99 +504,141 @@ async def __select_text(
             or "N/A" if no element matches.
     """
 
+    results: list[str] = []
+
     norm_selectors: list[str] = await __normalize_selectors(selectors)
     
     for sel in norm_selectors:
-        elem: bs4.Tag | None = tag.select_one(sel)
+        for tag in tags:
+            elem: Tag | None = tag.select_one(sel)
 
-        if elem:
-            return elem.get_text(strip=True)
+            if elem:
+                results.append(str(elem))
+
+            else: 
+                results.append("N/A")
         
-    return "N/A"
+    return results
 
 
 async def __select_all_text(
-        tag: bs4.element.Tag,
+        tags: list[Tag],
         selectors: list[str] | dict,
         availability_alt_texts: re.Pattern[str] | None
-    ) -> str:
-    """
-    Extract and concatenate text content from all elements matching
-    the given selectors.
+    ) -> list[str]:
+    """"""
 
-    If `selectors` is an `AvailabilityDict`, both "available" and 
-    "not_available" selectors are processed. When an element matches
-    an "available" selector but has no text, the fallback "In Stock"
-    is used as text.
+    results: list[str] = []
 
-    Args:
-        tag (Tag): 
-            A BeautifulSoup tag to search within.
+    for tag in tags:
+        texts: list[str] = []
 
-        selectors (list[str] | AvailabilityDict): 
-            A list of CSS selectors or an AvailabilityDict
-            containing 'available' and 'not_available' lists.
+        if isinstance(selectors, dict):
+            for state, sel_list in selectors.items():
+                for sel in sel_list:
+                    for elem in tag.select(sel):
+                        text: str = elem.get_text(strip=True)
 
-    Returns:
-        str:
-            A string containing the concatenated text of all matched
-            elements, separated by newlines.
-    """
-
-    texts: list[str] = []
-
-    if isinstance(selectors, dict):
-        state: str
-        sel_list: list[str]
-
-        for state, sel_list in selectors.items():
-            for sel in sel_list:
+                        if availability_alt_texts and state == "available":
+                            if re.search(availability_alt_texts, text):
+                                text = "In Stock"
+                        
+                        if text:
+                            texts.append(text)
+        else:
+            for sel in selectors:
                 for elem in tag.select(sel):
-                    text: str = elem.get_text(strip=True)
-
-                    if availability_alt_texts:
-                        if re.search(availability_alt_texts, text) and state == "available":
-                            text = "In Stock"
+                    text = elem.get_text(strip=True)
 
                     if text:
                         texts.append(text)
 
-    else:
+        results.append(", ".join(texts) if texts else "N/A")
+
+    return results
+
+
+async def __extract_attribute_from_selectors(
+        tags: ResultSet[Tag],
+        selectors: list[str] | None,
+        priority_attributes: list[str]
+    ) -> list[str]:
+    """"""
+
+    results: list[str] = []
+
+    if not selectors:
+        return ["N/A"] * len(tags)
+
+    for tag in tags:
+        found_val: str = "N/A"
+
         for sel in selectors:
-            for elem in tag.select(sel):
-                text = elem.get_text(strip=True)
+            container: Tag | None = tag.select_one(sel)
+            
+            if container:
+                candidates: list[Tag] = [container] + container.find_all(True)
+                
+                for cand in candidates:
+                    for attr in priority_attributes:
+                        if cand.has_attr(attr):
+                            val = cand.get(attr)
 
-                if text:
-                    texts.append(text)
+                            if val:
+                                found_val = str(val)
+                                break
 
-    return ", ".join(texts)
+                    if found_val != "N/A": 
+                        break
+            
+            if found_val != "N/A": 
+                break
+            
+        results.append(found_val)
+
+    return results
 
 
 async def __format_block(
         provider_name: str,
-        lines: list[str]
+        products: list[dict[str, str]] | str
     ) -> str:
     """
     Format a block of text with the provider name followed by
-    a list of content lines.
+    formatted product details.
 
     Args:
-        provider (BaseProvide):
-            The provider whose name will appear at the start of 
-            the block.
+        provider_name (str):
+            The name of the provider.
 
-        lines (list[str]):
-            A list of strings to include after the provider name.
+        products (list[dict[str, str]]):
+            A list of dictionaries, each containing product info
+            (e.g., 'name', 'price', 'availability').
 
     Returns:
         str:
             A single string with the provider name in uppercase,
-            followed by the lines joined with " | ".
+            followed by the product details joined with " | ".
     """
+    
+    if isinstance(products, list):
+        formatted_lines: list[str] = []
 
-    return " | ".join(
-        [
-            f"{provider_name.upper()}",
-            *lines
-        ]
-    )
+        for p in products:
+            line = " | ".join([
+                provider_name.upper(),
+                p.get("name", "N/A"),
+                p.get("availability", "N/A"),
+                p.get("price", "N/A"),
+                p.get("link", "N/A"),
+                p.get("image", "N/A")
+            ])
+
+            formatted_lines.append(line)
+    
+        return "\n".join(formatted_lines)
+    
+    else:
+        return " | ".join(
+            [provider_name.upper(), products]
+        )

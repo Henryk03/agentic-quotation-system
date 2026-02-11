@@ -109,19 +109,19 @@ SYSTEM_PROMPT: str = (
     "6. Each provider must be shown independently using this format.\n\n"
 
     "Example (product found):\n"
-    "**Comet**\n"
+    "**<Store Name>**\n"
     "*   **Product name:** <product_name>\n"
     "*   **Availability:** <product_availability>\n"
     "*   **Price:** <product_price>\n"
     "*   **Link:** <product_link>\n"
-    "*   **Image:** <product_image>\n\n"
+    "*   **Image:** <product_image_link>\n\n"
 
     "Example (product not found):\n"
-    "**Amazon**\n"
+    "**<Store Name>**\n"
     "*   No result found for '<product_search_name>'.\n\n"
 
     "Example (something failed):\n"
-    "**GruppoComet**\n"
+    "**<Store Name>t**\n"
     "*   <Clear, user-friendly explanation of why the operation failed>\n\n"
 
     "Before performing a web search using the tool, check whether the item has already "
@@ -164,7 +164,9 @@ COMPUTER_USE_SYSTEM_PROMPT: str = (
     "**<Store Name>**\n"
     "*   **Product name:** <full visible product name>\n"
     "*   **Availability:** <localized availability>\n"
-    "*   **Price:** <visible price>\n\n"
+    "*   **Price:** <visible price>\n"
+    "*   **Link:** <product_link>\n"
+    "*   **Image:** <product_image_link>\n\n"
 
     "**Example(Product NOT found):**\n"
     "**<Store Name>**\n"

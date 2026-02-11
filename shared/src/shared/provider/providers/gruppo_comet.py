@@ -15,6 +15,9 @@ class GruppoComet(BaseProvider):
                 "not_available": [".disp-no"]
             },
             availability_texts = None,
+            image_selectors = [
+                ".image-container"
+            ],
             login_required = True,
             logout_selectors = [
                 "a"
@@ -29,6 +32,9 @@ class GruppoComet(BaseProvider):
             ],
             price_classes = [
                 ".result-price"
+            ],
+            product_link_selectors = [
+                ".result-title"
             ],
             provider_name = "GruppoComet",
             provider_url = "https://gruppocomet.it/simevignuda",

@@ -16,6 +16,9 @@ class Comet(BaseProvider):
                 r"aggiungi al carrello", 
                 re.IGNORECASE
             ),
+            image_selectors = [
+                ".c-cd-prodotto__picture"
+            ],
             login_required = False,
             logout_selectors = None,
             logout_texts = None,
@@ -25,6 +28,9 @@ class Comet(BaseProvider):
             ],
             price_classes = [
                 ".c-cd-prodotto__prezzo-finale"
+            ],
+            product_link_selectors = [
+                "a.c-cd-prodotto__top"
             ],
             provider_name = "Comet",
             provider_url = "https://comet.it",
