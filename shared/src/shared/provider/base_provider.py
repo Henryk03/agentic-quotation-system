@@ -25,7 +25,7 @@ class BaseProvider:
     access the website.
 
     [UNIQUENESS REQUIREMENT]
-        To ensure data accuracy, selectors provided for images, links and 
+        To ensure data accuracy, selectors provided for links and 
         other fields must be as specific as possible.
 
     Attributes:
@@ -36,11 +36,6 @@ class BaseProvider:
             Regular expression used to identify availability based on specific 
             actionable text (e.g., "Add to cart"). If `None`, availability is 
             determined solely via CSS classes.
-
-        image_selectors (list[str] | None):
-            HTML selectors used to locate the product's image. Can point directly
-            to an 'img' tag or to a container (e.g., a 'div') holding the image. 
-            Can be `None` if images are not available.
 
         login_required (bool):
             Indicates whether authentication is required to browse
@@ -94,7 +89,6 @@ class BaseProvider:
         self,
         availability_classes: AvailabilityDict,
         availability_texts: Pattern[str] | None,
-        image_selectors: list[str] | None,
         login_required: bool,
         logout_selectors: list[str] | None,
         logout_texts: Pattern[str] | None,
@@ -109,7 +103,6 @@ class BaseProvider:
     ):
         self.availability_classes = availability_classes
         self.availability_texts = availability_texts
-        self.image_selectors = image_selectors
         self.login_required = login_required
         self.logout_selectors = logout_selectors
         self.logout_texts = logout_texts

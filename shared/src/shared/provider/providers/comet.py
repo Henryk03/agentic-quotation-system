@@ -16,9 +16,6 @@ class Comet(BaseProvider):
                 r"aggiungi al carrello", 
                 re.IGNORECASE
             ),
-            image_selectors = [
-                ".c-cd-prodotto__picture"
-            ],
             login_required = False,
             logout_selectors = None,
             logout_texts = None,
