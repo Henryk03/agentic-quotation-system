@@ -1,7 +1,11 @@
 
-from google import genai
-from google.genai.types import Content, Candidate
 from playwright.async_api import Page
+from google.genai import Client
+from google.genai.types import (
+    GenerateContentResponse,
+    GenerateContentConfig,
+    Candidate
+)
 
 from backend.backend_utils.computer_use.session import ComputerUseSession
 from backend.backend_utils.computer_use.parsing import is_final_response, extract_text
@@ -12,15 +16,16 @@ from backend.backend_utils.computer_use.functions import (
 
 
 async def run_computer_use_loop(
-        client: genai.Client,
+        client: Client,
         page: Page,
         session: ComputerUseSession,
-        config: genai.types.GenerateContentConfig,
+        config: GenerateContentConfig,
         max_iter: int = 10
     ) -> str | None:
+    """"""
 
     for _ in range(max_iter):
-        response: genai.types.GenerateContentResponse = (
+        response: GenerateContentResponse = (
             client.models.generate_content(
                 model="gemini-2.5-computer-use-preview-10-2025",
                 contents=session.contents,
@@ -34,6 +39,7 @@ async def run_computer_use_loop(
         session.add_model_candidate(candidate)
 
         if is_final_response(candidate):
+            print(f"COMPUTER USE: Ecco la risposta finale: {candidate}")
             return extract_text(candidate)
 
         results = await execute_function_calls(candidate, page)

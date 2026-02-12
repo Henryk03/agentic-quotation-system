@@ -173,7 +173,7 @@ if "ui_state" not in st.session_state:
 
     st.session_state.ui_state = {
         "selected_stores": [],          # list for supported stores (automation)
-        "custom_urls": [],              # list for non supported stores (computer use)
+        "custom_urls": [],              # list for other stores (computer use)
         "results_per_item": 1,
         "store_dialog_open": False,
         "autologin_dialog_open": False,
@@ -189,7 +189,8 @@ if "ui_state" not in st.session_state:
         "autologin": {
             "pending_stores": [],
             "current_store": None,
-            "credentials": {}
+            "credentials": {},
+            "are_valid_credentials": None
         },
 
         "send_credentials_now": False,
@@ -476,6 +477,8 @@ def insert_autologin_credentials() -> None:
                     "password": password
                 }
 
+                state["are_valid_credentials"] = True
+
                 state["pending_stores"].remove(store)
                 state["current_store"] = (
                     state["pending_stores"][0]
@@ -519,9 +522,13 @@ def store_selector_dialog() -> None:
     """"""
 
     base_options: list[str] = all_provider_names()
-    current_selection: list[str] = st.session_state.ui_state["selected_stores"]
+    current_selection: list[str] = st.session_state.ui_state[
+        "selected_stores"
+    ]
 
-    full_options: list[str] = list(set(base_options + current_selection))
+    full_options: list[str] = list(
+        set(base_options + current_selection)
+    )
 
     st.multiselect(
         "Supported Stores",
@@ -530,9 +537,19 @@ def store_selector_dialog() -> None:
         key="store_multiselect"
     )
 
+    base_custom_options: list[str] = ["https://amazon.com"]
+    current_custom_selection: list[str] = st.session_state.ui_state[
+        "custom_urls"
+    ]
+
+    full_custom_options: list[str] = list(
+        set(base_custom_options + current_custom_selection)
+    )
+
     st.multiselect(
         "Custom Store URLs",
-        options="https://amazon.com",
+        options=full_custom_options,
+        default=current_custom_selection,
         key="store_multiselect_computer_use",
         placeholder="https://store-example.com",
         accept_new_options=True
@@ -548,7 +565,7 @@ def store_selector_dialog() -> None:
 
     results_per_item: int = st.select_slider(
         "Items to retrieve per store",
-        options = list(range(1, 11)),
+        options = list(range(1, 6)),
         value = st.session_state.ui_state["results_per_item"],
         help = (
             "Define how many products to search for in each store. "

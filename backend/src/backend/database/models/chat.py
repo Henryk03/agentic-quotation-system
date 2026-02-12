@@ -32,5 +32,12 @@ class Chat(Base):
         nullable=False
     )
 
-    client = relationship("Client", back_populates="chats")
-    messages = relationship("Message", back_populates="chat", cascade="all, delete-orphan")
+    client = relationship(
+        "Client", 
+        back_populates="chats"
+    )
+    messages = relationship(
+        "Message", 
+        back_populates="chat", 
+        cascade="all, delete-orphan"
+    )

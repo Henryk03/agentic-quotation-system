@@ -215,6 +215,7 @@ logins/
 logs/
 .logins/
 .logs/
+.automation_profile
 
 # alembic
 /backend/alembic/

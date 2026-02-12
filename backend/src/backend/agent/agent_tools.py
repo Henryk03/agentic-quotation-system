@@ -19,8 +19,14 @@ from playwright.async_api import (
 
 from backend.backend_utils.common import SafeAsyncList
 from backend.backend_utils.exceptions import LoginFailedException
-from backend.backend_utils.browser import AsyncBrowserContextMaganer
-from backend.agent.prompts import USER_PROMPT, COMPUTER_USE_SYSTEM_PROMPT
+from backend.backend_utils.browser import (
+    AsyncBrowserContextMaganer, 
+    init_chrome_page
+)
+from backend.agent.prompts import (
+    USER_PROMPT, 
+    COMPUTER_USE_SYSTEM_PROMPT
+)
 from backend.backend_utils.computer_use import (
     ComputerUseSession,
     run_computer_use_loop,
@@ -106,9 +112,7 @@ async def search_products(
                     )
 
             except ProviderNotSupportedException:
-                _, _, page = await browser_context_manager.create_browser_context(
-                    start_url="https://google.com"
-                )
+                page = await init_chrome_page(apw, provider)
                 pages_to_close.append(page)
 
                 tasks.append(
@@ -302,7 +306,7 @@ async def __search_in_website(
 
 
 async def __search_with_computer_use(
-        provider: str,
+        provider_url: str,
         page: Page,
         products: list[str],
         result_list: SafeAsyncList,
@@ -337,7 +341,7 @@ async def __search_with_computer_use(
 
         prompt_filled: str = USER_PROMPT.format(
             products = formatted_products,
-            store = provider,
+            store = provider_url,
             items_per_product = limit_per_product
         )
 
@@ -356,7 +360,7 @@ async def __search_with_computer_use(
     except Exception as e:
         await result_list.add(
             await __format_block(
-                provider,
+                provider_url,
                 f"Error: {str(e)}"
             )
         )
@@ -365,7 +369,7 @@ async def __search_with_computer_use(
         if response_text:
             await result_list.add(
                 await __format_block(
-                    provider,
+                    provider_url,
                     response_text
                 )
             )
@@ -534,7 +538,7 @@ async def __select_all_text(
 
                         if availability_alt_texts and state == "available":
                             if re.search(availability_alt_texts, text):
-                                text = "In Stock"
+                                text = "Available"
                         
                         if text:
                             texts.append(text)
