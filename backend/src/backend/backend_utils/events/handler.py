@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import WebSocket
 
+from backend.config import settings
 from backend.agent.main_agent import graph as agent
 from backend.backend_utils.events.emitter import EventEmitter
 from backend.backend_utils.events.dispatcher import dispatch_chat
@@ -142,6 +143,9 @@ class EventHandler:
             websocket: WebSocket
         ) -> None:
         """"""
+
+        if settings.AUTO_LOGIN_ONLY:
+            are_valid_credentials: bool = False
 
         for store, creds in event.credentials.items():
             await credential_repo.upsert_credentials(

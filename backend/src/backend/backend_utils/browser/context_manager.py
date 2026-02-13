@@ -309,11 +309,20 @@ class AsyncBrowserContextMaganer:
                     "implementation is missing or not supported."
                 )
             )
+        
+        state: Path | StorageState | str | None = None
+        context: BrowserContext | None = None
+        page: Page | None = None
+        
+        state, _ = await AsyncBrowserContextMaganer.__get_current_state(
+            session_id,
+            provider
+        )
 
         _, context, page = await self.__prepare_provider_context(
-            provider=provider,
-            state=None,
-            headless=True
+            provider = provider,
+            state = state,
+            headless = True
         )
 
         try:

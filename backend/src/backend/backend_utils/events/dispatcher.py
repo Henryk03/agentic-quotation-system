@@ -96,12 +96,16 @@ async def dispatch_chat(
 
         ai_response: BaseMessage = messages["messages"][-1]
 
+        print(f"\n\nDISPATCHER: {ai_response}")
+
         await EventEmitter.emit_chat_message(
             websocket,
             ai_response,
             session_id,
             chat_id
         )
+
+        print("\n\nDISPATCHER: evento inviato correttamente")
 
     except UILoginException as uile:
         async with AsyncSessionLocal() as db:

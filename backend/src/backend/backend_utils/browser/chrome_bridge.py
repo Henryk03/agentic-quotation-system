@@ -21,25 +21,28 @@ SCREEN_HEIGHT = 900
 
 
 def launch_chrome_os(
-        headless: bool,
-        start_url: str = ""
+        headless: bool
     ) -> None:
     """"""
 
     system: str = platform.system().lower()
     full_command: list[str] = []
+    headless_options: list[str] = []
+
+    if headless:
+        headless_options = [
+            "--headless",
+            f"{"--disable-gpu" if system == "windows" else ""}"
+        ]
 
     args: list[str] = [
         f"--remote-debugging-port=9222",
         f"--user-data-dir={USER_DATA_DIR}",
         "--no-first-run",
         "--no-default-browser-check",
-        f"{"--headless" if headless else ""}",
-        f"{"--disable-gpu" if system == "windows" else ""}"
+        *headless_options,
+        "https://google.com"
     ]
-    
-    if start_url:
-        args.append(start_url)
 
     try:
         match system:
@@ -94,25 +97,19 @@ def launch_chrome_os(
 
 async def init_chrome_page(
         async_playwright: Playwright,
-        website_url: str
+        headless: bool,
     ) -> Page:
     """"""
 
-    launch_chrome_os(headless = True)
+    launch_chrome_os(headless = headless)
 
-    await asyncio.sleep(2)
+    await asyncio.sleep(5)
 
     browser = await async_playwright.chromium.connect_over_cdp(
         "http://127.0.0.1:9222"
     )
-    context = await browser.new_context(
-        screen = {
-            "height": SCREEN_HEIGHT,
-            "width": SCREEN_HEIGHT
-        }
-    )
+    context = browser.contexts[0]
 
     page = await context.new_page()
-    await page.goto(website_url)
 
     return page

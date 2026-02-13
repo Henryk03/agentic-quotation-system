@@ -75,6 +75,9 @@ def handle_event(
 
     ephemeral: DeltaGenerator = st.session_state.ephemeral_container
     login_open: bool = st.session_state.ui_state["login_dialog"]["open"]
+
+    st.session_state.ws_client.logger.info(f"\n\nEvento ricevuto dal server: {event}")
+    print(f"\n\nEvento ricevuto dal server: {event}")
         
     # ==========================
     #  Chat messages (persist)

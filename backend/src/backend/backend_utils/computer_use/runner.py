@@ -27,13 +27,13 @@ async def run_computer_use_loop(
     for _ in range(max_iter):
         response: GenerateContentResponse = (
             client.models.generate_content(
-                model="gemini-2.5-computer-use-preview-10-2025",
+                model="gemini-3-flash-preview",
                 contents=session.contents,
                 config=config,
             )
         )
 
-        print(f"COMPUTER USE: risposta dall'IA {response}")
+        print(f"\n\nCOMPUTER USE: risposta dall'IA {response}")
 
         candidate: Candidate = response.candidates[0]
         session.add_model_candidate(candidate)
@@ -43,7 +43,7 @@ async def run_computer_use_loop(
             return extract_text(candidate)
 
         results = await execute_function_calls(candidate, page)
-        print(f"COMPUTER USE: risultati {results}")
+        print(f"\n\nCOMPUTER USE: risultati {results}")
         function_responses = await get_function_responses(page, results)
         session.add_function_responses(function_responses)
 

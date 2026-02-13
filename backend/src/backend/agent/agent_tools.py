@@ -17,6 +17,7 @@ from playwright.async_api import (
     TimeoutError as PlaywrightTimeoutError
 )
 
+from backend.config import settings
 from backend.backend_utils.common import SafeAsyncList
 from backend.backend_utils.exceptions import LoginFailedException
 from backend.backend_utils.browser import (
@@ -112,7 +113,10 @@ async def search_products(
                     )
 
             except ProviderNotSupportedException:
-                page = await init_chrome_page(apw, provider)
+                page = await init_chrome_page(
+                    apw,
+                    settings.HEADLESS
+                )
                 pages_to_close.append(page)
 
                 tasks.append(
@@ -142,9 +146,13 @@ async def search_products(
         for page in pages_to_close:
             await close_page_resources(page)
 
+        print("Pagine chiuse...")
+
     web_search_results_str = "\n\n".join(
         [result for result in await web_search_results_list.get_all()]
     )
+
+    print(f"\n\nRisultati dal tool: {web_search_results_str}")
 
     return web_search_results_str
 
@@ -314,11 +322,13 @@ async def __search_with_computer_use(
     ) -> None:
     """"""
 
+    print("Inizializziamo computer use...")
+
     response_text: str | None = None
     excluded_functions: list[str] = [
         "drag_and_drop", 
         "open_web_browser",
-        "navigate"
+        "key_combination"
     ]
 
     try:
@@ -350,7 +360,7 @@ async def __search_with_computer_use(
             initial_screenshot
         )
 
-        response_text = await run_computer_use_loop(
+        response_text: str | None = await run_computer_use_loop(
             client,
             page,
             session,
@@ -358,6 +368,7 @@ async def __search_with_computer_use(
         )
 
     except Exception as e:
+        print(f"Eccezione da computer use {str(e)}")
         await result_list.add(
             await __format_block(
                 provider_url,

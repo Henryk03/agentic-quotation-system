@@ -16,6 +16,8 @@ def extract_text(
         candidate: Candidate
     ) -> str:
     """"""
+
+    print(f"PARSER: risposta da estrarre: {candidate.content.parts[0].text}")
     
     return " ".join(
         part.text for part in candidate.content.parts if part.text

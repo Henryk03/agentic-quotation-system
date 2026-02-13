@@ -141,6 +141,8 @@ class WSClient:
         await ws.send(event.model_dump_json())
         received: bool = await receive_events(ws, on_event, on_error)
 
+        self.logger.info(f"\n\nWS CLIENT: abbiamo ricevuto qualcosa? {received}")
+
         return received
 
 
