@@ -22,23 +22,19 @@ async def receive_events(
     """"""
     
     received_any: bool = False
-
-    loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
-    end_time: float = loop.time() + timeout
-
     event: Event | None = None
     
     try:
-        while loop.time() < end_time:
+        while True:
             try:
-                raw: Data = await asyncio.wait_for(
+                raw = await asyncio.wait_for(
                     websocket.recv(),
-                    timeout=0.5
+                    timeout=timeout
                 )
-
-            except asyncio.TimeoutError:
-                continue
                 
+            except asyncio.TimeoutError:
+                return received_any
+
             try:
                 event = parse_event(str(raw))
 
@@ -46,25 +42,25 @@ async def receive_events(
                 if on_error:
                     on_error(e)
 
-            needs_rerun: bool = on_event(event)
-                
+                continue
+
+            needs_rerun = on_event(event)
+
             if needs_rerun:
                 received_any = True
-            
+
             if isinstance(
-                event, 
+                event,
                 (
                     ChatMessageEvent, 
-                    ErrorEvent,
+                    ErrorEvent, 
                     LoginRequiredEvent
                 )
-            ):    
-                break
+            ):
+                return received_any
 
     except ConnectionClosed:
         raise
-    
-    return received_any
 
 
 async def receive_credentials_ack(

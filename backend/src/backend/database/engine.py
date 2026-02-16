@@ -10,12 +10,13 @@ from backend.config import settings
 
 DATABASE_URL: str | None = settings.DATABASE_URL
 
-# da sistemare driver a seconda del protocollo (postgreSQL, mySQL, ecc.)...
-
 if DATABASE_URL:
-    engine = create_async_engine(DATABASE_URL, echo=False)
+    engine = create_async_engine(
+        DATABASE_URL, 
+        echo = False
+    )
     AsyncSessionLocal = async_sessionmaker(
-        bind=engine,
-        class_=AsyncSession,
-        expire_on_commit=False
+        bind = engine,
+        class_ = AsyncSession,
+        expire_on_commit = False
     )

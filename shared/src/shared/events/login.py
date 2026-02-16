@@ -8,7 +8,7 @@ from playwright.async_api import StorageState
 class LoginRequiredEvent(BaseModel):
     """"""
 
-    event: Literal["login.required"] = "login.required"
+    type: Literal["login.required"] = "login.required"
     provider: str
     login_url: str
     message: str
@@ -17,7 +17,7 @@ class LoginRequiredEvent(BaseModel):
 class LoginResultEvent(BaseModel):
     """"""
 
-    event: Literal[
+    type: Literal[
         "login.success",
         "login.failed",
         "login.cancelled",
@@ -33,7 +33,7 @@ class LoginResultEvent(BaseModel):
 class AutoLoginCredentialsEvent(BaseModel):
     """"""
 
-    event: Literal[
+    type: Literal[
         "autologin.credentials.provided", 
         "autologin.credentials.received"
     ]

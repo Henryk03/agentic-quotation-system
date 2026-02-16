@@ -13,7 +13,7 @@ from backend.agent.agent_tools import search_products
 
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-3-flash-preview",
+    model="gemini-2.5-flash",
     temperature=0.3
 )
 

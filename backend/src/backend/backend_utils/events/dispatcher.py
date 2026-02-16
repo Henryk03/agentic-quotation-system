@@ -6,9 +6,33 @@ from langchain_core.messages import HumanMessage, BaseMessage
 from backend.agent.history.message_adapter import to_langchain_messages
 from backend.backend_utils.events.emitter import EventEmitter
 from backend.backend_utils.exceptions import UILoginException
-from backend.database.repositories import message_repo, chat_repo
 from backend.database.models.message import Message
 from backend.database.engine import AsyncSessionLocal
+from backend.database.repositories import (
+    MessageRepository, 
+    ChatRepository
+)
+
+
+def __normalize_content(
+        content: str | list[str | dict]
+    ) -> str | None:
+    """"""
+
+    if isinstance(content, str):
+        return content.strip() or None
+
+    if isinstance(content, list) and content:
+        first = content[0]
+
+        if isinstance(first, str):
+            return first.strip() or None
+
+        if isinstance(first, dict):
+            text = str(first.get("text", "")).strip()
+            return text or None
+
+    return None
 
 
 async def __format_message(
@@ -55,22 +79,25 @@ async def dispatch_chat(
         session_id: str,
         chat_id: str,
         selected_stores: list[str],
-        items_per_store: int,
-        websocket: WebSocket,
-    ) -> None:
+        items_per_store: int
+    ) -> str | None:
     """"""
 
     async with AsyncSessionLocal() as db:
-        previous_messages: list[Message] = await message_repo.get_all_messages(
-            db,
-            session_id,
-            chat_id
+        previous_messages: list[Message] = (
+            await MessageRepository.get_all_messages(
+                db,
+                session_id,
+                chat_id
+            )
         )
 
-        needs_rerun: bool = await chat_repo.consume_rerun_flag(
-            db,
-            session_id,
-            chat_id
+        needs_rerun: bool = (
+            await ChatRepository.consume_rerun_flag(
+                db,
+                session_id,
+                chat_id
+            )
         )
 
     user_message: str = await __format_message(
@@ -96,27 +123,14 @@ async def dispatch_chat(
 
         ai_response: BaseMessage = messages["messages"][-1]
 
-        print(f"\n\nDISPATCHER: {ai_response}")
-
-        await EventEmitter.emit_chat_message(
-            websocket,
-            ai_response,
-            session_id,
-            chat_id
-        )
-
-        print("\n\nDISPATCHER: evento inviato correttamente")
+        return __normalize_content(ai_response.content)
 
     except UILoginException as uile:
         async with AsyncSessionLocal() as db:
-            await chat_repo.mark_needs_rerun(
+            await ChatRepository.mark_needs_rerun(
                 db, 
                 session_id, 
                 chat_id
             )
 
-        await EventEmitter.emit_login_required(
-            websocket,
-            uile.provider.name,
-            uile.provider.url
-        )
+        return ""

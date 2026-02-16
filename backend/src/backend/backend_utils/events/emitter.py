@@ -46,26 +46,7 @@ class EventEmitter:
                 return None
             
 
-    @staticmethod
-    def __normalize_content(
-            content: str | list[str | dict]
-        ) -> str | None:
-        """"""
-
-        if isinstance(content, str):
-            return content.strip() or None
-
-        if isinstance(content, list) and content:
-            first = content[0]
-
-            if isinstance(first, str):
-                return first.strip() or None
-
-            if isinstance(first, dict):
-                text = str(first.get("text", "")).strip()
-                return text or None
-
-        return None
+    
 
 
     @staticmethod

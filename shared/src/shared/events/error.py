@@ -6,5 +6,5 @@ from pydantic import BaseModel
 class ErrorEvent(BaseModel):
     """"""
     
-    event: Literal["error"] = "error"
+    type: Literal["error"] = "error"
     message: str

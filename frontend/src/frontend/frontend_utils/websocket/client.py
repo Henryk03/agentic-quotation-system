@@ -4,8 +4,11 @@ import logging
 from typing import Callable
 
 import websockets
-from websockets import ClientConnection
 from playwright.async_api import StorageState
+from websockets import (
+    ClientConnection, 
+    ConnectionClosed
+)
 
 from frontend.frontend_utils.browser.manual_login import run_manual_login
 from frontend.frontend_utils.events.converter import to_chat_message_event
@@ -51,8 +54,6 @@ class WSClient:
 
         ws_uri = self.websocket_uri
         s_id = self.session_id
-        
-        # inserire la lingua nell'.env al setup
 
         url = f"{ws_uri}?session={s_id}"
 
@@ -134,16 +135,35 @@ class WSClient:
         ) -> bool:
         """"""
 
+        max_retries: int = 3
+        attempt: int = 0
+
         ws: ClientConnection = await self.__get_active_websocket()
 
-        event: Event = to_chat_message_event(role, message, metadata)
+        while attempt < max_retries:
+            try:
+                event: Event = to_chat_message_event(role, message, metadata)
 
-        await ws.send(event.model_dump_json())
-        received: bool = await receive_events(ws, on_event, on_error)
+                await ws.send(event.model_dump_json())
+                received: bool = await receive_events(ws, on_event, on_error)
 
-        self.logger.info(f"\n\nWS CLIENT: abbiamo ricevuto qualcosa? {received}")
+                self.logger.info(f"Abbiamo ricevuto qualcosa? {received}")
 
-        return received
+                return received
+
+            except ConnectionClosed:
+                self.logger.info("WS closed. Reconnecting...")
+
+                ws = await self.__get_active_websocket()
+                attempt += 1
+
+            except Exception as e:
+                if on_error:
+                    on_error(e)
+
+                return False
+            
+        return False
 
 
     async def send_event(

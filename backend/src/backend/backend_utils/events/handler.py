@@ -1,8 +1,6 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from fastapi import WebSocket
-
 from backend.config import settings
 from backend.agent.main_agent import graph as agent
 from backend.backend_utils.events.emitter import EventEmitter
@@ -10,15 +8,16 @@ from backend.backend_utils.events.dispatcher import dispatch_chat
 from backend.database.models.chat import Chat
 from backend.database.models.client import Client
 from backend.database.repositories import (
-    client_repo,
-    chat_repo,
-    message_repo,
-    credential_repo,
-    browser_context_repo
+    ClientRepository,
+    ChatRepository,
+    CredentialsRepository,
+    BrowserContextRepository,
+    MessageRepository
 )
 
 from shared.events import Event
 from shared.events.error import ErrorEvent
+from shared.events.chat import ChatMessageEvent
 from shared.events.login import AutoLoginCredentialsEvent
 
 
@@ -33,7 +32,7 @@ class EventHandler:
         ) -> Client:
         """"""
 
-        return await client_repo.get_or_create_client(
+        return await ClientRepository.get_or_create_client(
             db,
             session_id
         )
@@ -47,7 +46,7 @@ class EventHandler:
         ) -> Chat:
         """"""
 
-        return await chat_repo.get_or_create_chat(
+        return await ChatRepository.get_or_create_chat(
             db,
             chat_id,
             session_id
@@ -58,12 +57,11 @@ class EventHandler:
     async def handle_event(
             db: AsyncSession,
             event: Event,
-            session_id: str,
-            websocket: WebSocket
-        ) -> None:
+            session_id: str
+        ) -> dict:
         """"""
 
-        event_type: str = getattr(event, "event", "error")
+        event_type: str = getattr(event, "type")
 
         _ = await EventHandler.__ensure_client(db, session_id)
 
@@ -72,63 +70,55 @@ class EventHandler:
                 return await EventHandler.__handle_credentials(
                     db, 
                     event, 
-                    session_id, 
-                    websocket
+                    session_id
                 )
             
             case "chat.message":
                 return await EventHandler.__handle_chat_message(
                     db, 
                     event, 
-                    session_id, 
-                    websocket
+                    session_id
                 )
             
-            case "login.success":
-                return await EventHandler.__handle_browser_context(
-                    db, 
-                    event, 
-                    session_id, 
-                    websocket
-                )
+            # case "login.success":
+            #     return await EventHandler.__handle_browser_context(
+            #         db, 
+            #         event, 
+            #         session_id
+            #     )
 
-            case "login.failed":
-                return await EventHandler.__handle_login_failed(
-                    db,
-                    event,
-                    session_id,
-                    websocket
-                )
+            # case "login.failed":
+            #     return await EventHandler.__handle_login_failed(
+            #         db,
+            #         event,
+            #         session_id
+            #     )
 
-            case "login.error":
-                return await EventHandler.__handle_login_failed(
-                    db,
-                    event,
-                    session_id,
-                    websocket
-                )
+            # case "login.error":
+            #     return await EventHandler.__handle_login_failed(
+            #         db,
+            #         event,
+            #         session_id
+            #     )
 
-            case "login.cancelled":
-                return await EventHandler.__handle_login_cancelled(
-                    db,
-                    event,
-                    session_id,
-                    websocket
-                )
+            # case "login.cancelled":
+            #     return await EventHandler.__handle_login_cancelled(
+            #         db,
+            #         event,
+            #         session_id
+            #     )
             
             case "chat.clear_messages":
                 return await EventHandler.__handle_clear_messages(
                     db,
                     event,
-                    session_id,
-                    websocket
+                    session_id
                 )
             
             case "client.clear_chats":
                 return await EventHandler.__handle_delete_chats(
                     db,
-                    session_id,
-                    websocket
+                    session_id
                 )
 
             case _:
@@ -139,16 +129,15 @@ class EventHandler:
     async def __handle_credentials(
             db: AsyncSession, 
             event: Event, 
-            session_id: str,
-            websocket: WebSocket
-        ) -> None:
+            session_id: str
+        ) -> dict:
         """"""
 
         if settings.AUTO_LOGIN_ONLY:
             are_valid_credentials: bool = False
 
         for store, creds in event.credentials.items():
-            await credential_repo.upsert_credentials(
+            await CredentialsRepository.upsert_credentials(
                 db, 
                 session_id, 
                 store, 
@@ -156,23 +145,23 @@ class EventHandler:
                 creds["password"]
             )
 
-        await EventEmitter.emit_event(
-            websocket,
-            AutoLoginCredentialsEvent(
-                event="autologin.credentials.received",
-                credentials=None
-            )
+        result_event: Event = AutoLoginCredentialsEvent(
+            event="autologin.credentials.received",
+            credentials=None
         )
+
+        return result_event.model_dump()
 
 
     @staticmethod
     async def __handle_chat_message(
             db: AsyncSession,
             event: Event,
-            session_id: str,
-            websocket: WebSocket
-        ) -> None:
+            session_id: str
+        ) -> dict:
         """"""
+
+        ai_response: str | None = None
 
         role: str = event.role
         message: str = event.content
@@ -186,7 +175,7 @@ class EventHandler:
 
         _ = await EventHandler.__ensure_chat(db, chat_id, session_id)
 
-        await message_repo.save_message(
+        await MessageRepository.save_message(
             db,
             session_id,
             chat_id,
@@ -195,15 +184,22 @@ class EventHandler:
         )
 
         if role == "user":
-            await dispatch_chat(
+            ai_response = await dispatch_chat(
                 agent,
                 message,
                 session_id,
                 chat_id,
                 all_selected_stores,
-                items_per_store,
-                websocket
+                items_per_store
             )
+
+        result_event: Event = ChatMessageEvent(
+            role = "assistant",
+            content = ai_response,
+            metadata = event.metadata
+        )
+
+        return result_event.model_dump()
 
     
     @staticmethod
@@ -383,15 +379,14 @@ class EventHandler:
     async def __handle_clear_messages(
             db: AsyncSession,
             event: Event,
-            session_id: str,
-            websocket: WebSocket
-        ) -> None:
+            session_id: str
+        ) -> dict:
         """"""
 
         chat_id: str = event.chat_id
 
         try:
-            await message_repo.delete_messages_for_chat(
+            await MessageRepository.delete_messages_for_chat(
                 db,
                 session_id,
                 chat_id,
@@ -409,13 +404,12 @@ class EventHandler:
     @staticmethod
     async def __handle_delete_chats(
             db: AsyncSession,
-            session_id: str,
-            websocket: WebSocket
+            session_id: str
         ) -> None:
         """"""
 
         try:
-            await chat_repo.delete_all_chats_for_client(
+            await ChatMessageEvent.delete_all_chats_for_client(
                 db,
                 session_id
             )

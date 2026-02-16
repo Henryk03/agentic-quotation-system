@@ -13,14 +13,14 @@ class Credential(Base):
     session_id: Mapped[str] = mapped_column(
         ForeignKey(
             "clients.session_id",
-            ondelete="CASCADE"
+            ondelete = "CASCADE"
         ),
-        primary_key=True
+        primary_key = True
     )
 
     store: Mapped[str] = mapped_column(
         String,
-        primary_key=True
+        primary_key = True
     )
 
     username: Mapped[str] = mapped_column(String)
@@ -29,10 +29,10 @@ class Credential(Base):
 
     is_valid: Mapped[bool] = mapped_column(
         Boolean, 
-        default=True
+        default = True
     )
 
     client = relationship(
         "Client",
-        back_populates="credentials"
+        back_populates = "credentials"
     )

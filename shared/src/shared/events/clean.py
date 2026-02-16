@@ -6,11 +6,11 @@ from pydantic import BaseModel
 class ClearChatMessagesEvent(BaseModel):
     """"""
 
-    event: Literal["chat.clear_messages"] = "chat.clear_messages"
+    type: Literal["chat.clear_messages"] = "chat.clear_messages"
     chat_id: str
 
 
 class ClearClientChatsEvent(BaseModel):
     """"""
 
-    event: Literal["client.clear_chats"] = "client.clear_chats"
+    type: Literal["client.clear_chats"] = "client.clear_chats"
