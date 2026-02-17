@@ -2,31 +2,29 @@
 import asyncio
 from datetime import datetime
 from logging import (
-    Logger,
+    basicConfig,
     getLogger,
-    basicConfig
+    Logger
 )
 
-from uvicorn import Config, Server
-from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from uvicorn import Config, Server
 
 from backend.config import settings
-from backend.background.db_cleanup import cleanup_inactive_clients_task
-from backend.backend_utils.events.parser import parse_event
 from backend.backend_utils.events.handler import EventHandler
+from backend.background.db_cleanup import cleanup_inactive_clients_task
 from backend.database.engine import AsyncSessionLocal
 from backend.database.repositories import (
-    JobRepository,
+    ChatRepository,
     ClientRepository,
-    ChatRepository
+    JobRepository
 )
 
+from shared.events import Event
+from shared.events.job_status import JobStatusEvent
+from shared.events.transport import EventEnvelope
 from shared.events.utils import extract_chat_id
-from shared.events import (
-    Event, 
-    EventEnvelope
-)
 
 
 logger: Logger = getLogger("agent-server")
@@ -53,8 +51,8 @@ async def lifespan(
 
     cleanup_task: asyncio.Task = asyncio.create_task(
         cleanup_inactive_clients_task(
-            every_seconds=1800,
-            inactive_for_hours=24
+            every_seconds = 1800,
+            inactive_for_hours = 24
         )
     )
 
@@ -75,7 +73,7 @@ async def lifespan(
         logger.info("shutdown complete")
 
 
-app = FastAPI(lifespan = lifespan)
+app: FastAPI = FastAPI(lifespan = lifespan)
 
 
 @app.post("/event")
@@ -87,7 +85,9 @@ async def create_event_job(
     session_id: str = envelope.session_id
     event: Event = envelope.event
 
-    chat_id: str | None = extract_chat_id(event)
+    chat_id: str | None = extract_chat_id(
+        event
+    )
 
     async with AsyncSessionLocal() as db:
         _ = await ClientRepository.get_or_create_client(
@@ -116,10 +116,12 @@ async def create_event_job(
         )
     )
 
-    return {
-        "event_id": job_id,
-        "status": "PENDING"
-    }
+    status_event: JobStatusEvent = JobStatusEvent(
+        job_id = job_id,
+        status = "PENDING"
+    )
+
+    return status_event.model_dump()
 
 
 async def run_event_job(
@@ -171,7 +173,10 @@ async def get_event_result(
         )
 
     if not job:
-        raise HTTPException(status_code = 404)
+        raise HTTPException(
+            status_code = 404,
+            detail = "Event not found"
+        )
     
     return job
 

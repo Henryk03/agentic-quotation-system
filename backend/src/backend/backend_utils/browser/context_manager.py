@@ -12,7 +12,7 @@ from playwright.async_api import (
 
 from backend.config import settings
 from backend.database.engine import AsyncSessionLocal
-from backend.database.repositories import credential_repo
+from backend.src.backend.database.repositories import credentials_repo
 from backend.database.repositories import browser_context_repo
 from backend.backend_utils.exceptions import (
     LoginFailedException,
@@ -171,7 +171,7 @@ class AsyncBrowserContextMaganer:
         if not AsyncBrowserContextMaganer.is_cli_mode():
             async with AsyncSessionLocal() as db:
                 if session_id:
-                    credentials = await credential_repo.get_credentials(
+                    credentials = await credentials_repo.get_credentials(
                         db,
                         session_id,
                         provider.name

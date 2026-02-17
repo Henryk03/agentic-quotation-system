@@ -4,20 +4,25 @@ import uuid
 import asyncio
 import logging
 from functools import partial
+from asyncio import AbstractEventLoop
 
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
 from frontend.config import settings
-from frontend.frontend_utils.websocket.client import WSClient
+from frontend.frontend_utils.websocket.client import RESTClient
 
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
-from shared.events.login import LoginRequiredEvent
+from shared.events.login import AutoLoginCredentialsEvent
 from shared.provider.registry import (
     all_provider_names,
     support_autologin
+)
+from shared.events.clean import (
+    ClearClientChatsEvent,
+    ClearChatMessagesEvent
 )
 
 
@@ -25,7 +30,7 @@ from shared.provider.registry import (
 #          Helpers
 # ==========================
 
-def get_event_loop() -> asyncio.AbstractEventLoop:
+def get_event_loop() -> AbstractEventLoop:
     """"""
 
     if "loop" not in st.session_state:
@@ -43,6 +48,21 @@ def close_dialog(
     """"""
 
     st.session_state.ui_state[flag_key] = False
+
+
+def save_message(
+        role: str,
+        content: str
+    ) -> None:
+    """"""
+
+    if st.session_state.messages:
+        st.session_state.messages.append(
+            {
+                "role": role,
+                "content": content
+            }
+        )
 
 # ==========================
 #     Message animation
@@ -65,91 +85,24 @@ def stream_data(
 
 
 # ==========================
-#      Event handling
+#     Result processing
 # ==========================
 
-def handle_event(
-        event: Event
-    ) -> bool:
+def process_result(
+        result: dict
+    ) -> None:
     """"""
 
-    ephemeral: DeltaGenerator = st.session_state.ephemeral_container
-    login_open: bool = st.session_state.ui_state["login_dialog"]["open"]
-
-    st.session_state.ws_client.logger.info(f"\n\nEvento ricevuto dal server: {event}")
-    print(f"\n\nEvento ricevuto dal server: {event}")
+    ephemeral: DeltaGenerator = (
+        st.session_state.ephemeral_container
+    )
         
-    # ==========================
-    #  Chat messages (persist)
-    # ==========================
-    if isinstance(event, ChatMessageEvent):
-        if login_open:
-            st.session_state.messages.append(
-                {
-                    "role": event.role,
-                    "content": event.content,
-                }
+    match result.get("type", "error"):
+        case "chat.message":
+            save_message(
+                role = result.role,
+                content = result.content
             )
-            return True
-        
-        st.session_state.messages.append(
-            {
-                "role": event.role,
-                "content": event.content,
-            }
-        )
-
-        if ephemeral:
-            stream_data(event.content, ephemeral)  
-            st.session_state.ephemeral_container = None
-
-        return True
-
-    # ==========================
-    #      Errors (persist)
-    # ==========================
-    if isinstance(event, ErrorEvent):
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": f"⚠️ {event.message}",
-            }
-        )
-
-        if ephemeral:
-            ephemeral.error(event.message)
-
-        return True
-    
-    # ==========================
-    #   Login flow (temporary)
-    # ==========================
-    if isinstance(event, LoginRequiredEvent):
-        st.session_state.ui_state["login_dialog"].update(
-            {
-                "open": True,
-                "status": "waiting",
-                "provider": event.provider,
-                "login_url": event.login_url,
-                "message": "Manual login is required to continue"
-            }
-        )
-        
-        return True
-    
-    return False
-
-
-def on_event(event: Event) -> bool:
-    """"""
-
-    return handle_event(event)
-
-
-def on_error(exception: Exception) -> None:
-    """"""
-
-    pass
 
 
 # ==========================
@@ -159,11 +112,10 @@ def on_error(exception: Exception) -> None:
 if "ephemeral_container" not in st.session_state:
     st.session_state.ephemeral_container = None
 
-if "ws_client" not in st.session_state:
-    st.session_state.ws_client = WSClient(
-        websocket=None,
-        session_id=uuid.uuid4().hex,
-        websocket_uri=f"ws://{settings.HOST}:{settings.PORT}/ws/chat"
+if "rest_client" not in st.session_state:
+    st.session_state.ws_client = RESTClient(
+        base_url = f"http://{settings.HOST}:{settings.PORT}",
+        session_id = uuid.uuid4().hex
     )
 
     logging.basicConfig(
@@ -175,19 +127,20 @@ if "ui_state" not in st.session_state:
     chat_id: str = uuid.uuid4().hex
 
     st.session_state.ui_state = {
-        "selected_stores": [],          # list for supported stores (automation)
-        "custom_urls": [],              # list for other stores (computer use)
+        "selected_stores": [],
+        "custom_store_urls": [],
         "results_per_item": 1,
+
         "store_dialog_open": False,
         "autologin_dialog_open": False,
 
-        "login_dialog": {
-            "open": False,
-            "status": "idle",           # idle | waiting | in_progress | success | error | cancelled
-            "provider": None,
-            "login_url": None,
-            "_close_next_run": False
-        },
+        # "login_dialog": {
+        #     "open": False,
+        #     "status": "idle",           # idle | waiting | in_progress | success | error | cancelled
+        #     "provider": None,
+        #     "login_url": None,
+        #     "_close_next_run": False
+        # },
 
         "autologin": {
             "pending_stores": [],
@@ -268,9 +221,13 @@ with st.sidebar:
         chat["messages"].clear()
         st.session_state.messages = chat["messages"]
 
+        clear_messages_event: Event = ClearChatMessagesEvent(
+            chat_id = st.session_state.chat_id
+        )
+
         get_event_loop().run_until_complete(
-            st.session_state.ws_client.send_clear_messages(
-                st.session_state.chat_id
+            st.session_state.rest_client.send_and_wait(
+                clear_messages_event
             )
         )
 
@@ -292,8 +249,12 @@ with st.sidebar:
             st.session_state.ui_state["chats"]["Chat - 1"]["messages"]
         )
 
+        delete_chats_event: Event = ClearClientChatsEvent()
+
         get_event_loop().run_until_complete(
-            st.session_state.ws_client.send_clear_chats()
+            st.session_state.rest_client.send_and_wait(
+                delete_chats_event
+            )
         )
 
         st.rerun()
@@ -313,135 +274,135 @@ with st.sidebar:
 #    Login related dialog
 # ==========================
 
-@st.dialog("Login required")
-def login_dialog() -> None:
-    """"""
+# @st.dialog("Login required")
+# def login_dialog() -> None:
+#     """"""
 
-    login = st.session_state.ui_state["login_dialog"]
+#     login = st.session_state.ui_state["login_dialog"]
 
-    st.markdown(f"### Manual login required for **{login["provider"]}**")
+#     st.markdown(f"### Manual login required for **{login["provider"]}**")
 
-    status = st.empty()
+#     status = st.empty()
 
-    match login["status"]:
-        case "waiting":
-            status.info("Waiting for confirmation")
+#     match login["status"]:
+#         case "waiting":
+#             status.info("Waiting for confirmation")
 
-        case "in_progress":
-            status.warning("🔄 Login in progress...")
+#         case "in_progress":
+#             status.warning("🔄 Login in progress...")
 
-        case "success":
-            status.success("✅ Login completed successfully")
+#         case "success":
+#             status.success("✅ Login completed successfully")
 
-        case "error":
-            status.error(f"❌ Login failed: {login["message"]}")
+#         case "error":
+#             status.error(f"❌ Login failed: {login["message"]}")
 
-        case "cancelled":
-            status.warning("⚠️ Login cancelled by user")
+#         case "cancelled":
+#             status.warning("⚠️ Login cancelled by user")
 
-        case _:
-            status.error("❌ Invalid status")
+#         case _:
+#             status.error("❌ Invalid status")
 
-    col1, col2 = st.columns(2)
+#     col1, col2 = st.columns(2)
 
-    if login["status"] == "waiting":
-        col1, col2 = st.columns(2)
+#     if login["status"] == "waiting":
+#         col1, col2 = st.columns(2)
 
-        with col1:
-            if st.button("✅ Proceed"):
-                st.session_state.ui_state["login_dialog"]["status"] = "in_progress"
-                st.rerun()
+#         with col1:
+#             if st.button("✅ Proceed"):
+#                 st.session_state.ui_state["login_dialog"]["status"] = "in_progress"
+#                 st.rerun()
 
-        with col2:
-            if st.button("❌ Cancel"):
-                st.session_state.ui_state["login_dialog"].update(
-                    {
-                        "open": True,
-                        "status": "cancelled",
-                        "provider": login["provider"],
-                        "login_url": None
-                    }
-                )
-                st.rerun()
+#         with col2:
+#             if st.button("❌ Cancel"):
+#                 st.session_state.ui_state["login_dialog"].update(
+#                     {
+#                         "open": True,
+#                         "status": "cancelled",
+#                         "provider": login["provider"],
+#                         "login_url": None
+#                     }
+#                 )
+#                 st.rerun()
 
 
-if st.session_state.ui_state["login_dialog"]["open"]:
-    login_dialog()
+# if st.session_state.ui_state["login_dialog"]["open"]:
+#     login_dialog()
 
-if st.session_state.ui_state["login_dialog"]["status"] == "cancelled":
-    metadata = {
-        "chat_id": st.session_state.chat_id,
-        "selected_stores": st.session_state.ui_state["selected_stores"]
-    }
+# if st.session_state.ui_state["login_dialog"]["status"] == "cancelled":
+#     metadata = {
+#         "chat_id": st.session_state.chat_id,
+#         "selected_stores": st.session_state.ui_state["selected_stores"]
+#     }
 
-    _ = get_event_loop().run_until_complete(
-        st.session_state.ws_client.handle_login_cancelled(
-            st.session_state.ui_state["login_dialog"]["provider"],
-            metadata,
-            on_event,
-            on_error
-        )
-    )
+#     _ = get_event_loop().run_until_complete(
+#         st.session_state.ws_client.handle_login_cancelled(
+#             st.session_state.ui_state["login_dialog"]["provider"],
+#             metadata,
+#             on_event,
+#             on_error
+#         )
+#     )
 
-    st.session_state.ui_state["login_dialog"].update(
-        {
-            "open": False,
-            "status": "idle",
-            "provider": None,
-            "login_url": None
-        }
-    )
+#     st.session_state.ui_state["login_dialog"].update(
+#         {
+#             "open": False,
+#             "status": "idle",
+#             "provider": None,
+#             "login_url": None
+#         }
+#     )
 
-    st.rerun()
+#     st.rerun()
 
-if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
-    try:
-        ok: bool = get_event_loop().run_until_complete(
-            st.session_state.ws_client.handle_login(
-                st.session_state.ui_state["login_dialog"]["provider"],
-                st.session_state.ui_state["login_dialog"]["login_url"],
-                st.session_state.chat_id,
-                st.session_state.ui_state["selected_stores"],
-                on_event,
-                on_error
-            )
-        )
+# if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
+#     try:
+#         ok: bool = get_event_loop().run_until_complete(
+#             st.session_state.ws_client.handle_login(
+#                 st.session_state.ui_state["login_dialog"]["provider"],
+#                 st.session_state.ui_state["login_dialog"]["login_url"],
+#                 st.session_state.chat_id,
+#                 st.session_state.ui_state["selected_stores"],
+#                 on_event,
+#                 on_error
+#             )
+#         )
 
-        if ok:
-            st.session_state.ui_state["login_dialog"]["status"] = "success"
+#         if ok:
+#             st.session_state.ui_state["login_dialog"]["status"] = "success"
 
-        else:
-            st.session_state.ui_state["login_dialog"]["status"] = "error",
-            st.session_state.ui_state["login_dialog"]["message"] = (
-                "Login failed or timeout"
-            )
+#         else:
+#             st.session_state.ui_state["login_dialog"]["status"] = "error",
+#             st.session_state.ui_state["login_dialog"]["message"] = (
+#                 "Login failed or timeout"
+#             )
 
-    except Exception as e:
-        st.session_state.ui_state["login_dialog"]["status"] = "error"
-        st.session_state.ui_state["login_dialog"]["message"] = str(e)
+#     except Exception as e:
+#         st.session_state.ui_state["login_dialog"]["status"] = "error"
+#         st.session_state.ui_state["login_dialog"]["message"] = str(e)
 
-    st.rerun()
+#     st.rerun()
 
-if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
-    if not st.session_state.ui_state["login_dialog"]["_close_next_run"]:
-        st.session_state.ui_state["login_dialog"]["_close_next_run"] = True
-        st.rerun()
+# if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
+#     if not st.session_state.ui_state["login_dialog"]["_close_next_run"]:
+#         st.session_state.ui_state["login_dialog"]["_close_next_run"] = True
+#         st.rerun()
 
-    else:
-        time.sleep(2)
+#     else:
+#         time.sleep(2)
 
-        st.session_state.ui_state["login_dialog"].update(
-            {
-                "open": False,
-                "status": "idle",
-                "provider": None,
-                "login_url": None,
-                "message": None,
-                "_close_next_run": False,
-            }
-        )
+#         st.session_state.ui_state["login_dialog"].update(
+#             {
+#                 "open": False,
+#                 "status": "idle",
+#                 "provider": None,
+#                 "login_url": None,
+#                 "message": None,
+#                 "_close_next_run": False,
+#             }
+#         )
 
-        st.rerun()
+#         st.rerun()
 
 
 # ==========================
@@ -620,10 +581,15 @@ if st.session_state.ui_state["autologin_dialog_open"]:
     insert_autologin_credentials()
 
 if st.session_state.ui_state["send_credentials_now"]:
+    credentials_event: Event = AutoLoginCredentialsEvent(
+        type = "autologin.credentials.provided",
+        credentials = st.session_state.ui_state["autologin"]["credentials"]
+    )
+
     for _ in range(2):
         received_event = get_event_loop().run_until_complete(
-            st.session_state.ws_client.send_credentials(
-                st.session_state.ui_state["autologin"]["credentials"]
+            st.session_state.rest_client.send_and_wait(
+                credentials_event
             )
         )
 
@@ -651,18 +617,16 @@ for msg in st.session_state.messages:
 prompt: str | None = st.chat_input("Type a message...")
 
 if prompt:
-    st.session_state.messages.append(
-        {
-            "role": "user",
-            "content": prompt,
-        }
-    )
-
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    assistant_msg = st.chat_message("assistant")
-    placeholder = assistant_msg.empty()
+    save_message(
+        role = "user",
+        content = prompt.strip()
+    )
+
+    assistant_msg: DeltaGenerator = st.chat_message("assistant")
+    placeholder: DeltaGenerator = assistant_msg.empty()
 
     st.session_state.ephemeral_container = placeholder
 
@@ -673,28 +637,32 @@ if prompt:
         "items_per_store": st.session_state.ui_state["results_per_item"]
     }
 
+    event: Event = ChatMessageEvent(
+        role = "user",
+        content = prompt.strip(),
+        metadata = metadata
+    )
+
     with placeholder:
         placeholder.markdown("Thinking...")
 
         try:
-            received_events: bool = get_event_loop().run_until_complete(
-                st.session_state.ws_client.send(
-                    role="user",
-                    message=prompt,
-                    metadata=metadata,
-                    on_event=on_event,
-                    on_error=on_error,
+            result: dict | None = get_event_loop().run_until_complete(
+                st.session_state.rest_client.send_and_wait(
+                    event
                 )
             )
 
-            if received_events:
+            if result:
+                process_result(result)
                 st.rerun()
         
         except Exception as e:
-            err = f"WebSocket Error: {e}"
-
-            st.session_state.messages.append(
-                {"role": "assistant", "content": f"⚠️ {err}"}
-            )
+            err: str = f"WebSocket Error: {str(e)}"
 
             placeholder.error(err)
+
+            save_message(
+                role = "assistant",
+                content = f"⚠️  {err}"
+            )

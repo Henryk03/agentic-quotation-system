@@ -4,7 +4,7 @@ import logging
 from datetime import timedelta
 
 from backend.database.engine import AsyncSessionLocal
-from backend.database.repositories.client_repo import delete_inactive_clients
+from backend.database.repositories import ClientRepository
 
 
 logger = logging.getLogger("db-cleaner")
@@ -26,7 +26,7 @@ async def cleanup_inactive_clients_task(
     try:
         while True:
             async with AsyncSessionLocal() as db:
-                deleted = await delete_inactive_clients(
+                deleted = await ClientRepository.delete_inactive_clients(
                     db,
                     inactive_for=inactive_delta
                 )

@@ -1,12 +1,16 @@
 
 from pydantic import TypeAdapter
-from shared.events import Event
+from shared.events.transport import EventEnvelope
 
 
-event_adapter = TypeAdapter(Event)
+envelope_adapter: TypeAdapter = TypeAdapter(EventEnvelope)
 
 
-def parse_event(event_string: str) -> Event:
+def parse_envelope_from_dict(
+        data: dict
+    ) -> EventEnvelope:
     """"""
 
-    return event_adapter.validate_json(event_string)
+    return envelope_adapter.validate_python(
+        data
+    )

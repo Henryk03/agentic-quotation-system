@@ -32,7 +32,7 @@ async def async_main():
     
     print(f"\n🚀 Starting server on {settings.HOST}:{settings.PORT}...")
 
-    from backend.src.backend.server.rest_server import start_server
+    from backend.server.rest_server import start_server
     
     try:
         await start_server(host=settings.HOST, port=settings.PORT)

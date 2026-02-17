@@ -126,11 +126,11 @@ async def dispatch_chat(
         return __normalize_content(ai_response.content)
 
     except UILoginException as uile:
-        async with AsyncSessionLocal() as db:
-            await ChatRepository.mark_needs_rerun(
-                db, 
-                session_id, 
-                chat_id
-            )
+        # async with AsyncSessionLocal() as db:
+        #     await ChatRepository.mark_needs_rerun(
+        #         db, 
+        #         session_id, 
+        #         chat_id
+        #     )
 
-        return ""
+        pass
