@@ -8,4 +8,4 @@ class EventEnvelope(BaseModel):
     """"""
 
     session_id: str
-    event: Event
+    event: "Event"
