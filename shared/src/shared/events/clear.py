@@ -2,12 +2,14 @@
 from typing import Literal
 from pydantic import BaseModel
 
+from shared.events.metadata import BaseMetadata
+
 
 class ClearChatMessagesEvent(BaseModel):
     """"""
 
     type: Literal["chat.clear_messages"] = "chat.clear_messages"
-    chat_id: str
+    metadata: BaseMetadata
 
 
 class ClearClientChatsEvent(BaseModel):
