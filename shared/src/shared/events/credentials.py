@@ -30,6 +30,14 @@ from pydantic import BaseModel, SecretStr
 #     reason: str | None = None
 
 
+class CredentialsValidationResultEvent(BaseModel):
+    """"""
+    
+    type: Literal["credentials.validation.result"] = "credentials.validation.result"
+    success: bool
+    invalid_stores: list[str] | None = None
+
+
 class CredentialEntry(BaseModel):
     """"""
 
@@ -41,4 +49,4 @@ class StoreCredentialsEvent(BaseModel):
     """"""
 
     type: Literal["store.credentials"] = "store.credentials"
-    credentials: CredentialEntry
+    credentials: dict[str, CredentialEntry]

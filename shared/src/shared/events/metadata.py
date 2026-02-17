@@ -14,3 +14,4 @@ class StoreMetadata(BaseMetadata):
 
     selected_stores: list[str]
     selected_external_store_urls: list[str]
+    items_per_store: int = 1
