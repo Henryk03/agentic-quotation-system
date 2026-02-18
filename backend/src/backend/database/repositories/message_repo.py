@@ -1,9 +1,9 @@
 
-from sqlalchemy import select, desc, delete
+from sqlalchemy import delete, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.database.models.message import Message
 from backend.database.actions.client_touch import touch_client
+from backend.database.models.message import Message
 
 
 class MessageRepository:
@@ -13,7 +13,7 @@ class MessageRepository:
     @staticmethod
     async def get_last_user_message(
             db: AsyncSession,
-            session_id: str,
+            client_id: str,
             chat_id: str,
         ) -> str | None:
         """"""
@@ -21,7 +21,7 @@ class MessageRepository:
         stmt = (
             select(Message)
             .where(
-                Message.session_id == session_id,
+                Message.client_id == client_id,
                 Message.chat_id == chat_id,
                 Message.role == "user"
             )
@@ -38,7 +38,7 @@ class MessageRepository:
     @staticmethod
     async def save_message(
             db: AsyncSession, 
-            session_id: str, 
+            client_id: str, 
             chat_id: str, 
             role: str, 
             content: str
@@ -46,22 +46,22 @@ class MessageRepository:
         """"""
 
         msg = Message(
-            session_id=session_id,
-            chat_id=chat_id,
-            role=role,
-            content=content,
+            client_id = client_id,
+            chat_id = chat_id,
+            role = role,
+            content = content,
         )
 
         db.add(msg)
 
-        await touch_client(db, session_id)
+        await touch_client(db, client_id)
         await db.commit()
 
 
     @staticmethod
     async def get_all_messages(
             db: AsyncSession,
-            session_id: str,
+            client_id: str,
             chat_id: str
         ) -> list[Message]:
         """"""
@@ -69,7 +69,7 @@ class MessageRepository:
         stmt = (
             select(Message)
             .where(
-                Message.session_id == session_id,
+                Message.client_id == client_id,
                 Message.chat_id == chat_id
             )
             .order_by(
@@ -84,7 +84,7 @@ class MessageRepository:
     @staticmethod
     async def delete_messages_for_chat(
             db: AsyncSession,
-            session_id: str,
+            client_id: str,
             chat_id: str
         ) -> None:
         """"""
@@ -92,10 +92,10 @@ class MessageRepository:
         await db.execute(
             delete(Message)
             .where(
-                Message.session_id == session_id,
+                Message.client_id == client_id,
                 Message.chat_id == chat_id
             )
         )
 
-        await touch_client(db, session_id)
+        await touch_client(db, client_id)
         await db.commit()

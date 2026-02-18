@@ -1,9 +1,11 @@
 
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, ForeignKey, JSON
+from sqlalchemy import DateTime, Enum, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
+
+from shared.shared_utils.common import JobStatus
 
 
 class Job(Base):
@@ -16,9 +18,9 @@ class Job(Base):
         primary_key = True
     )
 
-    session_id: Mapped[str] = mapped_column(
+    client_id: Mapped[str] = mapped_column(
         ForeignKey(
-            "clients.session_id",
+            "clients.client_id",
             ondelete = "CASCADE"
         )
     )
@@ -31,9 +33,14 @@ class Job(Base):
         nullable = True
     )
 
-    status: Mapped[str] = mapped_column(
-        String,
-        default = "PENDING"
+    status: Mapped[JobStatus] = mapped_column(
+        Enum(
+            JobStatus,
+            name = "job_status",
+            native_enum = True
+        ),
+        default = JobStatus.PENDING,
+        nullable = False
     )
 
     result: Mapped[dict] = mapped_column(

@@ -1,5 +1,5 @@
 
-from sqlalchemy import select, update, delete
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.chat import Chat
@@ -14,21 +14,21 @@ class ChatRepository:
     async def get_or_create_chat(
             db: AsyncSession,
             chat_id: str,
-            session_id: str
+            client_id: str
         ) -> Chat:
         """"""
 
-        chat = await db.get(Chat, (chat_id, session_id))
+        chat = await db.get(Chat, (chat_id, client_id))
 
         if not chat:
             chat = Chat(
                 chat_id = chat_id,
-                session_id = session_id
+                client_id = client_id
             )
             
             db.add(chat)
 
-            await touch_client(db, session_id)
+            await touch_client(db, client_id)
             await db.commit()
 
         return chat
@@ -37,33 +37,33 @@ class ChatRepository:
     @staticmethod
     async def mark_needs_rerun(
             db: AsyncSession,
-            session_id: str,
+            client_id: str,
             chat_id: str
         ) -> None:
         """"""
 
         await db.execute(
             update(Chat)
-            .where(Chat.session_id == session_id)
+            .where(Chat.client_id == client_id)
             .where(Chat.chat_id == chat_id)
             .values(needs_rerun = True)
         )
 
-        await touch_client(db, session_id)
+        await touch_client(db, client_id)
         await db.commit()
 
 
     @staticmethod
     async def consume_rerun_flag(
             db: AsyncSession,
-            session_id: str,
+            client_id: str,
             chat_id: str
         ) -> bool:
         """"""
 
         stmt = (
             select(Chat.needs_rerun)
-            .where(Chat.session_id == session_id)
+            .where(Chat.client_id == client_id)
             .where(Chat.chat_id == chat_id)
         )
 
@@ -73,12 +73,12 @@ class ChatRepository:
         if needs:
             await db.execute(
                 update(Chat)
-                .where(Chat.session_id == session_id)
+                .where(Chat.client_id == client_id)
                 .where(Chat.chat_id == chat_id)
                 .values(needs_rerun = False)
             )
 
-            await touch_client(db, session_id)
+            await touch_client(db, client_id)
             await db.commit()
 
         return needs
@@ -87,14 +87,14 @@ class ChatRepository:
     @staticmethod
     async def delete_all_chats_for_client(
             db: AsyncSession,
-            session_id: str
+            client_id: str
         ) -> None:
         """"""
 
         await db.execute(
             delete(Chat)
-            .where(Chat.session_id == session_id)
+            .where(Chat.client_id == client_id)
         )
 
-        await touch_client(db, session_id)
+        await touch_client(db, client_id)
         await db.commit()

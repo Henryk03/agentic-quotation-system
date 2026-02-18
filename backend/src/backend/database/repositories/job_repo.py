@@ -1,11 +1,12 @@
 
 import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any
 
-from backend.database.models.job import Job
 from backend.database.actions.job_touch import touch_job
+from backend.database.models.job import Job
 
-from shared.events import Event
+from shared.shared_utils.common import JobStatus
 
 
 class JobRepository:
@@ -15,7 +16,7 @@ class JobRepository:
     @staticmethod
     async def create_job(
             db: AsyncSession, 
-            session_id: str,
+            client_id: str,
             chat_id: str | None
         ) -> str:
         """"""
@@ -24,9 +25,9 @@ class JobRepository:
 
         job = Job(
             id = job_id, 
-            session_id = session_id, 
+            client_id = client_id, 
             chat_id = chat_id,
-            status = "PENDING"
+            status = JobStatus.PENDING
         )
 
         db.add(job)
@@ -47,7 +48,7 @@ class JobRepository:
         job: Job | None = await db.get(Job, job_id)
 
         if job:
-            job.status = "RUNNING"
+            job.status = JobStatus.RUNNING
 
             await touch_job(db, job.id)
             await db.commit()
@@ -64,7 +65,7 @@ class JobRepository:
         job: Job | None = await db.get(Job, job_id)
 
         if job:
-            job.status = "DONE"
+            job.status = JobStatus.COMPLETED
             job.result = result
 
             await touch_job(db, job.id)
@@ -82,7 +83,7 @@ class JobRepository:
         job: Job | None = await db.get(Job, job_id)
 
         if job:
-            job.status = "ERROR"
+            job.status = JobStatus.FAILED
             job.error = error
 
             await touch_job(db, job.id)
@@ -93,7 +94,7 @@ class JobRepository:
     async def get(
             db: AsyncSession, 
             job_id: str
-        ) -> dict | None:
+        ) -> dict[str, Any] | None:
         """"""
 
         job: Job | None = await db.get(Job, job_id)
@@ -101,7 +102,7 @@ class JobRepository:
         if job:
             return {
                 "job_id": job.id,
-                "session_id": job.session_id,
+                "client_id": job.client_id,
                 "chat_id": job.chat_id,
                 "status": job.status,
                 "result": job.result,

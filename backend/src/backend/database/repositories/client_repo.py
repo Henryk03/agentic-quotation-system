@@ -1,12 +1,12 @@
 
-from typing import Any
-from datetime import timedelta, datetime, timezone
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete
 from sqlalchemy.engine import Result
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any
 
-from backend.database.models.client import Client
 from backend.database.actions.client_touch import touch_client
+from backend.database.models.client import Client
 
 
 class ClientRepository:
@@ -16,18 +16,18 @@ class ClientRepository:
     @staticmethod
     async def get_or_create_client(
             db: AsyncSession,
-            session_id: str
+            client_id: str
         ) -> Client:
         """"""
 
-        client: Client | None = await db.get(Client, session_id)
+        client: Client | None = await db.get(Client, client_id)
 
         if not client:
-            client = Client(session_id=session_id)
+            client = Client(client_id=client_id)
             
             db.add(client)
 
-            await touch_client(db, session_id)
+            await touch_client(db, client_id)
             await db.commit()
 
         return client

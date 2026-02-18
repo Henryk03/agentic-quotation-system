@@ -25,6 +25,7 @@ from shared.events import Event
 from shared.events.job_status import JobStatusEvent
 from shared.events.transport import EventEnvelope
 from shared.events.utils import extract_chat_id
+from shared.shared_utils.common import JobStatus
 
 
 logger: Logger = getLogger("agent-server")

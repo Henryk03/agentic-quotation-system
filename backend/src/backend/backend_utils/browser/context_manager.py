@@ -3,26 +3,27 @@ import asyncio
 from pathlib import Path
 
 from playwright.async_api import (
-    Playwright, 
-    Browser, 
-    BrowserContext, 
-    Page, 
+    Browser,
+    BrowserContext,
+    Page,
+    Playwright,
     StorageState,
 )
 
-from backend.config import settings
-from backend.database.engine import AsyncSessionLocal
-from backend.src.backend.database.repositories import credentials_repo
-from backend.database.repositories import browser_context_repo
 from backend.backend_utils.exceptions import (
     LoginFailedException,
-    ManualFallbackException,
-    UILoginException
+    ManualFallbackException
+)
+from backend.config import settings
+from backend.database.engine import AsyncSessionLocal
+from backend.database.repositories import (
+    CredentialsRepository,
+    LoginContextRepository,
 )
 
-from shared.provider.base_provider import BaseProvider
-from shared.playwright.waiter import wait_until_logged_in
 from shared.playwright.page_utilities import close_page_resources
+from shared.playwright.waiter import wait_until_logged_in
+from shared.provider.base_provider import BaseProvider
 
 
 if settings.CLI_MODE:
@@ -30,9 +31,6 @@ if settings.CLI_MODE:
 
     LOG_IN_STATES_DIR = BACKEND_ROOT / ".logins"
     LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
-
-SCREEN_WIDTH = 1440
-SCREEN_HEIGHT = 900
 
 
 class AsyncBrowserContextMaganer:
@@ -52,11 +50,11 @@ class AsyncBrowserContextMaganer:
     def __init__(
             self,
             playwright: Playwright, 
-            session_id: str | None = None
+            client_id: str | None = None
         ):
 
         self.async_playwright = playwright
-        self.session_id = session_id
+        self.client_id = client_id
 
 
     @staticmethod
@@ -93,41 +91,42 @@ class AsyncBrowserContextMaganer:
 
     @staticmethod
     async def __get_current_state(
-            session_id: str | None,
+            client_id: str | None,
             provider: BaseProvider
-        ) -> tuple[Path | StorageState | str | None, str | None]:
+        ) -> Path | StorageState | None:
         """"""
 
         if AsyncBrowserContextMaganer.is_cli_mode():
             path: Path = AsyncBrowserContextMaganer.__state_path(provider)
-            return (path, None) if path.exists() else (None, None)
+
+            return path if path.exists() else None
 
         else:
             async with AsyncSessionLocal() as db:
-                ctx: StorageState | str | None
-                rsn: str | None
+                ctx: StorageState | None
 
-                if session_id:
-                    ctx, rsn = await browser_context_repo.get_browser_context(
+                if client_id:
+                    ctx = await LoginContextRepository.get_browser_context(
                         db,
-                        session_id,
+                        client_id,
                         provider.name
                     )
-                    return ctx, rsn
+                    
+                    return ctx
 
                 else:
-                    return None, None
+                    return None
 
     
     @staticmethod
     async def __save_current_state(
-            session_id: str | None,
+            client_id: str | None,
             provider: BaseProvider,
             context: BrowserContext
         ) -> None:
         """"""
 
-        state_dict: StorageState = await context.storage_state()
+        state: StorageState = await context.storage_state()
 
         if AsyncBrowserContextMaganer.is_cli_mode():
             # you are free to store/upsert the 
@@ -136,44 +135,31 @@ class AsyncBrowserContextMaganer:
 
         else:
             async with AsyncSessionLocal() as db:
-                if session_id:
-                    await browser_context_repo.upsert_browser_context(
+                if client_id:
+                    await LoginContextRepository.upsert_browser_context(
                         db,
-                        session_id,
+                        client_id,
                         provider.name,
-                        state_dict,
-                        None
+                        state
                     )
-
-
-    @staticmethod
-    async def __handle_failure(
-            provider: BaseProvider, 
-            reason: str | None = None
-        ) -> None:
-        """"""
-
-        if AsyncBrowserContextMaganer.is_cli_mode():
-            raise ManualFallbackException(provider, reason)
-
-        raise UILoginException(provider, reason)
     
 
     @staticmethod
     async def __get_creds_by_mode(
-            session_id: str | None,
+            client_id: str | None,
             provider: BaseProvider
-        ) -> dict[str, str] | None:
+        ) -> tuple[str | None, str | None]:
         """"""
 
-        credentials: dict[str, str] | None = None
+        username: str | None = None
+        password: str | None = None
 
         if not AsyncBrowserContextMaganer.is_cli_mode():
             async with AsyncSessionLocal() as db:
-                if session_id:
-                    credentials = await credentials_repo.get_credentials(
+                if client_id:
+                    username, password = await CredentialsRepository.get_credentials(
                         db,
-                        session_id,
+                        client_id,
                         provider.name
                     )
 
@@ -182,14 +168,14 @@ class AsyncBrowserContextMaganer:
             # for a website where you want :)
             pass
 
-        return credentials
+        return (username, password)
 
 
     async def create_browser_context(
-        self,
-        state: Path | StorageState | str | None = None,
-        start_url: str | None = None,
-        headless: bool = True
+            self,
+            state: Path | StorageState | None = None,
+            start_url: str | None = None,
+            headless: bool = True
         ) -> tuple[Browser, BrowserContext, Page]:
         """
         Create a new browser, context, and page.
@@ -214,13 +200,13 @@ class AsyncBrowserContextMaganer:
         page: Page
 
         browser = await self.async_playwright.chromium.launch(
-            headless=(
+            headless = (
                 headless 
                 if not headless else AsyncBrowserContextMaganer.is_headless_mode()
             )
         )
 
-        storage_state_param: Path | StorageState | str | None = None
+        storage_state_param: Path | StorageState | None = None
 
         if state:
             if isinstance(state, Path):
@@ -231,11 +217,7 @@ class AsyncBrowserContextMaganer:
                 storage_state_param = state
 
         context = await browser.new_context(
-            storage_state=storage_state_param,
-            viewport={
-                "width": SCREEN_WIDTH,
-                "height": SCREEN_HEIGHT
-            }
+            storage_state = storage_state_param
         )
 
         page = await context.new_page()
@@ -249,7 +231,7 @@ class AsyncBrowserContextMaganer:
     async def __prepare_provider_context(
             self,
             provider: BaseProvider,
-            state: Path | StorageState | str | None,
+            state: Path | StorageState | None,
             headless: bool
         ) -> tuple[Browser, BrowserContext, Page]:
         """
@@ -280,9 +262,9 @@ class AsyncBrowserContextMaganer:
         page: Page
 
         browser, context, page = await self.create_browser_context(
-            state=state,
-            start_url=provider.url,
-            headless=headless
+            state = state,
+            start_url = provider.url,
+            headless = headless
         )
 
         await provider.close_all_popups(page)
@@ -292,7 +274,7 @@ class AsyncBrowserContextMaganer:
 
     async def __ensure_autologin_context(
             self,
-            session_id: str | None,
+            client_id: str | None,
             provider: BaseProvider
         ) -> BrowserContext | None:
         """"""
@@ -310,12 +292,12 @@ class AsyncBrowserContextMaganer:
                 )
             )
         
-        state: Path | StorageState | str | None = None
+        state: Path | StorageState | None = None
         context: BrowserContext | None = None
         page: Page | None = None
         
-        state, _ = await AsyncBrowserContextMaganer.__get_current_state(
-            session_id,
+        state = await AsyncBrowserContextMaganer.__get_current_state(
+            client_id,
             provider
         )
 
@@ -343,14 +325,14 @@ class AsyncBrowserContextMaganer:
                     )
                 )
 
-            credentials: dict[str, str] | None = (
+            username, password = (
                 await AsyncBrowserContextMaganer.__get_creds_by_mode(
-                    session_id,
+                    client_id,
                     provider
                 )
             )
 
-            if not credentials:
+            if not all((username, password)):
                 raise LoginFailedException(
                     provider, 
                     (
@@ -359,10 +341,7 @@ class AsyncBrowserContextMaganer:
                     )
                 )
 
-
-            if not await provider.auto_login(page, credentials):
-                # aggiornare la flag nel db (tabella credenziali) circa la prova...
-                # far reinserire le credenziali (fino a blocco obv )
+            if not await provider.auto_login(page, username, password):
                 raise LoginFailedException(
                     provider, 
                     (
@@ -372,7 +351,7 @@ class AsyncBrowserContextMaganer:
                 )
 
             await self.__save_current_state(
-                session_id,
+                client_id,
                 provider,
                 context
             )
@@ -389,30 +368,24 @@ class AsyncBrowserContextMaganer:
 
     async def __ensure_standard_context(
             self,
-            session_id: str | None,
+            client_id: str | None,
             provider: BaseProvider
         ) -> BrowserContext | None:
         """"""
 
-        state, fail_reason = (
+        state: Path | StorageState | None = (
             await AsyncBrowserContextMaganer.__get_current_state(
-                session_id,
+                client_id,
                 provider
             )
         )
-
-        if state == "BLOCKED":
-            raise LoginFailedException(provider, fail_reason)
 
         context: BrowserContext | None = None
         page: Page | None = None
 
         try:
             if not state and provider.login_required:
-                await AsyncBrowserContextMaganer.__handle_failure(
-                    provider,
-                    "MISSING_STATE"
-                )
+                raise ManualFallbackException(provider)
 
             _, context, page = await self.__prepare_provider_context(
                 provider,
@@ -430,61 +403,47 @@ class AsyncBrowserContextMaganer:
 
             if provider.has_auto_login():
                 if await provider.has_captcha(page):
-                    await AsyncBrowserContextMaganer.__handle_failure(
-                        provider,
-                        "CAPTCHA_DETECTED"
-                    )
+                    raise ManualFallbackException(provider)
 
-                credentials = await AsyncBrowserContextMaganer.__get_creds_by_mode(
-                    session_id,
+                username, password = await AsyncBrowserContextMaganer.__get_creds_by_mode(
+                    client_id,
                     provider
                 )
 
-                if await provider.auto_login(page, credentials):
+                if await provider.auto_login(page, username, password):
                     await self.__save_current_state(
-                        session_id,
+                        client_id,
                         provider,
                         context
                     )
                     await page.close()
                     return context
 
-                await AsyncBrowserContextMaganer.__handle_failure(
-                    provider,
-                    "AUTOLOGIN_FAILED"
-                )
 
-            await AsyncBrowserContextMaganer.__handle_failure(
-                provider,
-                "MISSING_AUTOLOGIN"
-            )
+            raise ManualFallbackException(provider)
 
         except ManualFallbackException:
             if page:
                 await close_page_resources(page)
 
-            if AsyncBrowserContextMaganer.is_cli_mode():
-                try:
-                    if not state:
-                        await self.__manual_login(provider)
-                        _, context, _ = await self.__prepare_provider_context(
-                            provider,
-                            state,
-                            True
-                        )
+            try:
+                if not state:
+                    await self.__manual_login(provider)
+                    _, context, _ = await self.__prepare_provider_context(
+                        provider,
+                        state,
+                        True
+                    )
 
-                except:
-                    raise LoginFailedException(provider)
-                
-            # there should be no else statement here,
-            # because this exception is CLI-only
+            except:
+                raise LoginFailedException(provider)
                 
         return context
 
 
     async def ensure_provider_context(
             self,
-            session_id: str | None,
+            client_id: str | None,
             provider: BaseProvider
         ) -> BrowserContext | None:
         """
@@ -504,14 +463,14 @@ class AsyncBrowserContextMaganer:
             BrowserContext | None
         """
 
-        if settings.AUTO_LOGIN_ONLY:
+        if not settings.CLI_MODE:
             return await self.__ensure_autologin_context(
-                session_id,
+                client_id,
                 provider
             )
         
         return await self.__ensure_standard_context(
-            provider,
+            None,
             provider
         ) 
 

@@ -1,5 +1,5 @@
 
-from sqlalchemy import String, ForeignKey, Boolean
+from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -10,9 +10,9 @@ class Credential(Base):
 
     __tablename__ = "credentials"
 
-    session_id: Mapped[str] = mapped_column(
+    client_id: Mapped[str] = mapped_column(
         ForeignKey(
-            "clients.session_id",
+            "clients.client_id",
             ondelete = "CASCADE"
         ),
         primary_key = True

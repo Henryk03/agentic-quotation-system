@@ -1,23 +1,17 @@
 
-import os
 import asyncio
-import subprocess
+import os
 import platform
+import subprocess
 from pathlib import Path
 
-from playwright.async_api import (
-    Playwright,
-    Page
-)
+from playwright.async_api import Page, Playwright
 
 
 BACKEND_ROOT: Path = Path(__file__).resolve().parents[4]
 USER_DATA_DIR: Path = BACKEND_ROOT / ".automation_profile"
 
 USER_DATA_DIR.mkdir(0o700, exist_ok = True)
-
-SCREEN_WIDTH = 1440
-SCREEN_HEIGHT = 900
 
 
 def launch_chrome_os(
@@ -63,6 +57,7 @@ def launch_chrome_os(
                     (p for p in paths if os.path.exists(p)), 
                     "chrome.exe"
                 )
+
                 full_command = [chrome_path] + args
 
             case "darwin":
@@ -83,12 +78,13 @@ def launch_chrome_os(
                     ).returncode == 0), 
                     "google-chrome"
                 )
+
                 full_command = [chrome_path] + args
 
         subprocess.Popen(
             full_command, 
-            stdout=subprocess.DEVNULL, 
-            stderr=subprocess.DEVNULL
+            stdout = subprocess.DEVNULL, 
+            stderr = subprocess.DEVNULL
         )
 
     except Exception as e:

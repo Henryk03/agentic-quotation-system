@@ -1,43 +1,39 @@
 
-import re
 import asyncio
-from typing import Coroutine, Any
+import re
+from typing import Any, Coroutine
 
+from bs4 import BeautifulSoup, ResultSet, Tag
 from google import genai
 from langchain_core.runnables import RunnableConfig
-from bs4 import (
-    BeautifulSoup,
-    ResultSet,
-    Tag
-)
 from playwright.async_api import (
-    async_playwright,
     BrowserContext,
     Page,
-    TimeoutError as PlaywrightTimeoutError
+    TimeoutError as PlaywrightTimeoutError,
+    async_playwright,
 )
 
-from backend.config import settings
-from backend.backend_utils.common import SafeAsyncList
-from backend.backend_utils.exceptions import LoginFailedException
-from backend.backend_utils.browser import (
-    AsyncBrowserContextMaganer, 
-    init_chrome_page
-)
 from backend.agent.prompts import (
-    USER_PROMPT, 
-    COMPUTER_USE_SYSTEM_PROMPT
+    COMPUTER_USE_SYSTEM_PROMPT,
+    USER_PROMPT,
 )
+from backend.backend_utils.browser import (
+    AsyncBrowserContextMaganer,
+    init_chrome_page,
+)
+from backend.backend_utils.common import SafeAsyncList
 from backend.backend_utils.computer_use import (
     ComputerUseSession,
+    generate_content_config,
     run_computer_use_loop,
-    generate_content_config
 )
+from backend.backend_utils.exceptions import LoginFailedException
+from backend.config import settings
 
-from shared.provider.base_provider import BaseProvider
-from shared.provider.registry import get_provider
 from shared.exceptions import ProviderNotSupportedException
 from shared.playwright.page_utilities import close_page_resources
+from shared.provider.base_provider import BaseProvider
+from shared.provider.registry import get_provider
 
 
 async def search_products(
@@ -75,14 +71,14 @@ async def search_products(
             search results, structured for easy parsing or LLM consumption.
     """
     
-    session_id: str | None
+    client_id: str | None
     web_search_results_list: SafeAsyncList
     browser_context_manager: AsyncBrowserContextMaganer
 
     async with async_playwright() as apw:
-        session_id = config.get("configurable", {}).get("client_id", None)
+        client_id = config.get("configurable", {}).get("client_id", None)
         web_search_results_list = SafeAsyncList()
-        browser_context_manager = AsyncBrowserContextMaganer(apw, session_id)
+        browser_context_manager = AsyncBrowserContextMaganer(apw, client_id)
 
         tasks: list[Coroutine[Any, Any, Any]] = []
         pages_to_close: list[Page] = []
@@ -93,7 +89,7 @@ async def search_products(
 
                 context: BrowserContext | None = (
                     await browser_context_manager.ensure_provider_context(
-                        session_id,
+                        client_id,
                         provider_instance
                     )
                 )
@@ -130,7 +126,6 @@ async def search_products(
                 )
 
             except LoginFailedException as lfe:
-                print(str(lfe))
                 await web_search_results_list.add(
                     await __format_block(provider, str(lfe))
                 )
@@ -146,13 +141,9 @@ async def search_products(
         for page in pages_to_close:
             await close_page_resources(page)
 
-        print("Pagine chiuse...")
-
     web_search_results_str = "\n\n".join(
         [result for result in await web_search_results_list.get_all()]
     )
-
-    print(f"\n\nRisultati dal tool: {web_search_results_str}")
 
     return web_search_results_str
 
@@ -163,7 +154,7 @@ async def __search_in_website(
         products: list[str],
         result_list: SafeAsyncList,
         limit_per_product: int = 1
-    ) -> None | str:
+    ) -> None:
     """
     Perform web actions on the given provider's website to gather informations 
     about the given products. These informations are then inserted into the given
@@ -183,8 +174,7 @@ async def __search_in_website(
             A list that will contain the scraping's results as strings.
 
     Returns:
-        None | str
-        - `None` if no problem was encountered during the execution.
+        None
     """
 
     try:
@@ -201,7 +191,7 @@ async def __search_in_website(
             try:
                 await page.get_by_role(
                     "textbox", 
-                    name=provider.search_texts
+                    name = provider.search_texts
                 ).fill(
                     item
                 )
@@ -228,7 +218,7 @@ async def __search_in_website(
                 )
                 _ = await __wait_for_all_selectors(
                     page, 
-                    provider.availability_classes
+                    dict(provider.availability_classes)
                 )
                 _ = await __wait_for_any_selector(
                     page, 
@@ -259,7 +249,7 @@ async def __search_in_website(
                         ),
                         __select_all_text(
                             product_containers,
-                            provider.availability_classes,
+                            dict(provider.availability_classes),
                             provider.availability_texts
                         ),
                         __select_text(

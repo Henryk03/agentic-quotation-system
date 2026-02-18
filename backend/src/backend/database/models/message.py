@@ -1,6 +1,6 @@
 
 from datetime import datetime, timezone
-from sqlalchemy import String, Text, DateTime, ForeignKeyConstraint
+from sqlalchemy import DateTime, ForeignKeyConstraint, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -13,7 +13,7 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key = True)
 
-    session_id: Mapped[str] = mapped_column(nullable = False)
+    client_id: Mapped[str] = mapped_column(nullable = False)
 
     chat_id: Mapped[str] = mapped_column(nullable = False)
 
@@ -29,13 +29,13 @@ class Message(Base):
 
     __table_args__ = (
         ForeignKeyConstraint(
-            ["chat_id", "session_id"],
-            ["chats.chat_id", "chats.session_id"],
+            ["chat_id", "client_id"],
+            ["chats.chat_id", "chats.client_id"],
             ondelete = "CASCADE"
         ),
         ForeignKeyConstraint(
-            ["session_id"],
-            ["clients.session_id"],
+            ["client_id"],
+            ["clients.client_id"],
             ondelete = "CASCADE"
         ),
     )
@@ -44,7 +44,7 @@ class Message(Base):
         "Chat",
         primaryjoin = (
             "and_(Message.chat_id==Chat.chat_id, "
-            "Message.session_id==Chat.session_id)"
+            "Message.client_id==Chat.client_id)"
         ),
         back_populates = "messages"
     )

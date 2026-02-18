@@ -10,17 +10,18 @@ import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
 from frontend.config import settings
-from frontend.frontend_utils.websocket.client import RESTClient
+from frontend.frontend_utils.rest.client import RESTClient
 
 from shared.events import Event
+from shared.events.metadata import StoreMetadata
 from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
-from shared.events.login import AutoLoginCredentialsEvent
+from shared.events.credentials import StoreCredentialsEvent
 from shared.provider.registry import (
     all_provider_names,
     support_autologin
 )
-from shared.events.clean import (
+from shared.events.clear import (
     ClearClientChatsEvent,
     ClearChatMessagesEvent
 )
@@ -89,7 +90,7 @@ def stream_data(
 # ==========================
 
 def process_result(
-        result: dict
+        result: Event
     ) -> None:
     """"""
 
@@ -97,12 +98,14 @@ def process_result(
         st.session_state.ephemeral_container
     )
         
-    match result.get("type", "error"):
-        case "chat.message":
+    match result:
+        case ChatMessageEvent():
             save_message(
                 role = result.role,
                 content = result.content
             )
+
+            ephemeral.markdown(result.content)
 
 
 # ==========================
@@ -221,15 +224,15 @@ with st.sidebar:
         chat["messages"].clear()
         st.session_state.messages = chat["messages"]
 
-        clear_messages_event: Event = ClearChatMessagesEvent(
-            chat_id = st.session_state.chat_id
-        )
+        # clear_messages_event: Event = ClearChatMessagesEvent(
+        #     chat_id = st.session_state.chat_id
+        # )
 
-        get_event_loop().run_until_complete(
-            st.session_state.rest_client.send_and_wait(
-                clear_messages_event
-            )
-        )
+        # get_event_loop().run_until_complete(
+        #     st.session_state.rest_client.send_and_wait(
+        #         clear_messages_event
+        #     )
+        # )
 
         st.rerun()
 
@@ -268,141 +271,6 @@ with st.sidebar:
             st.session_state.messages = chat["messages"]
 
             st.rerun()
-
-
-# ==========================
-#    Login related dialog
-# ==========================
-
-# @st.dialog("Login required")
-# def login_dialog() -> None:
-#     """"""
-
-#     login = st.session_state.ui_state["login_dialog"]
-
-#     st.markdown(f"### Manual login required for **{login["provider"]}**")
-
-#     status = st.empty()
-
-#     match login["status"]:
-#         case "waiting":
-#             status.info("Waiting for confirmation")
-
-#         case "in_progress":
-#             status.warning("🔄 Login in progress...")
-
-#         case "success":
-#             status.success("✅ Login completed successfully")
-
-#         case "error":
-#             status.error(f"❌ Login failed: {login["message"]}")
-
-#         case "cancelled":
-#             status.warning("⚠️ Login cancelled by user")
-
-#         case _:
-#             status.error("❌ Invalid status")
-
-#     col1, col2 = st.columns(2)
-
-#     if login["status"] == "waiting":
-#         col1, col2 = st.columns(2)
-
-#         with col1:
-#             if st.button("✅ Proceed"):
-#                 st.session_state.ui_state["login_dialog"]["status"] = "in_progress"
-#                 st.rerun()
-
-#         with col2:
-#             if st.button("❌ Cancel"):
-#                 st.session_state.ui_state["login_dialog"].update(
-#                     {
-#                         "open": True,
-#                         "status": "cancelled",
-#                         "provider": login["provider"],
-#                         "login_url": None
-#                     }
-#                 )
-#                 st.rerun()
-
-
-# if st.session_state.ui_state["login_dialog"]["open"]:
-#     login_dialog()
-
-# if st.session_state.ui_state["login_dialog"]["status"] == "cancelled":
-#     metadata = {
-#         "chat_id": st.session_state.chat_id,
-#         "selected_stores": st.session_state.ui_state["selected_stores"]
-#     }
-
-#     _ = get_event_loop().run_until_complete(
-#         st.session_state.ws_client.handle_login_cancelled(
-#             st.session_state.ui_state["login_dialog"]["provider"],
-#             metadata,
-#             on_event,
-#             on_error
-#         )
-#     )
-
-#     st.session_state.ui_state["login_dialog"].update(
-#         {
-#             "open": False,
-#             "status": "idle",
-#             "provider": None,
-#             "login_url": None
-#         }
-#     )
-
-#     st.rerun()
-
-# if st.session_state.ui_state["login_dialog"]["status"] == "in_progress":
-#     try:
-#         ok: bool = get_event_loop().run_until_complete(
-#             st.session_state.ws_client.handle_login(
-#                 st.session_state.ui_state["login_dialog"]["provider"],
-#                 st.session_state.ui_state["login_dialog"]["login_url"],
-#                 st.session_state.chat_id,
-#                 st.session_state.ui_state["selected_stores"],
-#                 on_event,
-#                 on_error
-#             )
-#         )
-
-#         if ok:
-#             st.session_state.ui_state["login_dialog"]["status"] = "success"
-
-#         else:
-#             st.session_state.ui_state["login_dialog"]["status"] = "error",
-#             st.session_state.ui_state["login_dialog"]["message"] = (
-#                 "Login failed or timeout"
-#             )
-
-#     except Exception as e:
-#         st.session_state.ui_state["login_dialog"]["status"] = "error"
-#         st.session_state.ui_state["login_dialog"]["message"] = str(e)
-
-#     st.rerun()
-
-# if st.session_state.ui_state["login_dialog"]["status"] in ("success", "error"):
-#     if not st.session_state.ui_state["login_dialog"]["_close_next_run"]:
-#         st.session_state.ui_state["login_dialog"]["_close_next_run"] = True
-#         st.rerun()
-
-#     else:
-#         time.sleep(2)
-
-#         st.session_state.ui_state["login_dialog"].update(
-#             {
-#                 "open": False,
-#                 "status": "idle",
-#                 "provider": None,
-#                 "login_url": None,
-#                 "message": None,
-#                 "_close_next_run": False,
-#             }
-#         )
-
-#         st.rerun()
 
 
 # ==========================
@@ -580,25 +448,24 @@ if st.session_state.ui_state["store_dialog_open"]:
 if st.session_state.ui_state["autologin_dialog_open"]:
     insert_autologin_credentials()
 
-if st.session_state.ui_state["send_credentials_now"]:
-    credentials_event: Event = AutoLoginCredentialsEvent(
-        type = "autologin.credentials.provided",
-        credentials = st.session_state.ui_state["autologin"]["credentials"]
-    )
+# if st.session_state.ui_state["send_credentials_now"]:
+#     credentials_event: Event = AutoLoginCredentialsEvent(
+#         credentials = st.session_state.ui_state["autologin"]["credentials"]
+#     )
 
-    for _ in range(2):
-        received_event = get_event_loop().run_until_complete(
-            st.session_state.rest_client.send_and_wait(
-                credentials_event
-            )
-        )
+#     for _ in range(2):
+#         received_event = get_event_loop().run_until_complete(
+#             st.session_state.rest_client.send_and_wait(
+#                 credentials_event
+#             )
+#         )
 
-        if received_event:
-            break
+#         if received_event:
+#             break
 
-    st.session_state.ui_state["send_credentials_now"] = False
+#     st.session_state.ui_state["send_credentials_now"] = False
 
-    st.rerun()
+#     st.rerun()
 
 
 # ==========================
@@ -630,12 +497,12 @@ if prompt:
 
     st.session_state.ephemeral_container = placeholder
 
-    metadata: dict[str, list[str] | str | int] = {
-        "selected_stores": st.session_state.ui_state["selected_stores"],
-        "custom_urls": st.session_state.ui_state["custom_urls"],
-        "chat_id": st.session_state.chat_id,
-        "items_per_store": st.session_state.ui_state["results_per_item"]
-    }
+    metadata: StoreMetadata = StoreMetadata(
+        selected_stores = st.session_state.ui_state["selected_stores"],
+        selected_external_store_urls = st.session_state.ui_state["custom_urls"],
+        chat_id = st.session_state.chat_id,
+        items_per_store = st.session_state.ui_state["results_per_item"]
+    )
 
     event: Event = ChatMessageEvent(
         role = "user",

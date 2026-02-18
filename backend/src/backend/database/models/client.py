@@ -1,6 +1,6 @@
 
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime
+from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -11,7 +11,7 @@ class Client(Base):
 
     __tablename__ = "clients"
 
-    session_id: Mapped[str] = mapped_column(
+    client_id: Mapped[str] = mapped_column(
         String, 
         primary_key = True
     )

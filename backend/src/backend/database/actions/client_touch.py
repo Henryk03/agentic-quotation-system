@@ -8,14 +8,14 @@ from backend.database.models.client import Client
 
 async def touch_client(
         db: AsyncSession,
-        session_id: str
+        client_id: str
     ) -> None:
     """"""
     
     await db.execute(
         update(Client)
         .where(
-            Client.session_id == session_id
+            Client.client_id == client_id
         )
         .values(
             last_active=datetime.now(timezone.utc)

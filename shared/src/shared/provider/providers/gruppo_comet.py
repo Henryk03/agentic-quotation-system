@@ -1,7 +1,7 @@
 
 import re
 
-from playwright.async_api import Page
+from playwright.async_api import Page, TimeoutError as PlaywrightTimeoutError
 
 from shared.provider.base_provider import BaseProvider
 
@@ -50,7 +50,8 @@ class GruppoComet(BaseProvider):
     async def auto_login(
             self, 
             page: Page,
-            credentials: dict[str, str]
+            username: str, 
+            password: str
         ) -> bool:
 
         login_texts: re.Pattern[str] = re.compile(
@@ -59,16 +60,20 @@ class GruppoComet(BaseProvider):
         )
 
         try:
-            await page.get_by_role("link", name=login_texts).click()
-
-            username: str = credentials["username"]
-            password: str = credentials["password"]
+            await page.get_by_role("link", name = login_texts).click()
 
             await page.locator("input[name='username']").fill(username)
             await page.locator("input[name='password']").fill(password)
             await page.keyboard.press("Enter")
 
-            await page.wait_for_load_state("networkidle")
+            try:
+                await page.wait_for_load_state(
+                    "networkidle",
+                    timeout = 5000
+                )
+
+            except PlaywrightTimeoutError:
+                pass
 
             return await self.is_logged_in(page)
 
