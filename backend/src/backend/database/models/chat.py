@@ -21,7 +21,7 @@ class Chat(Base):
             "clients.client_id",
             ondelete = "CASCADE"
         ),
-        primary_key=True,
+        nullable = False
     )
 
     needs_rerun: Mapped[bool] = mapped_column(default = False)

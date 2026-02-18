@@ -119,7 +119,7 @@ async def create_event_job(
 
     status_event: JobStatusEvent = JobStatusEvent(
         job_id = job_id,
-        status = "PENDING"
+        status = JobStatus.PENDING
     )
 
     return status_event.model_dump()

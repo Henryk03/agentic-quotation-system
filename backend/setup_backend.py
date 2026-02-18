@@ -328,7 +328,8 @@ def upgrade_database(
 
     return run_command(
         [str(python), "-m", "alembic", "upgrade", "head"],
-        "\n" + "⬆️ Applying database migrations"
+        "\n" + "⬆️ Applying database migrations",
+        False
     )
 
 
