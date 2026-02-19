@@ -7,5 +7,5 @@ from shared.events import Event
 class EventEnvelope(BaseModel):
     """"""
 
-    session_id: str
+    client_id: str
     event: Event

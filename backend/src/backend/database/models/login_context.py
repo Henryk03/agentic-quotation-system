@@ -1,6 +1,6 @@
 
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, ForeignKey, JSON, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -24,10 +24,22 @@ class LoginContext(Base):
         primary_key = True
     )
 
-    attempts_history: Mapped[list[dict] | None] = mapped_column(
-        JSON,
-        nullable = True,
-        default = list
+    current_attemps: Mapped[int] = mapped_column(
+        Integer,
+        default = 0,
+        nullable = False
+    )
+
+    max_attempts: Mapped[int] = mapped_column(
+        Integer,
+        default = 3,
+        nullable = False
+    )
+
+    cooldown_seconds: Mapped[int] = mapped_column(
+        Integer,
+        default = 900,
+        nullable = False
     )
 
     last_error_message: Mapped[str | None] = mapped_column(
@@ -59,5 +71,11 @@ class LoginContext(Base):
 
     client = relationship(
         "Client",
-        back_populates = "browser_contexts",
+        back_populates = "login_contexts",
+    )
+
+    attempts = relationship(
+        "LoginAttempt",
+        back_populates = "context",
+        cascade = "all, delete-orphan"
     )

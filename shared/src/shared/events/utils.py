@@ -1,5 +1,9 @@
 
 from shared.events import Event
+from shared.events.metadata import (
+    BaseMetadata, 
+    StoreMetadata
+)
 
 
 def extract_chat_id(
@@ -8,9 +12,17 @@ def extract_chat_id(
     """"""
 
     if hasattr(event, "chat_id"):
-        return getattr(event, "chat_id")
+        return getattr(event, "chat_id", None)
     
-    if hasattr(event, "metadata") and isinstance(event.metadata, dict):
-        return event.metadata.get("chat_id")
+    metadata: BaseMetadata | StoreMetadata | None = (
+        getattr(event, "metadata", None)
+    )
+
+    if metadata:
+        if hasattr(metadata, "chat_id"):
+            return getattr(metadata, "chat_id", None)
+        
+        if isinstance(metadata, dict):
+            return metadata.get("chat_id", None)
     
     return None

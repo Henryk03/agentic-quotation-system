@@ -106,7 +106,7 @@ class AsyncBrowserContextMaganer:
                 ctx: StorageState | None
 
                 if client_id:
-                    ctx = await LoginContextRepository.get_browser_context(
+                    ctx = await LoginContextRepository.get_context(
                         db,
                         client_id,
                         provider.name
@@ -136,7 +136,7 @@ class AsyncBrowserContextMaganer:
         else:
             async with AsyncSessionLocal() as db:
                 if client_id:
-                    await LoginContextRepository.upsert_browser_context(
+                    await LoginContextRepository.upsert_context(
                         db,
                         client_id,
                         provider.name,

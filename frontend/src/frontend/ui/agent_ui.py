@@ -105,7 +105,10 @@ def process_result(
                 content = result.content
             )
 
-            ephemeral.markdown(result.content)
+            stream_data(
+                result.content,
+                ephemeral
+            )
 
 
 # ==========================
@@ -137,19 +140,12 @@ if "ui_state" not in st.session_state:
         "store_dialog_open": False,
         "autologin_dialog_open": False,
 
-        # "login_dialog": {
-        #     "open": False,
-        #     "status": "idle",           # idle | waiting | in_progress | success | error | cancelled
-        #     "provider": None,
-        #     "login_url": None,
-        #     "_close_next_run": False
-        # },
-
         "autologin": {
             "pending_stores": [],
             "current_store": None,
             "credentials": {},
-            "are_valid_credentials": None
+            "validated_stores": set(),
+            "store_status": {}
         },
 
         "send_credentials_now": False,
@@ -191,7 +187,7 @@ st.caption("Streamlit chatbot powered by Google Gemini")
 with st.sidebar:
     st.title("Settings")
 
-    if st.button("🛒 Select Store", use_container_width=True):
+    if st.button("🛒 Select Store", use_container_width = True):
         st.session_state.ui_state["store_dialog_open"] = True
         st.rerun()
 
@@ -364,14 +360,14 @@ def store_selector_dialog() -> None:
 
     st.multiselect(
         "Supported Stores",
-        options=full_options,
-        default=current_selection,
-        key="store_multiselect"
+        options = full_options,
+        default = current_selection,
+        key = "store_multiselect"
     )
 
     base_custom_options: list[str] = ["https://amazon.com"]
     current_custom_selection: list[str] = st.session_state.ui_state[
-        "custom_urls"
+        "custom_store_urls"
     ]
 
     full_custom_options: list[str] = list(
@@ -380,11 +376,11 @@ def store_selector_dialog() -> None:
 
     st.multiselect(
         "Custom Store URLs",
-        options=full_custom_options,
-        default=current_custom_selection,
-        key="store_multiselect_computer_use",
-        placeholder="https://store-example.com",
-        accept_new_options=True
+        options = full_custom_options,
+        default = current_custom_selection,
+        key = "store_multiselect_computer_use",
+        placeholder = "https://store-example.com",
+        accept_new_options = True
     )
 
     st.caption(
@@ -411,14 +407,19 @@ def store_selector_dialog() -> None:
     with col1:
         if st.button("✅ Confirm"):
             selected_stores = st.session_state.store_multiselect
-            custom_urls = st.session_state.store_multiselect_computer_use
+            custom_store_urls = st.session_state.store_multiselect_computer_use
+
+            validated_stores = (
+                st.session_state.ui_state["autologin"]["validated_stores"]
+            )
 
             st.session_state.ui_state["selected_stores"] = selected_stores
-            st.session_state.ui_state["custom_urls"] = custom_urls
+            st.session_state.ui_state["custom_store_urls"] = custom_store_urls
             st.session_state.ui_state["results_per_item"] = results_per_item
 
             autologin_stores: list[str] = [
-                s for s in selected_stores if support_autologin(s)
+                s for s in selected_stores 
+                if support_autologin(s) and s not in validated_stores
             ]
 
             st.session_state.ui_state["autologin"]["pending_stores"] = autologin_stores
@@ -514,18 +515,17 @@ if prompt:
         placeholder.markdown("Thinking...")
 
         try:
-            result: dict | None = get_event_loop().run_until_complete(
+            result: Event = get_event_loop().run_until_complete(
                 st.session_state.rest_client.send_and_wait(
                     event
                 )
             )
 
-            if result:
-                process_result(result)
-                st.rerun()
+            process_result(result)
+            st.rerun()
         
         except Exception as e:
-            err: str = f"WebSocket Error: {str(e)}"
+            err: str = f"Error: {str(e)}"
 
             placeholder.error(err)
 

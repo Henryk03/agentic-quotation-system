@@ -83,7 +83,7 @@ async def create_event_job(
     ) -> dict[str, str]:
     """"""
 
-    session_id: str = envelope.session_id
+    client_id: str = envelope.client_id
     event: Event = envelope.event
 
     chat_id: str | None = extract_chat_id(
@@ -93,26 +93,26 @@ async def create_event_job(
     async with AsyncSessionLocal() as db:
         _ = await ClientRepository.get_or_create_client(
             db,
-            session_id
+            client_id
         )
 
         if chat_id:
             _ = await ChatRepository.get_or_create_chat(
                 db,
                 chat_id,
-                session_id
+                client_id
             )
 
         job_id: str = await JobRepository.create_job(
             db,
-            session_id,
+            client_id,
             chat_id
         )
 
     asyncio.create_task(
         run_event_job(
             job_id,
-            session_id, 
+            client_id, 
             event
         )
     )
@@ -127,7 +127,7 @@ async def create_event_job(
 
 async def run_event_job(
         job_id: str, 
-        session_id: str,
+        client_id: str,
         event: Event
     ) -> None:
     """"""
@@ -142,7 +142,7 @@ async def run_event_job(
             result: dict = await EventHandler.handle_event(
                 db,
                 event,
-                session_id
+                client_id
             )
 
             await JobRepository.set_result(

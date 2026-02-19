@@ -1,4 +1,6 @@
 
+from datetime import datetime, timezone
+from playwright.async_api import StorageState
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any
 
@@ -101,24 +103,41 @@ class EventHandler:
         results: list[StoreLoginResult] = []
 
         for store, entry in event.credentials.items():
-            can_attempt, lock_message, minutes_left = (
-                await LoginContextRepository.can_attempt_login(
-                    db,
-                    client_id,
-                    store
-                )
+            context = await LoginContextRepository.get_or_create_context(
+                db,
+                client_id,
+                store
             )
 
-            if not can_attempt:
+            attempts_left: int | None = None
+            minutes_left: int | None = None
+
+            now: datetime = datetime.now(timezone.utc)
+
+            if context.locked_until and context.locked_until > now:
+                minutes_left = int(
+                    ((context.locked_until - now).total_seconds() + 59) // 60
+                )
+
                 results.append(
                     StoreLoginResult(
                         store = store,
                         success = False,
-                        message = lock_message,
-                        minutes_left = minutes_left
+                        attempts_left = 0,
+                        minutes_left = minutes_left,
+                        error_message = context.last_error_message
                     )
                 )
+
                 continue
+
+            if context.locked_until and context.locked_until <= now:
+                context.locked_until = None
+                context.current_attemps = 0
+
+            success: bool = False
+            storage_state: StorageState | None = None
+            error_message: str | None = None
 
             try:
                 success, storage_state, error_message = (
@@ -134,6 +153,25 @@ class EventHandler:
                 storage_state = None
                 error_message = str(e)
 
+            await LoginContextRepository.add_login_attempt(
+                db,
+                client_id,
+                store,
+                success,
+                reason = None if success else error_message
+            )
+
+            if context.locked_until and context.locked_until > now:
+                attempts_left = 0
+                minutes_left = int(
+                    ((context.locked_until - now).total_seconds() + 59) // 60
+                )
+
+            else:
+                attempts_left = (
+                    context.max_attempts - context.current_attemps
+                )
+
             if success:
                 await CredentialsRepository.upsert_credentials(
                     db,
@@ -144,57 +182,35 @@ class EventHandler:
                 )
 
                 if storage_state:
-                    await LoginContextRepository.upsert_browser_context(
+                    await LoginContextRepository.upsert_context(
                         db,
                         client_id,
                         store,
                         storage_state
                     )
 
-                await LoginContextRepository.add_login_attempt(
-                    db,
-                    client_id,
-                    store,
-                    status = "success"
-                )
-
                 results.append(
                     StoreLoginResult(
                         store = store,
                         success = True,
-                        message = "Login successful"
+                        attempts_left = attempts_left
                     )
                 )
 
             else:
-                await LoginContextRepository.add_login_attempt(
-                    db,
-                    client_id,
-                    store,
-                    status = "failed",
-                    reason = error_message
-                )
-
-                _, lock_message_after, minutes_left_after = (
-                    await LoginContextRepository.can_attempt_login(
-                        db,
-                        client_id,
-                        store
-                    )
-                )
 
                 results.append(
                     StoreLoginResult(
                         store = store,
                         success = False,
-                        message = error_message or lock_message_after,
-                        minutes_left = minutes_left_after,
-                        last_error_message = error_message
+                        attempts_left = attempts_left,
+                        minutes_left = minutes_left,
+                        error_message = error_message
                     )
                 )
 
         result_event = CredentialsLoginResultEvent(
-            results = results
+            results=results
         )
 
         return result_event.model_dump()

@@ -168,7 +168,8 @@ class BaseProvider:
     async def auto_login(
             self, 
             page: Page,
-            credentials: dict
+            username: str,
+            password: str
         ) -> bool:
         """
         Default automatic login implementation, which performs no action.

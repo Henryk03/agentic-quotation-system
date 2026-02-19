@@ -8,9 +8,9 @@ class StoreLoginResult(BaseModel):
 
     store: str
     success: bool
-    message: str | None = None
+    attempts_left: int | None = None
     minutes_left: int | None = None
-    last_error_message: str | None = None
+    error_message: str | None = None
 
 
 class CredentialsLoginResultEvent(BaseModel):
