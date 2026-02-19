@@ -5,6 +5,14 @@ from pydantic import BaseModel
 from shared.events.metadata import BaseMetadata
 
 
+class ClearChatMessagesResultEvent(BaseModel):
+    """"""
+
+    type: Literal["chat.clear.messages.result"] = "chat.clear.messages.result"
+    metadata: BaseMetadata
+    success: bool
+
+
 class ClearChatMessagesEvent(BaseModel):
     """"""
 
@@ -12,7 +20,14 @@ class ClearChatMessagesEvent(BaseModel):
     metadata: BaseMetadata
 
 
-class ClearClientChatsEvent(BaseModel):
+class DeleteClientChatsResultEvent(BaseModel):
+    """"""
+
+    type: Literal["client.chats.delete.result"] = "client.chats.delete.result"
+    success: bool
+
+
+class DeleteClientChatsEvent(BaseModel):
     """"""
 
     type: Literal["client.clear_chats"] = "client.clear_chats"
