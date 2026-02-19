@@ -22,8 +22,10 @@ from shared.provider.registry import (
     support_autologin
 )
 from shared.events.clear import (
-    ClearClientChatsEvent,
-    ClearChatMessagesEvent
+    DeleteClientChatsEvent,
+    ClearChatMessagesEvent,
+    ClearChatMessagesResultEvent,
+    DeleteClientChatsResultEvent
 )
 
 
@@ -132,7 +134,8 @@ if "ui_state" not in st.session_state:
             "current_store": None,
             "credentials": {},
             "validated_stores": set(),
-            "store_status": {}
+            "blocked_stores": [],
+            "login_results": {}
         },
 
         "send_credentials_now": False,
@@ -201,51 +204,65 @@ with st.sidebar:
         st.rerun()
 
     if st.button("🧹 Clear Chat", use_container_width=True):
-        current = st.session_state.ui_state["current_chat"]
-        chat = st.session_state.ui_state["chats"][current]
-
-        chat["messages"].clear()
-        st.session_state.messages = chat["messages"]
-
         clear_messages_event: Event = ClearChatMessagesEvent(
             metadata = BaseMetadata(
                 chat_id = st.session_state.chat_id
             )
         )
 
-        _ = get_event_loop().run_until_complete(
-            st.session_state.rest_client.send_and_wait(
-                clear_messages_event
+        clear_messages_result_event: Event = (
+            get_event_loop().run_until_complete(
+                st.session_state.rest_client.send_and_wait(
+                    clear_messages_event
+                )
             )
         )
 
-        st.rerun()
+        if isinstance(clear_messages_result_event, ClearChatMessagesResultEvent):
+            if clear_messages_result_event.success:
+                current = st.session_state.ui_state["current_chat"]
+                chat = st.session_state.ui_state["chats"][current]
+
+                chat["messages"].clear()
+                st.session_state.messages = chat["messages"]
+
+                st.rerun()
+
+            else:
+                pass        # decidere cosa fare
 
     if st.button("🗑️ Delete All Chats", use_container_width=True):
-        new_chat_id = uuid.uuid4().hex
+        delete_chats_event: Event = DeleteClientChatsEvent()
 
-        st.session_state.ui_state["chats"] = {
-            "Chat - 1": {
-                "chat_id": new_chat_id,
-                "messages": []
-            }
-        }
-
-        st.session_state.ui_state["current_chat"] = "Chat - 1"
-        st.session_state.chat_id = new_chat_id
-        st.session_state.messages = (
-            st.session_state.ui_state["chats"]["Chat - 1"]["messages"]
-        )
-
-        delete_chats_event: Event = ClearClientChatsEvent()
-
-        _ = get_event_loop().run_until_complete(
-            st.session_state.rest_client.send_and_wait(
-                delete_chats_event
+        delete_chat_result_event: Event = (
+            get_event_loop().run_until_complete(
+                st.session_state.rest_client.send_and_wait(
+                    delete_chats_event
+                )
             )
         )
 
-        st.rerun()
+        if isinstance(delete_chat_result_event, DeleteClientChatsResultEvent):
+            if delete_chat_result_event.success:
+                new_chat_id = uuid.uuid4().hex
+
+                st.session_state.ui_state["chats"] = {
+                    "Chat - 1": {
+                        "chat_id": new_chat_id,
+                        "messages": []
+                    }
+                }
+
+                st.session_state.ui_state["current_chat"] = "Chat - 1"
+                st.session_state.chat_id = new_chat_id
+                st.session_state.messages = (
+                    st.session_state.ui_state["chats"]["Chat - 1"]["messages"]
+                )
+
+                st.rerun()
+
+            else:
+                pass        # decidere anche qui cosa fare
 
     st.divider()
 
