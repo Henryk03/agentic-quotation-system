@@ -19,10 +19,15 @@ from backend.database.repositories import (
 
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
-from shared.events.clear import ClearChatMessagesEvent, ClearClientChatsEvent
+from shared.events.clear import (
+    ClearChatMessagesEvent, 
+    DeleteClientChatsEvent, 
+    ClearChatMessagesResultEvent,
+    DeleteClientChatsResultEvent
+)
 from shared.events.credentials import StoreCredentialsEvent
 from shared.events.login import CredentialsLoginResultEvent, StoreLoginResult
-from shared.events.metadata import StoreMetadata
+from shared.events.metadata import StoreMetadata, BaseMetadata
 
 
 class EventHandler:
@@ -62,7 +67,7 @@ class EventHandler:
             db: AsyncSession,
             event: Event,
             client_id: str
-        ) -> dict:
+        ) -> dict[str, Any]:
         """"""
 
         _ = await EventHandler.__ensure_client(db, client_id)
@@ -82,11 +87,18 @@ class EventHandler:
                     client_id
                 )
             
-            # case ClearChatMessagesEvent():
-            #     pass
+            case ClearChatMessagesEvent():
+                return await EventHandler.__handle_clear_messages(
+                    db,
+                    event,
+                    client_id
+                )
             
-            # case ClearClientChatsEvent():
-            #     pass
+            case DeleteClientChatsEvent():
+                return await EventHandler.__handle_delete_chats(
+                    db,
+                    client_id
+                )
 
             case _:
                 raise Exception("Event not supported.")
@@ -221,7 +233,7 @@ class EventHandler:
             db: AsyncSession,
             event: ChatMessageEvent,
             client_id: str
-        ) -> dict:
+        ) -> dict[str, Any]:
         """"""
 
         ai_response: str | None = None
@@ -235,7 +247,7 @@ class EventHandler:
         
         chat_id: str = getattr(metadata, "chat_id")
         selected_stores: list[str] = getattr(metadata, "selected_stores")
-        custom_stores: list[str] = getattr(metadata, "custom_store_urls")
+        custom_stores: list[str] = getattr(metadata, "selected_external_store_urls")
         items_per_store: int = getattr(metadata, "items_per_store")
 
         all_selected_stores: list[str] = selected_stores + custom_stores
@@ -268,50 +280,61 @@ class EventHandler:
         return result_event.model_dump()
 
 
-    # @staticmethod
-    # async def __handle_clear_messages(
-    #         db: AsyncSession,
-    #         event: Event,
-    #         client_id: str
-    #     ) -> dict:
-    #     """"""
+    @staticmethod
+    async def __handle_clear_messages(
+            db: AsyncSession,
+            event: ClearChatMessagesEvent,
+            client_id: str
+        ) -> dict[str, Any]:
+        """"""
 
-    #     chat_id: str = event.chat_id
+        metadata: BaseMetadata = event.metadata
+        chat_id: str = getattr(metadata, "chat_id")
 
-    #     try:
-    #         await MessageRepository.delete_messages_for_chat(
-    #             db,
-    #             client_id,
-    #             chat_id,
-    #         )
+        success: bool = False
 
-    #     except Exception as e:
-    #         await EventEmitter.emit_event(
-    #             websocket,
-    #             ErrorEvent(
-    #                 message=str(e)
-    #             )
-    #         )
+        try:
+            await MessageRepository.delete_messages_for_chat(
+                db,
+                client_id,
+                chat_id,
+            )
+
+            success = True
+
+        except:
+            pass
+
+        result_event: Event = ClearChatMessagesResultEvent(
+            metadata = metadata,
+            success = success
+        )
+
+        return result_event.model_dump()
 
 
-    # @staticmethod
-    # async def __handle_delete_chats(
-    #         db: AsyncSession,
-    #         client_id: str
-    #     ) -> None:
-    #     """"""
+    @staticmethod
+    async def __handle_delete_chats(
+            db: AsyncSession,
+            client_id: str
+        ) -> dict[str, Any]:
+        """"""
 
-    #     try:
-    #         await ChatMessageEvent.delete_all_chats_for_client(
-    #             db,
-    #             client_id
-    #         )
+        success: bool = False
 
-    #     except Exception as e:
-    #         print(str(e))
-    #         await EventEmitter.emit_event(
-    #             websocket,
-    #             ErrorEvent(
-    #                 message=str(e)
-    #             )
-    #         )
+        try:
+            await ChatRepository.delete_all_chats_for_client(
+                db,
+                client_id
+            )
+
+            success = True
+
+        except:
+            pass
+
+        result_event: Event = DeleteClientChatsResultEvent(
+            success = success
+        )
+
+        return result_event.model_dump()

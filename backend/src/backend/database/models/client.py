@@ -34,16 +34,19 @@ class Client(Base):
         back_populates = "client", 
         cascade = "all, delete-orphan"
     )
+
     credentials = relationship(
         "Credential", 
         back_populates = "client", 
         cascade = "all, delete-orphan"
     )
-    browser_contexts = relationship(
-        "BrowserContext",
+
+    login_contexts = relationship(
+        "LoginContext",
         back_populates = "client",
         cascade = "all, delete-orphan",
     )
+    
     jobs = relationship(
         "Job", 
         back_populates = "client", 

@@ -29,9 +29,15 @@ class Message(Base):
         nullable = False
     )
 
-    role: Mapped[str] = mapped_column(String)
+    role: Mapped[str] = mapped_column(
+        String,
+        nullable = False
+    )
 
-    content: Mapped[str] = mapped_column(Text)
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable = False
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone = True),

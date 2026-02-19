@@ -13,7 +13,7 @@ from frontend.config import settings
 from frontend.frontend_utils.rest.client import RESTClient
 
 from shared.events import Event
-from shared.events.metadata import StoreMetadata
+from shared.events.metadata import StoreMetadata, BaseMetadata
 from shared.events.chat import ChatMessageEvent
 from shared.events.error import ErrorEvent
 from shared.events.credentials import StoreCredentialsEvent
@@ -50,21 +50,6 @@ def close_dialog(
 
     st.session_state.ui_state[flag_key] = False
 
-
-def save_message(
-        role: str,
-        content: str
-    ) -> None:
-    """"""
-
-    if st.session_state.messages:
-        st.session_state.messages.append(
-            {
-                "role": role,
-                "content": content
-            }
-        )
-
 # ==========================
 #     Message animation
 # ==========================
@@ -100,9 +85,11 @@ def process_result(
         
     match result:
         case ChatMessageEvent():
-            save_message(
-                role = result.role,
-                content = result.content
+            st.session_state.messages.append(
+                {
+                    "role": result.role,
+                    "content": result.content
+                }
             )
 
             stream_data(
@@ -119,9 +106,9 @@ if "ephemeral_container" not in st.session_state:
     st.session_state.ephemeral_container = None
 
 if "rest_client" not in st.session_state:
-    st.session_state.ws_client = RESTClient(
-        base_url = f"http://{settings.HOST}:{settings.PORT}",
-        session_id = uuid.uuid4().hex
+    st.session_state.rest_client = RESTClient(
+        base_url = f"http://127.0.0.1:{settings.PORT}",
+        client_id = uuid.uuid4().hex
     )
 
     logging.basicConfig(
@@ -220,15 +207,17 @@ with st.sidebar:
         chat["messages"].clear()
         st.session_state.messages = chat["messages"]
 
-        # clear_messages_event: Event = ClearChatMessagesEvent(
-        #     chat_id = st.session_state.chat_id
-        # )
+        clear_messages_event: Event = ClearChatMessagesEvent(
+            metadata = BaseMetadata(
+                chat_id = st.session_state.chat_id
+            )
+        )
 
-        # get_event_loop().run_until_complete(
-        #     st.session_state.rest_client.send_and_wait(
-        #         clear_messages_event
-        #     )
-        # )
+        _ = get_event_loop().run_until_complete(
+            st.session_state.rest_client.send_and_wait(
+                clear_messages_event
+            )
+        )
 
         st.rerun()
 
@@ -250,7 +239,7 @@ with st.sidebar:
 
         delete_chats_event: Event = ClearClientChatsEvent()
 
-        get_event_loop().run_until_complete(
+        _ = get_event_loop().run_until_complete(
             st.session_state.rest_client.send_and_wait(
                 delete_chats_event
             )
@@ -485,22 +474,26 @@ for msg in st.session_state.messages:
 prompt: str | None = st.chat_input("Type a message...")
 
 if prompt:
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": prompt.strip()
+        }
+    )
+    
     with st.chat_message("user"):
         st.markdown(prompt)
-
-    save_message(
-        role = "user",
-        content = prompt.strip()
-    )
 
     assistant_msg: DeltaGenerator = st.chat_message("assistant")
     placeholder: DeltaGenerator = assistant_msg.empty()
 
     st.session_state.ephemeral_container = placeholder
 
+    timeout: float = 120.0
+
     metadata: StoreMetadata = StoreMetadata(
         selected_stores = st.session_state.ui_state["selected_stores"],
-        selected_external_store_urls = st.session_state.ui_state["custom_urls"],
+        selected_external_store_urls = st.session_state.ui_state["custom_store_urls"],
         chat_id = st.session_state.chat_id,
         items_per_store = st.session_state.ui_state["results_per_item"]
     )
@@ -517,7 +510,12 @@ if prompt:
         try:
             result: Event = get_event_loop().run_until_complete(
                 st.session_state.rest_client.send_and_wait(
-                    event
+                    event,
+                    timeout = (
+                        300.0 
+                        if st.session_state.ui_state["custom_store_urls"]
+                        else 120.0
+                    )
                 )
             )
 
@@ -529,7 +527,9 @@ if prompt:
 
             placeholder.error(err)
 
-            save_message(
-                role = "assistant",
-                content = f"⚠️  {err}"
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"⚠️  {err}"
+                }
             )

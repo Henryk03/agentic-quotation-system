@@ -1,6 +1,6 @@
 
 from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKeyConstraint, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -18,18 +18,12 @@ class LoginAttempt(Base):
     )
 
     client_id: Mapped[str] = mapped_column(
-        ForeignKey(
-            "login_contexts.client_id", 
-            ondelete = "CASCADE"
-        ),
+        String,
         nullable = False
     )
 
     store: Mapped[str] = mapped_column(
-        ForeignKey(
-            "login_contexts.store", 
-            ondelete = "CASCADE"
-        ),
+        String,
         nullable = False
     )
 
@@ -48,6 +42,14 @@ class LoginAttempt(Base):
         DateTime(timezone = True),
         default = lambda: datetime.now(timezone.utc),
         nullable = False
+    )
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["client_id", "store"],
+            ["login_contexts.client_id", "login_contexts.store"],
+            ondelete = "CASCADE"
+        ),
     )
 
     context = relationship(

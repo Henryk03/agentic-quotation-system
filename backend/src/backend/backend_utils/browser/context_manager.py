@@ -106,7 +106,7 @@ class AsyncBrowserContextMaganer:
                 ctx: StorageState | None
 
                 if client_id:
-                    ctx = await LoginContextRepository.get_context(
+                    ctx = await LoginContextRepository.get_storage_state(
                         db,
                         client_id,
                         provider.name

@@ -18,7 +18,7 @@ class ChatRepository:
         ) -> Chat:
         """"""
 
-        chat = await db.get(Chat, (chat_id, client_id))
+        chat = await db.get(Chat, chat_id)
 
         if not chat:
             chat = Chat(

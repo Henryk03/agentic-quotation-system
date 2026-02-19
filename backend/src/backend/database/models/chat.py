@@ -1,6 +1,6 @@
 
 from datetime import datetime, timezone
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database.base import Base
@@ -24,7 +24,10 @@ class Chat(Base):
         nullable = False
     )
 
-    needs_rerun: Mapped[bool] = mapped_column(default = False)
+    needs_rerun: Mapped[bool] = mapped_column(
+        Boolean, 
+        default = False
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone = True),
@@ -36,6 +39,7 @@ class Chat(Base):
         "Client", 
         back_populates = "chats"
     )
+
     messages = relationship(
         "Message", 
         back_populates = "chat", 

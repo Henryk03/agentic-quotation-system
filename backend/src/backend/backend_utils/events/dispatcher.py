@@ -73,7 +73,7 @@ async def __format_message(
 async def dispatch_chat(
         agent: Runnable,
         user_input: str,
-        session_id: str,
+        client_id: str,
         chat_id: str,
         selected_stores: list[str],
         items_per_store: int
@@ -84,7 +84,7 @@ async def dispatch_chat(
         previous_messages: list[Message] = (
             await MessageRepository.get_all_messages(
                 db,
-                session_id,
+                client_id,
                 chat_id
             )
         )
@@ -92,7 +92,7 @@ async def dispatch_chat(
         needs_rerun: bool = (
             await ChatRepository.consume_rerun_flag(
                 db,
-                session_id,
+                client_id,
                 chat_id
             )
         )
@@ -114,7 +114,7 @@ async def dispatch_chat(
                 "messages": lc_messages + [HumanMessage(user_message)]
             },
             config={
-                "configurable": {"client_id": session_id}
+                "configurable": {"client_id": client_id}
             }
         )
 

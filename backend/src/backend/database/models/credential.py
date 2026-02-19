@@ -23,9 +23,15 @@ class Credential(Base):
         primary_key = True
     )
 
-    username: Mapped[str] = mapped_column(String)
+    username: Mapped[str] = mapped_column(
+        String,
+        nullable = False
+    )
 
-    password: Mapped[str] = mapped_column(String)
+    password: Mapped[str] = mapped_column(
+        String,
+        nullable = False
+    )
 
     is_valid: Mapped[bool] = mapped_column(
         Boolean, 

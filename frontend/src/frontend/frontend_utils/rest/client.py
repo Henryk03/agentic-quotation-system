@@ -11,22 +11,22 @@ from shared.events import Event
 from shared.events.transport import EventEnvelope
 
 
-__event_adapter: TypeAdapter = TypeAdapter(Event)
-
-
 class RESTClient:
-    """"""    
+    """"""
+
+
+    __event_adapter: TypeAdapter = TypeAdapter(Event) 
 
 
     def __init__(
             self,
             base_url: str,
-            session_id: str
+            client_id: str
         ) -> None:
         """"""
 
         self.base_url = base_url.rstrip("/")
-        self.session_id = session_id
+        self.client_id = client_id
 
 
     def send_event(
@@ -36,12 +36,12 @@ class RESTClient:
         """"""
 
         envelope: EventEnvelope = EventEnvelope(
-            session_id = self.session_id,
+            client_id = self.client_id,
             event = event
         )
 
         response: Response = requests.post(
-            url = self.base_url,
+            url = f"{self.base_url}/event",
             json = envelope.model_dump()
         )
 
@@ -89,7 +89,7 @@ class RESTClient:
                 if status == "COMPLETED":
                     result_data: dict[str, Any] = job_data.get("result", {})
 
-                    return __event_adapter.validate_python(result_data)
+                    return RESTClient.__event_adapter.validate_python(result_data)
                 
                 if status == "FAILED":
                     raise Exception(
