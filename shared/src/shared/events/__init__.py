@@ -11,9 +11,12 @@ from shared.events.clear import (
 from shared.events.credentials import CredentialEntry, StoreCredentialsEvent
 from shared.events.error import ErrorEvent
 from shared.events.job_status import JobStatusEvent
+from shared.events.login import StoreLoginResult, CredentialsLoginResultEvent
 
 
 Event = Union[
+    StoreLoginResult, 
+    CredentialsLoginResultEvent,
     ChatMessageEvent,
     ClearChatMessagesEvent,
     DeleteClientChatsEvent,
