@@ -1,6 +1,6 @@
 
 from typing import Literal
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel
 
 # from playwright.async_api import StorageState
 
@@ -33,8 +33,8 @@ from pydantic import BaseModel, SecretStr
 class CredentialEntry(BaseModel):
     """"""
 
-    username: SecretStr
-    password: SecretStr
+    username: str
+    password: str
 
 
 class StoreCredentialsEvent(BaseModel):
