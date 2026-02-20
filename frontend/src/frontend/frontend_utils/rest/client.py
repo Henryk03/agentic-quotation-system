@@ -42,7 +42,7 @@ class RESTClient:
 
         response: Response = requests.post(
             url = f"{self.base_url}/event",
-            json = envelope.model_dump()
+            json = envelope.model_dump(serialize_as_any=True, mode="json")
         )
 
         response.raise_for_status()

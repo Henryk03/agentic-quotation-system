@@ -20,10 +20,10 @@ from backend.database.repositories import (
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
 from shared.events.clear import (
+    ClearChatMessagesResultEvent, 
     ClearChatMessagesEvent, 
-    DeleteClientChatsEvent, 
-    ClearChatMessagesResultEvent,
-    DeleteClientChatsResultEvent
+    DeleteClientChatsResultEvent,
+    DeleteClientChatsEvent
 )
 from shared.events.credentials import StoreCredentialsEvent
 from shared.events.login import CredentialsLoginResultEvent, StoreLoginResult
@@ -155,8 +155,8 @@ class EventHandler:
                 success, storage_state, error_message = (
                     await validate_credentials(
                         store = store,
-                        username = entry.username.get_secret_value(),
-                        password = entry.password.get_secret_value()
+                        username = entry.username,
+                        password = entry.password
                     )
                 )
 
@@ -189,8 +189,8 @@ class EventHandler:
                     db,
                     client_id,
                     store,
-                    entry.username.get_secret_value(),
-                    entry.password.get_secret_value()
+                    entry.username,
+                    entry.password
                 )
 
                 if storage_state:
@@ -269,6 +269,14 @@ class EventHandler:
             chat_id,
             all_selected_stores,
             items_per_store
+        )
+
+        await MessageRepository.save_message(
+            db,
+            client_id,
+            chat_id,
+            role = "assistant",
+            content = ai_response
         )
 
         result_event: Event = ChatMessageEvent(

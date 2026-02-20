@@ -5,6 +5,7 @@ import asyncio
 import logging
 from functools import partial
 from asyncio import AbstractEventLoop
+from typing import Any
 
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
@@ -15,8 +16,8 @@ from frontend.frontend_utils.rest.client import RESTClient
 from shared.events import Event
 from shared.events.metadata import StoreMetadata, BaseMetadata
 from shared.events.chat import ChatMessageEvent
-from shared.events.error import ErrorEvent
 from shared.events.credentials import StoreCredentialsEvent
+from shared.events.login import StoreLoginResult, CredentialsLoginResultEvent
 from shared.provider.registry import (
     all_provider_names,
     support_autologin
@@ -51,6 +52,31 @@ def close_dialog(
     """"""
 
     st.session_state.ui_state[flag_key] = False
+
+
+def __move_to_next_store(
+        store: str,
+        state: dict[str, Any]
+    ) -> None:
+    """"""
+
+    state["pending_stores"].remove(store)
+    state["current_store"] = (
+        state["pending_stores"][0]
+        if state["pending_stores"] else None
+    )
+
+    if not state["current_store"]:
+        st.session_state.ui_state["autologin_dialog_open"] = False
+
+
+def __validate_store(
+        store: str,
+        state: dict[str, Any]
+    ) -> None:
+    """"""
+
+    state["validated_stores"].add(store)
 
 # ==========================
 #     Message animation
@@ -113,11 +139,6 @@ if "rest_client" not in st.session_state:
         client_id = uuid.uuid4().hex
     )
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format=""
-    )
-
 if "ui_state" not in st.session_state:
     chat_id: str = uuid.uuid4().hex
 
@@ -135,10 +156,9 @@ if "ui_state" not in st.session_state:
             "credentials": {},
             "validated_stores": set(),
             "blocked_stores": [],
-            "login_results": {}
+            "phase": "input",
+            "login_result": None
         },
-
-        "send_credentials_now": False,
 
         "chats": {
             "Chat - 1": {
@@ -267,7 +287,14 @@ with st.sidebar:
     st.divider()
 
     for chat_name, chat in st.session_state.ui_state["chats"].items():
-        if st.button(f"💬 {chat_name}", use_container_width=True):
+        is_active: bool = chat_name == st.session_state.ui_state["current_chat"]
+
+        label: str = f"💬 {chat_name}"
+
+        if is_active:
+            label = f"👉 {chat_name}"
+
+        if st.button(label, use_container_width = True):
             st.session_state.ui_state["current_chat"] = chat_name
             st.session_state.chat_id = chat["chat_id"]
             st.session_state.messages = chat["messages"]
@@ -292,57 +319,127 @@ def insert_autologin_credentials() -> None:
     state = st.session_state.ui_state["autologin"]
     store = state["current_store"]
 
-    st.markdown(f"### Login credentials for **{store}**")
+    st.markdown(f"### 🔑 Login credentials for **{store}**")
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    if state["phase"] == "input":
+        username = st.text_input("Email or Username")
+        password = st.text_input("Password", type = "password")
 
-    col1, col2 = st.columns(2)
-    show_err_message = False
+        col1, col2 = st.columns(2)
+        show_error_message: bool = False
 
-    with col1:
-        if st.button("💾 Save"):
-            if username.strip() == "" or password.strip() == "":
-                show_err_message = True
-            
-            else:
-                state["credentials"][store] = {
-                    "username": username,
-                    "password": password
-                }
+        with col1:
+            if st.button("💾 Save & Login"):
+                if username.strip() == "" or password.strip() == "":
+                    show_error_message = True
 
-                state["are_valid_credentials"] = True
+                else:
+                    state["credentials"][store] = {
+                        "username": username,
+                        "password": password
+                    }
 
-                state["pending_stores"].remove(store)
-                state["current_store"] = (
-                    state["pending_stores"][0]
-                    if state["pending_stores"] else None
-                )
+                    state["phase"] = "processing"
+                    st.rerun()
 
-                if not state["current_store"]:
-                    st.session_state.ui_state["autologin_dialog_open"] = False
-                    st.session_state.ui_state["send_credentials_now"] = True
-
+        with col2:
+            if st.button("↪️ Skip"):
+                __move_to_next_store(store, state)
                 st.rerun()
 
-    with col2:
-        if st.button("↪️ Skip"):
-            state["pending_stores"].remove(store)
-            state["current_store"] = (
-                state["pending_stores"][0]
-                if state["pending_stores"] else None
+        if show_error_message:
+            st.error(
+                "⛔️ Please set both **Username** and "
+                "**Password** or press **Skip**."
             )
 
-            if not state["current_store"]:
-                st.session_state.ui_state["autologin_dialog_open"] = False
+    elif state["phase"] == "processing":
+        st.info("Signing in... please wait.")
+
+        result_event: Event = get_event_loop().run_until_complete(
+            st.session_state.rest_client.send_and_wait(
+                StoreCredentialsEvent(
+                    credentials = {
+                        store: state["credentials"][store]
+                    }
+                )
+            )
+        )
+
+        if isinstance(result_event, CredentialsLoginResultEvent):
+            store_result_event = result_event.results[0]
+
+            state["login_result"] = store_result_event
+            state["phase"] = "result"
+
+        st.rerun()
+
+    elif state["phase"] == "result":
+        login_result: StoreLoginResult = state["login_result"]
+
+        _ = state["credentials"].pop(store, None)
+
+        if login_result.success:
+            st.success(
+                "✅ Successfully signed in! Moving to the next store..."
+            )
+
+            __validate_store(store, state)
+            __move_to_next_store(store, state)
+
+            state["phase"] = "input"
 
             st.rerun()
 
-    if show_err_message:
-        st.error(
-            "⛔️ Please set both **Username** and "
-            "**Password** to save or press **Skip**."
-        )
+        else:
+            st.error(f"❌ We couldn't sign you in to **{store}**.")
+
+            info_messages: list[str] = []
+
+            if login_result.attempts_left is not None:
+                if login_result.attempts_left > 0:
+                    info_messages.append(
+                        f"* You have **{login_result.attempts_left} "
+                        "attempt(s)** remaining."
+                    )
+
+                else:
+                    info_messages.append(
+                        "* You've used all available login attempts "
+                        "for this store."
+                    )
+
+            if login_result.minutes_left:
+                info_messages.append(
+                    f"* This store is temporarily locked. Please try "
+                    f"again in **{login_result.minutes_left} minute(s)**."
+                )
+
+            if info_messages:
+                st.markdown("#### ℹ️ What's happening?")
+
+                for msg in info_messages:
+                    st.markdown(msg)
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                if login_result.attempts_left and login_result.attempts_left > 0:
+                    if st.button("🔄 Try again"):
+                        state["phase"] = "input"
+                        state["last_result"] = None
+                        st.rerun()
+
+            with col2:
+                if st.button("↪️ Skip"):
+                    __move_to_next_store(store, state)
+                    state["phase"] = "input"
+                    st.rerun()
+
+            with col3:
+                if st.button("❌ Close"):
+                    st.session_state.ui_state["autologin_dialog_open"] = False
+                    st.rerun()
 
 
 @st.dialog(
@@ -454,25 +551,6 @@ if st.session_state.ui_state["store_dialog_open"]:
 
 if st.session_state.ui_state["autologin_dialog_open"]:
     insert_autologin_credentials()
-
-# if st.session_state.ui_state["send_credentials_now"]:
-#     credentials_event: Event = AutoLoginCredentialsEvent(
-#         credentials = st.session_state.ui_state["autologin"]["credentials"]
-#     )
-
-#     for _ in range(2):
-#         received_event = get_event_loop().run_until_complete(
-#             st.session_state.rest_client.send_and_wait(
-#                 credentials_event
-#             )
-#         )
-
-#         if received_event:
-#             break
-
-#     st.session_state.ui_state["send_credentials_now"] = False
-
-#     st.rerun()
 
 
 # ==========================

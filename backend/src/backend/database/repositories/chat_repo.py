@@ -1,5 +1,5 @@
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models.chat import Chat
@@ -51,37 +51,6 @@ class ChatRepository:
 
         await touch_client(db, client_id)
         await db.commit()
-
-
-    @staticmethod
-    async def consume_rerun_flag(
-            db: AsyncSession,
-            client_id: str,
-            chat_id: str
-        ) -> bool:
-        """"""
-
-        stmt = (
-            select(Chat.needs_rerun)
-            .where(Chat.client_id == client_id)
-            .where(Chat.chat_id == chat_id)
-        )
-
-        result = await db.execute(stmt)
-        needs = result.scalar_one()
-
-        if needs:
-            await db.execute(
-                update(Chat)
-                .where(Chat.client_id == client_id)
-                .where(Chat.chat_id == chat_id)
-                .values(needs_rerun = False)
-            )
-
-            await touch_client(db, client_id)
-            await db.commit()
-
-        return needs
 
 
     @staticmethod

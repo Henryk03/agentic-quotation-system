@@ -35,25 +35,17 @@ def __normalize_content(
 async def __format_message(
         message: str,
         selected_stores: list[str],
-        items_per_store: int,
-        is_rerun: bool
+        items_per_store: int
     ) -> str:
     """"""
 
     store_list: str
-    rerun_msg: str = ""
 
     if len(selected_stores) >= 1:
         store_list = "* " + "\n*".join(selected_stores)
     
     else:
         store_list = "* No store selected"
-
-    if is_rerun:
-        rerun_msg = (
-            "I want you to perform the search for the product(s) again, even "
-            "though you have already searched it/them."
-        )
 
     final_message: str = (
         f"This is my message to you: {message}"
@@ -63,8 +55,6 @@ async def __format_message(
         f"{store_list}"
         "\n"
         f"For each product, search {items_per_store} items."
-        "\n"
-        f"{rerun_msg}"
     )
 
     return final_message
@@ -89,19 +79,10 @@ async def dispatch_chat(
             )
         )
 
-        needs_rerun: bool = (
-            await ChatRepository.consume_rerun_flag(
-                db,
-                client_id,
-                chat_id
-            )
-        )
-
     user_message: str = await __format_message(
         user_input,
         selected_stores,
-        items_per_store,
-        needs_rerun
+        items_per_store
     )
 
     lc_messages: list[BaseMessage] = to_langchain_messages(
