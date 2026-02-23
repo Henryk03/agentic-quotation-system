@@ -34,6 +34,8 @@ async def cleanup_inactive_clients_task(
                 if deleted:
                     logger.info(f"deleted {deleted} inactive client(s)")
 
+                await db.commit()
+
             await asyncio.sleep(every_seconds)
 
     except asyncio.CancelledError:

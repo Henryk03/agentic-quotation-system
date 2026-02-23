@@ -28,7 +28,6 @@ class ClientRepository:
             db.add(client)
 
             await touch_client(db, client_id)
-            await db.commit()
 
         return client
 
@@ -52,6 +51,5 @@ class ClientRepository:
         result: Result[Any] = await db.execute(stmt)
         deleted: Any | None = getattr(result, "rowcount", None)
 
-        await db.commit()
 
         return deleted

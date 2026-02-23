@@ -18,7 +18,6 @@ async def touch_client(
             Client.client_id == client_id
         )
         .values(
-            last_active=datetime.now(timezone.utc)
+            last_active = datetime.now(timezone.utc)
         )
     )
-    await db.commit()

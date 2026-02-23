@@ -55,7 +55,6 @@ class MessageRepository:
         db.add(msg)
 
         await touch_client(db, client_id)
-        await db.commit()
 
 
     @staticmethod
@@ -98,4 +97,3 @@ class MessageRepository:
         )
 
         await touch_client(db, client_id)
-        await db.commit()

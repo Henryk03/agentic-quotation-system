@@ -54,3 +54,33 @@ async def validate_credentials(
             error_message = "Invalid credentials."
 
             return (success, None, error_message)
+        
+
+async def validate_state(
+        store: str,
+        state: StorageState
+    ) -> bool:
+    """"""
+
+    manager: AsyncBrowserContextMaganer
+
+    success: bool = False
+    page: Page | None = None
+
+    store_instance: BaseProvider = get_provider(
+        provider_name = store
+    )
+
+    async with async_playwright() as apw:
+        manager = AsyncBrowserContextMaganer(apw)
+
+        _, _, page = await manager.create_browser_context(
+            state,
+            start_url = store_instance.url
+        )
+
+        success = await store_instance.is_logged_in(
+            page
+        )
+
+    return success

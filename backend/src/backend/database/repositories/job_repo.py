@@ -33,7 +33,6 @@ class JobRepository:
         db.add(job)
 
         await touch_job(db, job_id)
-        await db.commit()
 
         return job_id
 
@@ -51,7 +50,6 @@ class JobRepository:
             job.status = JobStatus.RUNNING
 
             await touch_job(db, job.id)
-            await db.commit()
 
 
     @staticmethod
@@ -69,7 +67,6 @@ class JobRepository:
             job.result = result
 
             await touch_job(db, job.id)
-            await db.commit()
 
 
     @staticmethod
@@ -87,7 +84,6 @@ class JobRepository:
             job.error = error
 
             await touch_job(db, job.id)
-            await db.commit()
 
 
     @staticmethod

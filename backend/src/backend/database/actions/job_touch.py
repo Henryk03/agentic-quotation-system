@@ -21,4 +21,3 @@ async def touch_job(
             updated_at = datetime.now(timezone.utc)
         )
     )
-    await db.commit()

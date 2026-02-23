@@ -90,24 +90,32 @@ async def create_event_job(
         event
     )
 
-    async with AsyncSessionLocal() as db:
-        _ = await ClientRepository.get_or_create_client(
-            db,
-            client_id
-        )
+    job_id: str = ""
 
-        if chat_id:
-            _ = await ChatRepository.get_or_create_chat(
+    async with AsyncSessionLocal() as db:
+        try:
+            _ = await ClientRepository.get_or_create_client(
                 db,
-                chat_id,
                 client_id
             )
 
-        job_id: str = await JobRepository.create_job(
-            db,
-            client_id,
-            chat_id
-        )
+            if chat_id:
+                _ = await ChatRepository.get_or_create_chat(
+                    db,
+                    chat_id,
+                    client_id
+                )
+
+            job_id: str = await JobRepository.create_job(
+                db,
+                client_id,
+                chat_id
+            )
+
+            await db.commit()
+
+        except:
+            await db.rollback()
 
     asyncio.create_task(
         run_event_job(
@@ -152,11 +160,14 @@ async def run_event_job(
             )
 
         except Exception as e:
+            await db.rollback()
             await JobRepository.set_error(
                 db,
                 job_id, 
                 str(e)
             )
+
+        await db.commit()
 
 
 @app.get("/event/{event_id}")

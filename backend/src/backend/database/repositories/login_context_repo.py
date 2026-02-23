@@ -109,24 +109,15 @@ class LoginContextRepository:
     @staticmethod
     async def add_login_attempt(
             db: AsyncSession,
-            client_id: str,
-            store: str,
+            context: LoginContext,
             success: bool,
             reason: str | None = None
-        ) -> None:
+        ) -> LoginContext:
         """"""
 
-        context: LoginContext = (
-            await LoginContextRepository.get_or_create_context(
-                db,
-                client_id,
-                store
-            )
-        )
-
         attempt = LoginAttempt(
-            client_id = client_id,
-            store = store,
+            client_id = context.client_id,
+            store = context.store,
             success = success,
             reason = reason
         )
@@ -134,7 +125,7 @@ class LoginContextRepository:
         db.add(attempt)
 
         if success:
-            context.current_attemps = 0
+            context.current_attempts = 0
             context.locked_until = None
             context.last_error_message = None
             context.last_error_at = None
@@ -142,18 +133,19 @@ class LoginContextRepository:
         else:
             now: datetime = datetime.now(timezone.utc)
 
-            context.current_attemps += 1
+            context.current_attempts += 1
             context.last_error_message = reason
             context.last_error_at = now
 
-            if context.current_attemps >= context.max_attempts:
+            if context.current_attempts >= context.max_attempts:
                 context.locked_until = now + timedelta(
                     seconds = context.cooldown_seconds
                 )
-                context.current_attemps = 0
+                context.current_attempts = 0
 
-        await touch_client(db, client_id)
-        await db.commit()
+        await touch_client(db, context.client_id)
+
+        return context
 
 
     @staticmethod
@@ -214,8 +206,7 @@ class LoginContextRepository:
         
         if context.locked_until and context.locked_until <= now:
             context.locked_until = None
-            context.current_attemps = 0
+            context.current_attempts = 0
 
-            await db.commit()
 
         return True, None, None

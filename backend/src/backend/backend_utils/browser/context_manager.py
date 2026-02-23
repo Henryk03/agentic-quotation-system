@@ -142,6 +142,7 @@ class AsyncBrowserContextMaganer:
                         provider.name,
                         state
                     )
+                    await db.commit()
     
 
     @staticmethod

@@ -24,7 +24,7 @@ class LoginContext(Base):
         primary_key = True
     )
 
-    current_attemps: Mapped[int] = mapped_column(
+    current_attempts: Mapped[int] = mapped_column(
         Integer,
         default = 0,
         nullable = False

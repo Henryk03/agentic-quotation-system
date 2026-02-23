@@ -5,10 +5,7 @@ from langchain_core.messages import HumanMessage, BaseMessage
 from backend.agent.history.message_adapter import to_langchain_messages
 from backend.database.models.message import Message
 from backend.database.engine import AsyncSessionLocal
-from backend.database.repositories import (
-    MessageRepository, 
-    ChatRepository
-)
+from backend.database.repositories import MessageRepository
 
 
 def __normalize_content(

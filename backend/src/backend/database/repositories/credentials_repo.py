@@ -50,7 +50,6 @@ class CredentialsRepository:
             db.add(cred)
 
         await touch_client(db, client_id)
-        await db.commit()
 
 
     @staticmethod

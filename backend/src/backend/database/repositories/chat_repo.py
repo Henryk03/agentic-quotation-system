@@ -29,28 +29,8 @@ class ChatRepository:
             db.add(chat)
 
             await touch_client(db, client_id)
-            await db.commit()
 
         return chat
-
-
-    @staticmethod
-    async def mark_needs_rerun(
-            db: AsyncSession,
-            client_id: str,
-            chat_id: str
-        ) -> None:
-        """"""
-
-        await db.execute(
-            update(Chat)
-            .where(Chat.client_id == client_id)
-            .where(Chat.chat_id == chat_id)
-            .values(needs_rerun = True)
-        )
-
-        await touch_client(db, client_id)
-        await db.commit()
 
 
     @staticmethod
@@ -66,4 +46,3 @@ class ChatRepository:
         )
 
         await touch_client(db, client_id)
-        await db.commit()

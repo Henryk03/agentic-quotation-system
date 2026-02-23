@@ -5,10 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any
 
 from backend.agent.main_agent import graph as agent
-from backend.backend_utils.browser.login_service import validate_credentials
+from backend.backend_utils.browser.login_service import (
+    validate_state,
+    validate_credentials
+)
 from backend.backend_utils.events.dispatcher import dispatch_chat
 from backend.database.models.chat import Chat
 from backend.database.models.client import Client
+from backend.database.models.login_context import LoginContext
 from backend.database.repositories import (
     ChatRepository,
     ClientRepository,
@@ -26,7 +30,12 @@ from shared.events.clear import (
     DeleteClientChatsEvent
 )
 from shared.events.credentials import StoreCredentialsEvent
-from shared.events.login import CredentialsLoginResultEvent, StoreLoginResult
+from shared.events.login import (
+    CredentialsLoginResultEvent, 
+    StoreLoginResult,
+    CheckLoginStatusEvent,
+    LoginStatusResultEvent
+)
 from shared.events.metadata import StoreMetadata, BaseMetadata
 
 
@@ -41,10 +50,13 @@ class EventHandler:
         ) -> Client:
         """"""
 
-        return await ClientRepository.get_or_create_client(
+        client: Client = await ClientRepository.get_or_create_client(
             db,
             client_id
         )
+        await db.commit()
+
+        return client
     
 
     @staticmethod
@@ -55,11 +67,14 @@ class EventHandler:
         ) -> Chat:
         """"""
 
-        return await ChatRepository.get_or_create_chat(
+        chat: Chat = await ChatRepository.get_or_create_chat(
             db,
             chat_id,
             client_id
         )
+        await db.commit()
+
+        return chat
 
 
     @staticmethod
@@ -97,6 +112,13 @@ class EventHandler:
             case DeleteClientChatsEvent():
                 return await EventHandler.__handle_delete_chats(
                     db,
+                    client_id
+                )
+            
+            case CheckLoginStatusEvent():
+                return await EventHandler.__handle_check_status(
+                    db,
+                    event,
                     client_id
                 )
 
@@ -145,7 +167,7 @@ class EventHandler:
 
             if context.locked_until and context.locked_until <= now:
                 context.locked_until = None
-                context.current_attemps = 0
+                context.current_attempts = 0
 
             success: bool = False
             storage_state: StorageState | None = None
@@ -165,23 +187,25 @@ class EventHandler:
                 storage_state = None
                 error_message = str(e)
 
-            await LoginContextRepository.add_login_attempt(
+            context = await LoginContextRepository.add_login_attempt(
                 db,
-                client_id,
-                store,
+                context,
                 success,
                 reason = None if success else error_message
             )
 
-            if context.locked_until and context.locked_until > now:
-                attempts_left = 0
-                minutes_left = int(
-                    ((context.locked_until - now).total_seconds() + 59) // 60
-                )
+            if context.locked_until:
+                now: datetime = datetime.now(timezone.utc)
+                
+                if context.locked_until > now:
+                    attempts_left = 0
+                    minutes_left = int(
+                        ((context.locked_until - now).total_seconds() + 59) // 60
+                    )
 
             else:
                 attempts_left = (
-                    context.max_attempts - context.current_attemps
+                    context.max_attempts - context.current_attempts
                 )
 
             if success:
@@ -189,8 +213,8 @@ class EventHandler:
                     db,
                     client_id,
                     store,
-                    entry.username,
-                    entry.password
+                    username = entry.username,
+                    password = entry.password
                 )
 
                 if storage_state:
@@ -210,7 +234,6 @@ class EventHandler:
                 )
 
             else:
-
                 results.append(
                     StoreLoginResult(
                         store = store,
@@ -220,6 +243,8 @@ class EventHandler:
                         error_message = error_message
                     )
                 )
+
+        await db.commit()
 
         result_event = CredentialsLoginResultEvent(
             results=results
@@ -346,3 +371,94 @@ class EventHandler:
         )
 
         return result_event.model_dump()
+    
+
+    @staticmethod
+    async def __handle_check_status(
+            db: AsyncSession,
+            event: CheckLoginStatusEvent,
+            client_id: str
+        ) -> dict[str, Any]:
+        """"""
+
+        store: str = event.store
+
+        context: LoginContext = (
+            await LoginContextRepository.get_or_create_context(
+                db,
+                client_id,
+                store
+            )
+        )
+
+        now: datetime = datetime.now(timezone.utc)
+
+        attempts_left: int | None = None
+        minutes_left: int | None = None
+
+        if context.locked_until and context.locked_until > now:
+            minutes_left = int(
+                ((context.locked_until - now).total_seconds() + 59) // 60
+            )
+
+            attempts_left = 0
+
+        else:
+            if context.locked_until and context.locked_until <= now:
+                context.locked_until = None
+                context.current_attempts = 0
+
+            attempts_left = (
+                context.max_attempts - context.current_attempts
+            )
+
+        success: bool = False
+
+        if context.context_data:
+            state: StorageState | None = (
+                await LoginContextRepository.get_storage_state(
+                    db,
+                    client_id,
+                    store
+                )
+            )
+
+            try:
+                if state:
+                    success = await validate_state(
+                        store, 
+                        state
+                    )
+
+                    # if not success:
+                    #     username, password = (
+                    #         await CredentialsRepository.get_credentials(
+                    #             db,
+                    #             client_id,
+                    #             store
+                    #         )
+                    #     )
+
+                    #     if username and password:
+                    #         success, storage_state, _ = await validate_credentials(
+                    #             store, 
+                    #             username, 
+                    #             password
+                    #         )
+
+            except:
+                success = False
+
+        await db.commit()
+
+        result: Event = StoreLoginResult(
+            store = store,
+            success = success,
+            attempts_left = attempts_left,
+            minutes_left = minutes_left,
+            error_message = context.last_error_message
+        )
+
+        return LoginStatusResultEvent(
+            result = result
+        ).model_dump()

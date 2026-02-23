@@ -72,11 +72,13 @@ async def search_products(
     """
     
     client_id: str | None
+
     web_search_results_list: SafeAsyncList
     browser_context_manager: AsyncBrowserContextMaganer
 
     async with async_playwright() as apw:
         client_id = config.get("configurable", {}).get("client_id", None)
+        
         web_search_results_list = SafeAsyncList()
         browser_context_manager = AsyncBrowserContextMaganer(apw, client_id)
 

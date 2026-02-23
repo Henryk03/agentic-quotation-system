@@ -9,3 +9,12 @@ class JobStatus(str, Enum):
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+
+
+class LoginStatus(str, Enum):
+    """"""
+
+    VALID = "valid"
+    COOLDOWN = "cooldown"
+    NEEDS_CREDENTIALS = "needs_credentials"
+    AUTOLOGIN_REQUIRED = "autologin_required"
