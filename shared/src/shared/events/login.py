@@ -3,6 +3,12 @@ from pydantic import BaseModel
 from typing import Literal
 
 
+class CheckLoginStatusEvent(BaseModel):
+    """"""
+
+    store: str
+
+
 class StoreLoginResult(BaseModel):
     """"""
 
@@ -11,6 +17,12 @@ class StoreLoginResult(BaseModel):
     attempts_left: int | None = None
     minutes_left: int | None = None
     error_message: str | None = None
+
+
+class LoginStatusResultEvent(BaseModel):
+    """"""
+
+    result: StoreLoginResult
 
 
 class CredentialsLoginResultEvent(BaseModel):
