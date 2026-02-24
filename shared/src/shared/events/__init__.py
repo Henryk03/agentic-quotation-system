@@ -15,11 +15,13 @@ from shared.events.login import (
     StoreLoginResult, 
     CredentialsLoginResultEvent,
     CheckLoginStatusEvent,
-    LoginStatusResultEvent
+    LoginStatusResultEvent,
+    TriggerAutoLoginEvent
 )
 
 
 Event = Union[
+    TriggerAutoLoginEvent,
     CheckLoginStatusEvent,
     LoginStatusResultEvent,
     StoreLoginResult, 

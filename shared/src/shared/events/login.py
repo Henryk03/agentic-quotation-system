@@ -5,6 +5,12 @@ from typing import Literal
 from shared.shared_utils.common import LoginStatus
 
 
+class TriggerAutoLoginEvent(BaseModel):
+    """"""
+
+    store: str
+
+
 class CheckLoginStatusEvent(BaseModel):
     """"""
 
