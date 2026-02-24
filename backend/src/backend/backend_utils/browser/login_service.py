@@ -12,6 +12,50 @@ from shared.provider.base_provider import BaseProvider
 from shared.provider.registry import get_provider
 
 
+async def execute_autologin(
+        store: str,
+        username: str,
+        password: str
+    ) -> tuple[bool, StorageState | None]:
+    """"""
+
+    manager: AsyncBrowserContextMaganer
+    page: Page
+    context: BrowserContext
+
+    success: bool = False
+    storage_state: StorageState | None = None
+    store_instance: BaseProvider = get_provider(
+        store
+    )
+
+    async with async_playwright() as apw:
+        manager = AsyncBrowserContextMaganer(apw)
+
+        _, context, page = await manager.create_browser_context(
+            start_url = store_instance.url
+        )
+
+        success = await store_instance.auto_login(
+            page,
+            username,
+            password
+        )
+
+        if success:
+            storage_state = await context.storage_state()
+
+            return (
+                success, 
+                storage_state
+            )
+
+    return (
+        success,
+        storage_state
+    )
+
+
 async def validate_credentials(
         store: str,
         username: str, 

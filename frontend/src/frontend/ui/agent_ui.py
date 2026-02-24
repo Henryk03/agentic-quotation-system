@@ -21,7 +21,8 @@ from shared.events.login import (
     StoreLoginResult, 
     CredentialsLoginResultEvent,
     LoginStatusResultEvent,
-    CheckLoginStatusEvent
+    CheckLoginStatusEvent,
+    TriggerAutoLoginEvent
 )
 from shared.provider.registry import (
     all_provider_names,
@@ -33,6 +34,7 @@ from shared.events.clear import (
     ClearChatMessagesResultEvent,
     DeleteClientChatsResultEvent
 )
+from shared.shared_utils.common import LoginStatus
 
 
 # ==========================
@@ -75,22 +77,28 @@ def __move_to_next_store(
         st.session_state.ui_state["autologin_dialog_open"] = False
 
 
-def __validate_store(
-        store: str,
-        state: dict[str, Any]
-    ) -> None:
+def __next_phase_from_result(
+            result: StoreLoginResult
+        ) -> str:
     """"""
 
-    state["validated_stores"].add(store)
+    if result.status == LoginStatus.VALID:
+        return "success"
+    
+    if result.status == LoginStatus.COOLDOWN:
+        return "cooldown"
+    
+    if result.status == LoginStatus.NEEDS_CREDENTIALS:
+        return "input"
+    
+    if result.status == LoginStatus.AUTOLOGIN_REQUIRED:
+        return "autologin_attempt"
+    
+    if result.status == LoginStatus.FAILED: 
+        return "failed"
+    
+    return "result"
 
-
-def __invalidate_store(
-        store: str,
-        state: dict[str, Any]
-    ) -> None:
-    """"""
-
-    _ = state["validated_stores"].discard(store)
 
 # ==========================
 #     Message animation
@@ -149,7 +157,7 @@ if "ephemeral_container" not in st.session_state:
 
 if "rest_client" not in st.session_state:
     st.session_state.rest_client = RESTClient(
-        base_url = f"http://127.0.0.1:{settings.PORT}",
+        base_url = f"http://{settings.HOST}:{settings.PORT}",
         client_id = uuid.uuid4().hex
     )
 
@@ -169,8 +177,9 @@ if "ui_state" not in st.session_state:
             "current_store": None,
             "credentials": {},
             "validated_stores": set(),
-            "phase": "input",
-            "login_result": None
+            "phase": "checking",
+            "login_result": None,
+            "first_login_done": {}
         },
 
         "chats": {
@@ -332,48 +341,65 @@ def insert_autologin_credentials() -> None:
     state = st.session_state.ui_state["autologin"]
     store = state["current_store"]
 
-    st.markdown(f"### 🔑 Login credentials for **{store}**")
+    if state["phase"] == "success":
+
+        # da vedere se tenere
+        if not state["first_login_done"].get(store, False):
+            st.success(f"✅ Successfully logged in to **{store}** for the first time!")
+            state["first_login_done"][store] = True
+
+            time.sleep(1.5)
+
+        __move_to_next_store(store, state)
+        state["phase"] = "checking"
+        st.rerun()
 
     if state["phase"] == "checking":
-        st.info("Checking login status...")
-
-        result_event: Event = get_event_loop().run_until_complete(
+        st.info(f"🔍 Checking login status for **{store}**...")
+        
+        result_event = get_event_loop().run_until_complete(
             st.session_state.rest_client.send_and_wait(
                 CheckLoginStatusEvent(
                     store = store
                 )
             )
         )
-
+        
         if isinstance(result_event, LoginStatusResultEvent):
             result: StoreLoginResult = result_event.result
+
             state["login_result"] = result
-
-            if result.success:
-                state["phase"] = "validated"
-
-            elif result.minutes_left and result.minutes_left > 0:
-                state["phase"] = "cooldown"
-
-            else:
-                state["phase"] = "input"
-
+            state["phase"] = __next_phase_from_result(result)
+            
         st.rerun()
 
-    elif state["phase"] == "validated":
-        # __validate_store(store, state)
-        __move_to_next_store(store, state)
-
-        state["phase"] = "checking"
-
+    if state["phase"] == "autologin_attempt":
+        st.info(f"🔄 Attempting to auto-login to **{store}**...")
+        
+        result_event = get_event_loop().run_until_complete(
+            st.session_state.rest_client.send_and_wait(
+                TriggerAutoLoginEvent(
+                    store = store
+                )
+            )
+        )
+        
+        if isinstance(result_event, LoginStatusResultEvent):
+            result: StoreLoginResult = result_event.result
+            
+            state["login_result"] = result
+            state["phase"] = __next_phase_from_result(result)
+        
         st.rerun()
 
-    elif state["phase"] == "input":
-        username = st.text_input("Email or Username")
-        password = st.text_input("Password", type="password")
+    if state["phase"] == "input":
+        st.markdown(f"### 🔑 Credentials required for **{store}**")
 
+        username: str = st.text_input("Email or Username")
+        password: str = st.text_input("Password", type = "password")
+        
         col1, col2 = st.columns(2)
-        show_error = False
+        show_error: bool = False
 
         with col1:
             if st.button("💾 Save & Login"):
@@ -382,30 +408,28 @@ def insert_autologin_credentials() -> None:
 
                 else:
                     state["credentials"][store] = {
-                        "username": username,
+                        "username": username, 
                         "password": password
                     }
 
-                    state["phase"] = "processing"
+                    state["phase"] = "manual_processing"
                     st.rerun()
 
         with col2:
-            if st.button("↪️ Skip"):
+            if st.button("↪️ Skip this store"):
                 __move_to_next_store(store, state)
-
                 state["phase"] = "checking"
                 st.rerun()
 
         if show_error:
             st.error(
-                "⛔️ Please set both **Username** and "
-                "**Password** or press **Skip**."
+                "⛔️ Both **username** and **password** are required."
             )
 
-    elif state["phase"] == "processing":
-        st.info("Signing in... please wait.")
-
-        result_event: Event = get_event_loop().run_until_complete(
+    if state["phase"] == "manual_processing":
+        st.info(f"🔐 Login in progress for **{store}**...")
+        
+        result_event = get_event_loop().run_until_complete(
             st.session_state.rest_client.send_and_wait(
                 StoreCredentialsEvent(
                     credentials = {
@@ -414,78 +438,38 @@ def insert_autologin_credentials() -> None:
                 )
             )
         )
-
+        
         if isinstance(result_event, CredentialsLoginResultEvent):
-            store_result = result_event.results[0]
-            state["login_result"] = store_result
-
-            if store_result.success:
-                state["phase"] = "validated"
-
-            elif store_result.minutes_left and store_result.minutes_left > 0:
-                state["phase"] = "cooldown"
-
-            else:
-                state["phase"] = "result"
-
+            result: StoreLoginResult = result_event.results[0]
+            
+            state["login_result"] = result
+            state["phase"] = __next_phase_from_result(result)
+        
         st.rerun()
 
-    elif state["phase"] == "cooldown":
+    if state["phase"] in ("failed", "cooldown"):
         result = state["login_result"]
+        
+        if result.status == LoginStatus.COOLDOWN:
+            st.error(f"❌ **{store}** temporary blocked.")
+            st.markdown(
+                f"⏳ Try again in **{result.minutes_left} minute(s)**."
+            )
 
-        st.error(f"❌ Store temporarily locked")
+        else:
+            st.error(f"❌ Unable to access **{store}**")
 
-        st.markdown(
-            f"⏳ Please try again in "
-            f"**{result.minutes_left} minute(s)**."
-        )
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            if st.button("🔄 Check again"):
-                state["phase"] = "checking"
-                st.rerun()
-
-        with col2:
-            if st.button("↪️ Skip"):
-                __move_to_next_store(store, state)
-                state["phase"] = "checking"
-                st.rerun()
-
-        with col3:
-            if st.button("❌ Close"):
-                st.session_state.ui_state["autologin_dialog_open"] = False
-                st.rerun()
-
-    elif state["phase"] == "result":
-        result = state["login_result"]
-
-        st.error(f"❌ We couldn't sign you in to **{store}**.")
-
-        if result.attempts_left is not None:
-            if result.attempts_left > 0:
-                st.markdown(
-                    f"* You have **{result.attempts_left} attempt(s)** remaining."
-                )
-
-            else:
-                st.markdown(
-                    "* You've used all available login attempts."
-                )
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
             if result.attempts_left and result.attempts_left > 0:
-                if st.button("🔄 Try again"):
-                    state["phase"] = "input"
-                    st.rerun()
+                st.markdown(
+                    f"You have **{result.attempts_left} attempt(s)** remaining."
+                )
+        
+        col1, col2, col3 = st.columns(3)
 
-            else:
-                if st.button("🔄 Check again"):
-                    state["phase"] = "checking"
-                    st.rerun()
+        with col1:
+            if st.button("🔄 Try again"):
+                state["phase"] = "checking"
+                st.rerun()
 
         with col2:
             if st.button("↪️ Skip"):
@@ -638,6 +622,18 @@ if prompt:
 
     timeout: float = 120.0
 
+    if st.session_state.ui_state["custom_store_urls"]:
+        timeout = 300.0 * round(
+            number = (st.session_state.ui_state["results_per_item"] / 2),
+            ndigits = 1
+        )
+
+    else:
+        timeout *= round(
+            number = st.session_state.ui_state["results_per_item"],
+            ndigits = 1
+        )
+
     metadata: StoreMetadata = StoreMetadata(
         selected_stores = st.session_state.ui_state["selected_stores"],
         selected_external_store_urls = st.session_state.ui_state["custom_store_urls"],
@@ -658,11 +654,7 @@ if prompt:
             result: Event = get_event_loop().run_until_complete(
                 st.session_state.rest_client.send_and_wait(
                     event,
-                    timeout = (
-                        300.0 
-                        if st.session_state.ui_state["custom_store_urls"]
-                        else 120.0
-                    )
+                    timeout = timeout
                 )
             )
 

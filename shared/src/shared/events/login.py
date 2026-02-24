@@ -27,23 +27,23 @@ class StoreLoginResult(BaseModel):
     minutes_left: int | None = None
     error_message: str | None = None
 
-    # @model_validator(mode = "after")
-    # def validate_invariants(self):
-    #     """"""
+    @model_validator(mode = "after")
+    def validate_invariants(self):
+        """"""
 
-    #     if self.status == LoginStatus.COOLDOWN:
-    #         if self.minutes_left is None:
-    #             raise ValueError(
-    #                 "COOLDOWN status requires minutes_left"
-    #             )
+        if self.status == LoginStatus.COOLDOWN:
+            if self.minutes_left is None:
+                raise ValueError(
+                    "COOLDOWN status requires minutes_left"
+                )
 
-    #     if self.status == LoginStatus.FAILED:
-    #         if self.attempts_left is None:
-    #             raise ValueError(
-    #                 "FAILED status requires attempts_left"
-    #             )
+        if self.status == LoginStatus.FAILED:
+            if self.attempts_left is None:
+                raise ValueError(
+                    "FAILED status requires attempts_left"
+                )
 
-    #     return self
+        return self
 
 
 class LoginStatusResultEvent(BaseModel):

@@ -71,7 +71,7 @@ class RESTClient:
             self,
             event: Event,
             poll_interval: float = 0.5,
-            timeout: float = 60.0
+            timeout: float = 120.0
         ) -> Event:
         """"""
 
