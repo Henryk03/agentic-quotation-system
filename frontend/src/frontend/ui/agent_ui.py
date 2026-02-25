@@ -78,26 +78,26 @@ def __move_to_next_store(
 
 
 def __next_phase_from_result(
-            result: StoreLoginResult
-        ) -> str:
+        result: StoreLoginResult
+    ) -> str:
     """"""
 
-    if result.status == LoginStatus.VALID:
-        return "success"
-    
-    if result.status == LoginStatus.COOLDOWN:
-        return "cooldown"
-    
-    if result.status == LoginStatus.NEEDS_CREDENTIALS:
-        return "input"
-    
-    if result.status == LoginStatus.AUTOLOGIN_REQUIRED:
-        return "autologin_attempt"
-    
-    if result.status == LoginStatus.FAILED: 
-        return "failed"
-    
-    return "result"
+    match result.status:
+
+        case LoginStatus.VALID:
+            return "success"
+        
+        case LoginStatus.NEEDS_CREDENTIALS:
+            return "input"
+        
+        case LoginStatus.AUTOLOGIN_REQUIRED:
+            return "autologin_attempt"
+        
+        case LoginStatus.FAILED: 
+            return "failed"
+        
+        case _:
+            return "result"
 
 
 # ==========================
@@ -176,10 +176,8 @@ if "ui_state" not in st.session_state:
             "pending_stores": [],
             "current_store": None,
             "credentials": {},
-            "validated_stores": set(),
             "phase": "checking",
-            "login_result": None,
-            "first_login_done": {}
+            "login_result": None
         },
 
         "chats": {
@@ -338,149 +336,139 @@ with st.sidebar:
 def insert_autologin_credentials() -> None:
     """"""
 
-    state = st.session_state.ui_state["autologin"]
-    store = state["current_store"]
+    state: dict[str, Any] = st.session_state.ui_state["autologin"]
+    store: str = state["current_store"]
 
-    if state["phase"] == "success":
+    phase: str = state.get("phase", "failed")
 
-        # da vedere se tenere
-        if not state["first_login_done"].get(store, False):
-            st.success(f"✅ Successfully logged in to **{store}** for the first time!")
-            state["first_login_done"][store] = True
+    match phase:
+
+        case "success":
+            st.success(
+                f"✅ **{store}** authenticated, moving on..."
+            )
 
             time.sleep(1.5)
 
-        __move_to_next_store(store, state)
-        state["phase"] = "checking"
-        st.rerun()
+            __move_to_next_store(store, state)
+            state["phase"] = "checking"
+            st.rerun()
 
-    if state["phase"] == "checking":
-        st.info(f"🔍 Checking login status for **{store}**...")
-        
-        result_event = get_event_loop().run_until_complete(
-            st.session_state.rest_client.send_and_wait(
-                CheckLoginStatusEvent(
-                    store = store
+        case "checking":
+            st.info(f"🔍 Checking login status for **{store}**...")
+            
+            result_event = get_event_loop().run_until_complete(
+                st.session_state.rest_client.send_and_wait(
+                    CheckLoginStatusEvent(
+                        store = store
+                    )
                 )
             )
-        )
-        
-        if isinstance(result_event, LoginStatusResultEvent):
-            result: StoreLoginResult = result_event.result
-
-            state["login_result"] = result
-            state["phase"] = __next_phase_from_result(result)
             
-        st.rerun()
+            if isinstance(result_event, LoginStatusResultEvent):
+                result: StoreLoginResult = result_event.result
 
-    if state["phase"] == "autologin_attempt":
-        st.info(f"🔄 Attempting to auto-login to **{store}**...")
-        
-        result_event = get_event_loop().run_until_complete(
-            st.session_state.rest_client.send_and_wait(
-                TriggerAutoLoginEvent(
-                    store = store
+                state["login_result"] = result
+                state["phase"] = __next_phase_from_result(result)
+                
+            st.rerun()
+
+        case "autologin_attempt":
+            st.info(f"🔄 Attempting to auto-login to **{store}**...")
+            
+            result_event = get_event_loop().run_until_complete(
+                st.session_state.rest_client.send_and_wait(
+                    TriggerAutoLoginEvent(
+                        store = store
+                    )
                 )
             )
-        )
-        
-        if isinstance(result_event, LoginStatusResultEvent):
-            result: StoreLoginResult = result_event.result
             
-            state["login_result"] = result
-            state["phase"] = __next_phase_from_result(result)
-        
-        st.rerun()
+            if isinstance(result_event, LoginStatusResultEvent):
+                result: StoreLoginResult = result_event.result
+                
+                state["login_result"] = result
+                state["phase"] = __next_phase_from_result(result)
+            
+            st.rerun()
 
-    if state["phase"] == "input":
-        st.markdown(f"### 🔑 Credentials required for **{store}**")
+        case "input":
+            st.markdown(f"### 🔑 Credentials required for **{store}**")
 
-        username: str = st.text_input("Email or Username")
-        password: str = st.text_input("Password", type = "password")
-        
-        col1, col2 = st.columns(2)
-        show_error: bool = False
+            username: str = st.text_input("Email or Username")
+            password: str = st.text_input("Password", type = "password")
+            
+            col1, col2 = st.columns(2)
+            show_error: bool = False
 
-        with col1:
-            if st.button("💾 Save & Login"):
-                if not username.strip() or not password.strip():
-                    show_error = True
+            with col1:
+                if st.button("💾 Save & Login"):
+                    if not username.strip() or not password.strip():
+                        show_error = True
 
-                else:
-                    state["credentials"][store] = {
-                        "username": username, 
-                        "password": password
-                    }
+                    else:
+                        state["credentials"][store] = {
+                            "username": username, 
+                            "password": password
+                        }
 
-                    state["phase"] = "manual_processing"
+                        state["phase"] = "manual_processing"
+                        st.rerun()
+
+            with col2:
+                if st.button("↪️ Skip this store"):
+                    __move_to_next_store(store, state)
+                    state["phase"] = "checking"
                     st.rerun()
 
-        with col2:
-            if st.button("↪️ Skip this store"):
-                __move_to_next_store(store, state)
-                state["phase"] = "checking"
-                st.rerun()
-
-        if show_error:
-            st.error(
-                "⛔️ Both **username** and **password** are required."
-            )
-
-    if state["phase"] == "manual_processing":
-        st.info(f"🔐 Login in progress for **{store}**...")
-        
-        result_event = get_event_loop().run_until_complete(
-            st.session_state.rest_client.send_and_wait(
-                StoreCredentialsEvent(
-                    credentials = {
-                        store: state["credentials"][store]
-                    }
+            if show_error:
+                st.error(
+                    "⛔️ Both **username** and **password** are required."
                 )
-            )
-        )
-        
-        if isinstance(result_event, CredentialsLoginResultEvent):
-            result: StoreLoginResult = result_event.results[0]
+
+        case "manual_processing":
+            st.info(f"🔐 Login in progress for **{store}**...")
             
-            state["login_result"] = result
-            state["phase"] = __next_phase_from_result(result)
-        
-        st.rerun()
-
-    if state["phase"] in ("failed", "cooldown"):
-        result = state["login_result"]
-        
-        if result.status == LoginStatus.COOLDOWN:
-            st.error(f"❌ **{store}** temporary blocked.")
-            st.markdown(
-                f"⏳ Try again in **{result.minutes_left} minute(s)**."
-            )
-
-        else:
-            st.error(f"❌ Unable to access **{store}**")
-
-            if result.attempts_left and result.attempts_left > 0:
-                st.markdown(
-                    f"You have **{result.attempts_left} attempt(s)** remaining."
+            result_event = get_event_loop().run_until_complete(
+                st.session_state.rest_client.send_and_wait(
+                    StoreCredentialsEvent(
+                        credentials = {
+                            store: state["credentials"][store]
+                        }
+                    )
                 )
-        
-        col1, col2, col3 = st.columns(3)
+            )
+            
+            if isinstance(result_event, CredentialsLoginResultEvent):
+                result: StoreLoginResult = result_event.results[0]
+                
+                state["login_result"] = result
+                state["phase"] = __next_phase_from_result(result)
+            
+            st.rerun()
 
-        with col1:
-            if st.button("🔄 Try again"):
-                state["phase"] = "checking"
-                st.rerun()
+        case "failed":
+            result = state["login_result"]
 
-        with col2:
-            if st.button("↪️ Skip"):
-                __move_to_next_store(store, state)
-                state["phase"] = "checking"
-                st.rerun()
+            st.error(f"❌ Unable to access **{store}**")
+            
+            col1, col2, col3 = st.columns(3)
 
-        with col3:
-            if st.button("❌ Close"):
-                st.session_state.ui_state["autologin_dialog_open"] = False
-                st.rerun()
+            with col1:
+                if st.button("🔄 Try again"):
+                    state["phase"] = "checking"
+                    st.rerun()
+
+            with col2:
+                if st.button("↪️ Skip"):
+                    __move_to_next_store(store, state)
+                    state["phase"] = "checking"
+                    st.rerun()
+
+            with col3:
+                if st.button("❌ Close"):
+                    st.session_state.ui_state["autologin_dialog_open"] = False
+                    st.rerun()
 
 
 @st.dialog(

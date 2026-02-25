@@ -33,17 +33,13 @@ async def run_computer_use_loop(
             )
         )
 
-        print(f"\n\nCOMPUTER USE: risposta dall'IA {response}")
-
         candidate: Candidate = response.candidates[0]
         session.add_model_candidate(candidate)
 
         if is_final_response(candidate):
-            print(f"COMPUTER USE: Ecco la risposta finale: {candidate}")
             return extract_text(candidate)
 
         results = await execute_function_calls(candidate, page)
-        print(f"\n\nCOMPUTER USE: risultati {results}")
         function_responses = await get_function_responses(page, results)
         session.add_function_responses(function_responses)
 

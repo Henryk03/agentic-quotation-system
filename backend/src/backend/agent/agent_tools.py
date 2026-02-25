@@ -38,9 +38,7 @@ from shared.provider.registry import get_provider
 
 async def search_products(
         config: RunnableConfig,
-        products: list[str],
-        providers: list[str],
-        limit_per_product: int = 1
+        products: list[str]
     ) -> str:
     """
     Searches for multiple products across specified providers.
@@ -57,14 +55,6 @@ async def search_products(
         products (list[str]): 
             A list of product names, models, or keywords to investigate.
 
-        providers (list[str]): 
-            A list of platforms, websites, or data sources to include in 
-            the search.
-
-        limit_per_product (int): 
-            The maximum number of search results to retrieve for each item 
-            in the products list.
-
     Returns:
         str: 
             A concatenated and formatted string containing the aggregated 
@@ -72,22 +62,50 @@ async def search_products(
     """
     
     client_id: str | None
+    selected_stores: list[str] | None
+    limit_per_product: int = 1
 
     web_search_results_list: SafeAsyncList
     browser_context_manager: AsyncBrowserContextMaganer
 
     async with async_playwright() as apw:
-        client_id = config.get("configurable", {}).get("client_id", None)
+        client_id = (
+            config
+            .get("configurable", {})
+            .get("client_id", None)
+        )
+        selected_stores = (
+            config
+            .get("configurable", {})
+            .get("selected_stores", None)
+        )
+        limit_per_product = (
+            config
+            .get("configurable", {})
+            .get("items_per_store", 1)
+        )
+
+        if not selected_stores:
+            return (
+                "No store is currently selected. To perform a "
+                "search, please choose at least one store using "
+                "the 'Select Store' button in the sidebar."
+            )
         
         web_search_results_list = SafeAsyncList()
-        browser_context_manager = AsyncBrowserContextMaganer(apw, client_id)
+        browser_context_manager = AsyncBrowserContextMaganer(
+            apw, 
+            client_id
+        )
 
         tasks: list[Coroutine[Any, Any, Any]] = []
         pages_to_close: list[Page] = []
 
-        for provider in providers:
+        for store in selected_stores:
             try:
-                provider_instance: BaseProvider = get_provider(provider)
+                provider_instance: BaseProvider = get_provider(
+                    store
+                )
 
                 context: BrowserContext | None = (
                     await browser_context_manager.ensure_provider_context(
@@ -119,7 +137,7 @@ async def search_products(
 
                 tasks.append(
                     __search_with_computer_use(
-                        provider,
+                        store,
                         page,
                         products,
                         web_search_results_list,
@@ -129,12 +147,12 @@ async def search_products(
 
             except LoginFailedException as lfe:
                 await web_search_results_list.add(
-                    await __format_block(provider, str(lfe))
+                    await __format_block(store, str(lfe))
                 )
 
             except Exception as e:
                 await web_search_results_list.add(
-                    await __format_block(provider, str(e))
+                    await __format_block(store, str(e))
                 )
 
         await asyncio.gather(*tasks)
@@ -314,8 +332,6 @@ async def __search_with_computer_use(
     ) -> None:
     """"""
 
-    print("Inizializziamo computer use...")
-
     response_text: str | None = None
     excluded_functions: list[str] = [
         "drag_and_drop", 
@@ -360,7 +376,6 @@ async def __search_with_computer_use(
         )
 
     except Exception as e:
-        print(f"Eccezione da computer use {str(e)}")
         await result_list.add(
             await __format_block(
                 provider_url,

@@ -17,22 +17,23 @@ _cli_instructions: str = (
 )
 
 _ui_instructions: str = (
-    "If the user is asking to search for a product or price, you must "
-    "ensure a store is provided. If no store is currently selected or "
-    "provided for a search request, inform the user that they must first "
-    "select a store using the 'Select Store' button in the interface sidebar "
-    "to proceed with the search. However, if the user's message is just a "
-    "greeting or general conversation (e.g., 'Hello', 'How are you?'), respond "
-    "naturally without asking for a store selection.\n\n"
+    "If the user asks to search for a product or check a price, assume "
+    "that the selected stores are already provided through the interface "
+    "callback and proceed using those stores without asking the user to "
+    "select one. If no store is selected, the system will provide a "
+    "message indicating that no store is currently selected. In that "
+    "case, clearly inform the user that they must select at least one "
+    "store using the 'Select Store' button in the sidebar before "
+    "performing a search. Do not independently ask the user to choose "
+    "a store unless this system condition occurs. If the user explicitly "
+    "asks how to select, change, or manage stores, explain that stores "
+    "can be selected from the sidebar using the 'Select Store' button. "
+    "If the user's message is only a greeting or general conversation "
+    "(e.g., 'Hello', 'How are you?'), respond naturally without "
+    "mentioning store selection.\n\n"
 
-    "When a search is requested and a store is provided, even if it is not "
-    f"among the supported providers ({', '.join(all_provider_names())}), use "
-    "the `search_products` tool to perform the search on that specific site.\n\n"
-
-    "If the store is not among the supported ones, use the URL exactly as provided "
-    "by the user. Do not modify, shorten, normalize, or remove any part of it. "
-    "Keep the full link unchanged, including the protocol ('https://' or 'http://'), "
-    "subdomain, domain, path, query parameters, and any other components.\n\n"
+    "When a search is requested, use the `search_products` tool to perform "
+    "the search.\n\n"
 )
 
 
@@ -115,7 +116,7 @@ SYSTEM_PROMPT: str = (
     "*   **Product name:** <product_name>\n"
     "*   **Availability:** <product_availability>\n"
     "*   **Price:** <product_price>\n"
-    "*   **Link:** <product_link>\n\n"
+    "*   **Link:** [View product](<product_link>)\n\n"
 
     "Example (product not found):\n"
     "**<Store Name>**\n"
@@ -162,8 +163,8 @@ COMPUTER_USE_SYSTEM_PROMPT: str = (
     "comments, summaries, or any additional text beyond the required output.\n\n"
 
     "**Example (Product found):**\n"
-    "<Store Name> | <Full product name> | <Availability> | <Price> | "
-    "<Full product link>\n\n"
+    "<Store Name> | <Product name> | <Availability> | <Price> | "
+    "[View product](<Full product link>)\n\n"
 
     "**Example(Product NOT found):**\n"
     "<Store Name> | No result found for '<search_term>'.\n\n"
@@ -172,10 +173,17 @@ COMPUTER_USE_SYSTEM_PROMPT: str = (
     "<Store Name> | Unable to retrieve product information due to a technical "
     "issue on '<website_url>'.\n\n"
 
-    "When extracting data, never truncate product names. If any field such as price "
-    "or availability is not visible on the screen, write 'N/A' and do not infer or "
-    "guess missing information. Avoid clicking unrelated links, sponsored content, "
-    "or advertisements unless they are the only visible result.\n\n"
+    "When extracting data, never remove or invent technical specifications. "
+    "Rewrite product names into a concise and structured summary that preserves "
+    "the most important technical attributes such as brand, model, variant, "
+    "capacity, size, configuration, performance specifications, and key "
+    "distinguishing features. Remove marketing language, promotional phrases, "
+    "compatibility statements, and non-essential wording. The summarized name "
+    "must remain technically accurate and reflect the core characteristics of "
+    "the product without unnecessary verbosity. If any field such as price or "
+    "availability is not visible on the screen, write 'N/A' and do not infer "
+    "or guess missing information. Avoid clicking unrelated links, sponsored "
+    "content, or advertisements unless they are the only visible result.\n\n"
 
     "The product link must be copied exactly from the browser's omnibox (address bar) "
     "while the product detail page is open. Do not reconstruct, shorten, clean, "

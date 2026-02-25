@@ -76,12 +76,6 @@ async def dispatch_chat(
             )
         )
 
-    user_message: str = await __format_message(
-        user_input,
-        selected_stores,
-        items_per_store
-    )
-
     lc_messages: list[BaseMessage] = to_langchain_messages(
         previous_messages
     )
@@ -89,10 +83,14 @@ async def dispatch_chat(
     try:
         messages: dict = await agent.ainvoke(
             input={
-                "messages": lc_messages + [HumanMessage(user_message)]
+                "messages": lc_messages + [HumanMessage(user_input)]
             },
             config={
-                "configurable": {"client_id": client_id}
+                "configurable": {
+                    "client_id": client_id,
+                    "selected_stores": selected_stores,
+                    "items_per_store": items_per_store
+                }
             }
         )
 
