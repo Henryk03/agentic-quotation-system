@@ -16,6 +16,5 @@ class LoginStatus(str, Enum):
 
     VALID = "valid"
     FAILED = "failed"
-    COOLDOWN = "cooldown"
     NEEDS_CREDENTIALS = "needs_credentials"
     AUTOLOGIN_REQUIRED = "autologin_required"
