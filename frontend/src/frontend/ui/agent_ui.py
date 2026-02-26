@@ -1,10 +1,7 @@
 
 import time
 import uuid
-import asyncio
-import logging
 from functools import partial
-from asyncio import AbstractEventLoop
 from typing import Any
 
 import streamlit as st
@@ -14,6 +11,7 @@ from frontend.config import settings
 from frontend.frontend_utils.rest.client import RESTClient
 
 from shared.events import Event
+from shared.events import ErrorEvent
 from shared.events.metadata import StoreMetadata, BaseMetadata
 from shared.events.chat import ChatMessageEvent
 from shared.events.credentials import StoreCredentialsEvent
@@ -41,16 +39,14 @@ from shared.shared_utils.common import LoginStatus
 #          Helpers
 # ==========================
 
-def get_event_loop() -> AbstractEventLoop:
+def send_event(
+        event: Event
+    ) -> Event:
     """"""
 
-    if "loop" not in st.session_state:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        st.session_state.loop = loop
-
-    return st.session_state.loop
+    return st.session_state.rest_client.send_and_wait(
+        event
+    )
 
 
 def close_dialog(
@@ -77,7 +73,7 @@ def __move_to_next_store(
         st.session_state.ui_state["autologin_dialog_open"] = False
 
 
-def __next_phase_from_result(
+def __next_phase(
         result: StoreLoginResult
     ) -> str:
     """"""
@@ -100,19 +96,16 @@ def __next_phase_from_result(
             return "result"
 
 
-# ==========================
-#     Message animation
-# ==========================
-
 def stream_data(
-        text: str, 
+        text: str,
         placeholder: DeltaGenerator
     ) -> None:
     """"""
 
-    full_response = ""
+    full_response: str = ""
 
     for chunk in text.split(" "):
+
         full_response += chunk + " "
         time.sleep(0.05)
         placeholder.markdown(full_response + "▌")
@@ -121,47 +114,24 @@ def stream_data(
 
 
 # ==========================
-#     Result processing
-# ==========================
-
-def process_result(
-        result: Event
-    ) -> None:
-    """"""
-
-    ephemeral: DeltaGenerator = (
-        st.session_state.ephemeral_container
-    )
-        
-    match result:
-        case ChatMessageEvent():
-            st.session_state.messages.append(
-                {
-                    "role": result.role,
-                    "content": result.content
-                }
-            )
-
-            stream_data(
-                result.content,
-                ephemeral
-            )
-
-
-# ==========================
 #        Session state
 # ==========================
 
 if "ephemeral_container" not in st.session_state:
+
     st.session_state.ephemeral_container = None
 
+
 if "rest_client" not in st.session_state:
+
     st.session_state.rest_client = RESTClient(
         base_url = f"http://{settings.HOST}:{settings.PORT}",
         client_id = uuid.uuid4().hex
     )
 
+
 if "ui_state" not in st.session_state:
+
     chat_id: str = uuid.uuid4().hex
 
     st.session_state.ui_state = {
@@ -176,8 +146,7 @@ if "ui_state" not in st.session_state:
             "pending_stores": [],
             "current_store": None,
             "credentials": {},
-            "phase": "checking",
-            "login_result": None
+            "phase": "checking"
         },
 
         "chats": {
@@ -197,13 +166,115 @@ if "ui_state" not in st.session_state:
 
 
 # ==========================
+#     Result processing
+# ==========================
+
+def process_result(
+        result: Event
+    ) -> None:
+    """"""
+
+    ephemeral: DeltaGenerator = st.session_state.ephemeral_container
+    state: dict[str, Any] = st.session_state.ui_state["autologin"]
+        
+    match result:
+
+        # ----------------------- ERROR ------------------------
+        case ErrorEvent():
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": result.message
+            })
+
+            error_msg: str = f"❌ **Error**: {result.message}"
+            ephemeral.error(error_msg)
+
+            st.rerun()
+
+        # ------------------------ CHAT ------------------------
+        case ChatMessageEvent():
+            st.session_state.messages.append({
+                "role": result.role,
+                "content": result.content
+            })
+
+            stream_data(
+                result.content,
+                ephemeral
+            )
+
+            st.rerun()
+
+        # ----------------------- LOGIN ------------------------
+        case LoginStatusResultEvent():
+            state["phase"] = __next_phase(result.result)
+
+            st.rerun()
+
+        # -------------------- CREDENTIALS ---------------------
+        case CredentialsLoginResultEvent():
+            state["phase"] = __next_phase(result.results[0])
+            
+            st.rerun()
+
+        # --------------------- CLEAR CHAT ---------------------
+        case ClearChatMessagesResultEvent():            
+            if result.success:
+                current = st.session_state.ui_state["current_chat"]
+                chat = st.session_state.ui_state["chats"][current]
+
+                chat["messages"].clear()
+                st.session_state.messages = chat["messages"]
+
+                st.rerun()
+
+            else:
+                pass
+
+        # -------------------- DELETE CHATS --------------------
+        case DeleteClientChatsResultEvent():
+            if result.success:
+                new_chat_id = uuid.uuid4().hex
+
+                st.session_state.ui_state["chats"] = {
+                    "Chat - 1": {
+                        "chat_id": new_chat_id,
+                        "messages": []
+                    }
+                }
+
+                st.session_state.ui_state["current_chat"] = "Chat - 1"
+                st.session_state.chat_id = new_chat_id
+                st.session_state.messages = (
+                    st.session_state.ui_state["chats"]["Chat - 1"]["messages"]
+                )
+
+                st.rerun()
+
+            else:
+                pass
+
+        case _:
+            error_msg: str = "❌ Event not supported."
+
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": error_msg
+            })
+
+            ephemeral.error(error_msg)
+
+            st.rerun()
+
+
+# ==========================
 #        Page setup
 # ==========================
 
 st.set_page_config(
-    page_title="Agent Chat",
-    page_icon="🤖",
-    layout="centered",
+    page_title = "Agent Chat",
+    page_icon = "🤖",
+    layout = "centered",
 )
 
 st.title("🤖 Agent Chat")
@@ -215,6 +286,7 @@ st.caption("Streamlit chatbot powered by Google Gemini")
 # ==========================
 
 with st.sidebar:
+    
     st.title("Settings")
 
     if st.button("🛒 Select Store", use_container_width = True):
@@ -222,6 +294,7 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
+
 
     st.title("Chats")
 
@@ -244,67 +317,25 @@ with st.sidebar:
         st.rerun()
 
     if st.button("🧹 Clear Chat", use_container_width=True):
-        clear_messages_event: Event = ClearChatMessagesEvent(
-            metadata = BaseMetadata(
-                chat_id = st.session_state.chat_id
-            )
-        )
-
-        clear_messages_result_event: Event = (
-            get_event_loop().run_until_complete(
-                st.session_state.rest_client.send_and_wait(
-                    clear_messages_event
+        clear_messages_result_event: Event = send_event(
+            ClearChatMessagesEvent(
+                metadata = BaseMetadata(
+                    chat_id = st.session_state.chat_id
                 )
             )
         )
 
-        if isinstance(clear_messages_result_event, ClearChatMessagesResultEvent):
-            if clear_messages_result_event.success:
-                current = st.session_state.ui_state["current_chat"]
-                chat = st.session_state.ui_state["chats"][current]
-
-                chat["messages"].clear()
-                st.session_state.messages = chat["messages"]
-
-                st.rerun()
-
-            else:
-                pass        # decidere cosa fare
+        process_result(clear_messages_result_event)
 
     if st.button("🗑️ Delete All Chats", use_container_width=True):
-        delete_chats_event: Event = DeleteClientChatsEvent()
-
-        delete_chat_result_event: Event = (
-            get_event_loop().run_until_complete(
-                st.session_state.rest_client.send_and_wait(
-                    delete_chats_event
-                )
-            )
+        delete_chats_result_event: Event = send_event(
+            DeleteClientChatsEvent()
         )
 
-        if isinstance(delete_chat_result_event, DeleteClientChatsResultEvent):
-            if delete_chat_result_event.success:
-                new_chat_id = uuid.uuid4().hex
-
-                st.session_state.ui_state["chats"] = {
-                    "Chat - 1": {
-                        "chat_id": new_chat_id,
-                        "messages": []
-                    }
-                }
-
-                st.session_state.ui_state["current_chat"] = "Chat - 1"
-                st.session_state.chat_id = new_chat_id
-                st.session_state.messages = (
-                    st.session_state.ui_state["chats"]["Chat - 1"]["messages"]
-                )
-
-                st.rerun()
-
-            else:
-                pass        # decidere anche qui cosa fare
+        process_result(delete_chats_result_event)
 
     st.divider()
+
 
     for chat_name, chat in st.session_state.ui_state["chats"].items():
         is_active: bool = chat_name == st.session_state.ui_state["current_chat"]
@@ -328,7 +359,7 @@ with st.sidebar:
 
 @st.dialog(
     "Auto-login credentials",
-    on_dismiss=partial(
+    on_dismiss = partial(
         close_dialog,
         "autologin_dialog_open"
     )
@@ -357,40 +388,24 @@ def insert_autologin_credentials() -> None:
         case "checking":
             st.info(f"🔍 Checking login status for **{store}**...")
             
-            result_event = get_event_loop().run_until_complete(
-                st.session_state.rest_client.send_and_wait(
-                    CheckLoginStatusEvent(
-                        store = store
-                    )
+            result_event = send_event(
+                CheckLoginStatusEvent(
+                    store = store
                 )
             )
             
-            if isinstance(result_event, LoginStatusResultEvent):
-                result: StoreLoginResult = result_event.result
-
-                state["login_result"] = result
-                state["phase"] = __next_phase_from_result(result)
-                
-            st.rerun()
+            process_result(result_event)
 
         case "autologin_attempt":
             st.info(f"🔄 Attempting to auto-login to **{store}**...")
             
-            result_event = get_event_loop().run_until_complete(
-                st.session_state.rest_client.send_and_wait(
-                    TriggerAutoLoginEvent(
-                        store = store
-                    )
+            result_event = send_event(
+                TriggerAutoLoginEvent(
+                    store = store
                 )
             )
             
-            if isinstance(result_event, LoginStatusResultEvent):
-                result: StoreLoginResult = result_event.result
-                
-                state["login_result"] = result
-                state["phase"] = __next_phase_from_result(result)
-            
-            st.rerun()
+            process_result(result_event)
 
         case "input":
             st.markdown(f"### 🔑 Credentials required for **{store}**")
@@ -429,27 +444,17 @@ def insert_autologin_credentials() -> None:
         case "manual_processing":
             st.info(f"🔐 Login in progress for **{store}**...")
             
-            result_event = get_event_loop().run_until_complete(
-                st.session_state.rest_client.send_and_wait(
-                    StoreCredentialsEvent(
-                        credentials = {
-                            store: state["credentials"][store]
-                        }
-                    )
+            result_event = send_event(
+                StoreCredentialsEvent(
+                    credentials = {
+                        store: state["credentials"][store]
+                    }
                 )
             )
-            
-            if isinstance(result_event, CredentialsLoginResultEvent):
-                result: StoreLoginResult = result_event.results[0]
-                
-                state["login_result"] = result
-                state["phase"] = __next_phase_from_result(result)
-            
-            st.rerun()
+
+            process_result(result_event)
 
         case "failed":
-            result = state["login_result"]
-
             st.error(f"❌ Unable to access **{store}**")
             
             col1, col2, col3 = st.columns(3)
@@ -573,6 +578,7 @@ def store_selector_dialog() -> None:
 if st.session_state.ui_state["store_dialog_open"]:
     store_selector_dialog()
 
+
 if st.session_state.ui_state["autologin_dialog_open"]:
     insert_autologin_credentials()
 
@@ -639,24 +645,16 @@ if prompt:
         placeholder.markdown("Thinking...")
 
         try:
-            result: Event = get_event_loop().run_until_complete(
-                st.session_state.rest_client.send_and_wait(
-                    event,
-                    timeout = timeout
-                )
+            result: Event = st.session_state.rest_client.send_and_wait(
+                event,
+                timeout = timeout
             )
 
             process_result(result)
-            st.rerun()
         
         except Exception as e:
-            err: str = f"Error: {str(e)}"
-
-            placeholder.error(err)
-
-            st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "content": f"⚠️  {err}"
-                }
+            process_result(
+                ErrorEvent(
+                    message = str(e)
+                )
             )

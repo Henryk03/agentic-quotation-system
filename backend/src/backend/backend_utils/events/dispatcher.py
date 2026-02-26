@@ -29,34 +29,6 @@ def __normalize_content(
     return ""
 
 
-async def __format_message(
-        message: str,
-        selected_stores: list[str],
-        items_per_store: int
-    ) -> str:
-    """"""
-
-    store_list: str
-
-    if len(selected_stores) >= 1:
-        store_list = "* " + "\n*".join(selected_stores)
-    
-    else:
-        store_list = "* No store selected"
-
-    final_message: str = (
-        f"This is my message to you: {message}"
-        "\n"
-        "If I am asking you to perform a search, then do it in these websites:"
-        "\n"
-        f"{store_list}"
-        "\n"
-        f"For each product, search {items_per_store} items."
-    )
-
-    return final_message
-
-
 async def dispatch_chat(
         agent: Runnable,
         user_input: str,

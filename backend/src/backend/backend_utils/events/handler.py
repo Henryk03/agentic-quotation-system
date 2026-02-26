@@ -285,7 +285,7 @@ class EventHandler:
 
         role: str = event.role
         message: str = event.content
-        metadata: StoreMetadata | None = event.metadata
+        metadata: StoreMetadata | BaseMetadata = event.metadata
 
         if not metadata:
             raise ValueError("Metadata missing.")
@@ -339,7 +339,9 @@ class EventHandler:
         result_event: Event = ChatMessageEvent(
             role = "assistant",
             content = ai_response,
-            metadata = None
+            metadata = BaseMetadata(
+                chat_id = chat_id
+            )
         )
 
         return result_event.model_dump()

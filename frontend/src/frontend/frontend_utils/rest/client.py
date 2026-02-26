@@ -1,4 +1,5 @@
 
+import time
 import asyncio
 import logging
 import requests
@@ -8,6 +9,7 @@ from requests import Response
 from asyncio import AbstractEventLoop
 
 from shared.events import Event
+from shared.events import ErrorEvent
 from shared.events.transport import EventEnvelope
 
 
@@ -42,7 +44,10 @@ class RESTClient:
 
         response: Response = requests.post(
             url = f"{self.base_url}/event",
-            json = envelope.model_dump(serialize_as_any=True, mode="json")
+            json = envelope.model_dump(
+                serialize_as_any = True, 
+                mode = "json"
+            )
         )
 
         response.raise_for_status()
@@ -67,35 +72,37 @@ class RESTClient:
         return response.json()
     
 
-    async def send_and_wait(
+    def send_and_wait(
             self,
             event: Event,
             poll_interval: float = 0.5,
             timeout: float = 120.0
         ) -> Event:
         """"""
-
         event_id: str | None = self.send_event(event)
 
-        loop: AbstractEventLoop = asyncio.get_event_loop()
-        deadline: float = loop.time() + timeout
+        if not event_id:
+            raise RuntimeError("...")
+        
+        deadline: float = time.time() + timeout
 
-        if event_id:
-            while loop.time() < deadline:
-                job_data: dict[str, Any] = self.get_job(event_id)
+        while time.time() < deadline:
+            job_data: dict[str, Any] = self.get_job(event_id)
+            status: str = job_data.get("status", "FAILED")
 
-                status: str = job_data.get("status", "FAILED")
+            if status in ("COMPLETED", "FAILED"):
+                result_data: dict[str, Any] = job_data.get("result", {})
 
-                if status == "COMPLETED":
-                    result_data: dict[str, Any] = job_data.get("result", {})
-
-                    return RESTClient.__event_adapter.validate_python(result_data)
+                try:
+                    return self.__event_adapter.validate_python(result_data)
                 
-                if status == "FAILED":
-                    raise Exception(
-                        job_data.get("error", "Something went wrong.")
+                except Exception as e:
+                    error_msg: str = job_data.get("error") or str(e)
+                    return ErrorEvent(
+                        message=error_msg,
+                        metadata=getattr(event, "metadata", None) or None
                     )
                 
-                await asyncio.sleep(poll_interval)
-
+            time.sleep(poll_interval)
+            
         raise TimeoutError(f"Timeout waiting for job {event_id}")

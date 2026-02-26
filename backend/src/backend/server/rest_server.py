@@ -22,6 +22,8 @@ from backend.database.repositories import (
 )
 
 from shared.events import Event
+from shared.events.metadata import BaseMetadata
+from shared.events.error import ErrorEvent
 from shared.events.job_status import JobStatusEvent
 from shared.events.transport import EventEnvelope
 from shared.events.utils import extract_chat_id
@@ -161,10 +163,29 @@ async def run_event_job(
 
         except Exception as e:
             await db.rollback()
+
+            metadata: BaseMetadata | None = None
+
+            if getattr(getattr(event, "metadata", None), "chat_id", None):
+                metadata = BaseMetadata(
+                    chat_id = event.metadata.chat_id
+                )
+
+            error_event: Event = ErrorEvent(
+                message = str(e),
+                metadata = metadata
+            )
+
             await JobRepository.set_error(
                 db,
                 job_id, 
                 str(e)
+            )
+
+            await JobRepository.set_result(
+                db,
+                job_id,
+                result = error_event.model_dump()
             )
 
         await db.commit()
