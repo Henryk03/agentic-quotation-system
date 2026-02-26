@@ -2,7 +2,10 @@
 from typing import Literal
 from pydantic import BaseModel
 
-from shared.events.metadata import StoreMetadata
+from shared.events.metadata import (
+    BaseMetadata,
+    StoreMetadata
+)
 
 
 class ChatMessageEvent(BaseModel):
@@ -11,4 +14,4 @@ class ChatMessageEvent(BaseModel):
     type: Literal["chat.message"] = "chat.message"
     role: Literal["user", "assistant", "tool"]
     content: str
-    metadata: StoreMetadata | None
+    metadata: BaseMetadata | StoreMetadata
