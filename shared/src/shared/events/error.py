@@ -2,7 +2,7 @@
 from typing import Literal
 from pydantic import BaseModel
 
-from metadata import BaseMetadata
+from shared.events.metadata import BaseMetadata
 
 
 class ErrorEvent(BaseModel):
