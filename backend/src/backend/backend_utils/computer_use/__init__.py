@@ -6,6 +6,7 @@ from backend.backend_utils.computer_use.parsing import (
     is_final_response,
     extract_text
 )
+from backend.backend_utils.computer_use.custom import save_product
 from backend.backend_utils.computer_use.functions import (
     get_function_responses,
     execute_function_calls

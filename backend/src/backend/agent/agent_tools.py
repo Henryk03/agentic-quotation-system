@@ -1,7 +1,7 @@
 
 import asyncio
 import re
-from typing import Any, Coroutine
+from typing import Any, Coroutine, Callable
 
 from bs4 import BeautifulSoup, ResultSet, Tag
 from google import genai
@@ -26,6 +26,7 @@ from backend.backend_utils.computer_use import (
     ComputerUseSession,
     generate_content_config,
     run_computer_use_loop,
+    save_product
 )
 from backend.backend_utils.exceptions import LoginFailedException
 from backend.config import settings
@@ -332,20 +333,26 @@ async def __search_with_computer_use(
     ) -> None:
     """"""
 
-    response_text: str | None = None
+    products_data: list[dict[str, str]] = []
+
     excluded_functions: list[str] = [
         "drag_and_drop", 
         "open_web_browser",
         "key_combination"
+    ]
+    custom_functions: list[Callable[..., Any]] = [
+        save_product
     ]
 
     try:
         client: genai.Client = genai.Client()
 
         config: genai.types.GenerateContentConfig = (
-            await generate_content_config(
+            generate_content_config(
+                client,
                 COMPUTER_USE_SYSTEM_PROMPT,
-                excluded_functions
+                excluded_functions,
+                custom_functions
             )
         )
 
@@ -368,27 +375,31 @@ async def __search_with_computer_use(
             initial_screenshot
         )
 
-        response_text: str | None = await run_computer_use_loop(
+        await run_computer_use_loop(
             client,
             page,
             session,
-            config
+            config,
+            products_data
         )
 
-    except Exception as e:
-        await result_list.add(
-            await __format_block(
-                provider_url,
-                f"Error: {str(e)}"
-            )
-        )
+    except:
+        pass
 
     finally:
-        if response_text:
+        if products_data:
             await result_list.add(
                 await __format_block(
                     provider_url,
-                    response_text
+                    products_data
+                )
+            )
+
+        else:
+            await result_list.add(
+                await __format_block(
+                    provider_url,
+                    "No result found for any of the products."
                 )
             )
 

@@ -7,6 +7,7 @@ from google.genai.types import (
     Candidate
 )
 
+from backend.backend_utils.common import SafeAsyncList
 from backend.backend_utils.computer_use.session import ComputerUseSession
 from backend.backend_utils.computer_use.parsing import is_final_response, extract_text
 from backend.backend_utils.computer_use.functions import (
@@ -20,8 +21,9 @@ async def run_computer_use_loop(
         page: Page,
         session: ComputerUseSession,
         config: GenerateContentConfig,
+        result_list: list[dict[str, str]],
         max_iter: int = 10
-    ) -> str | None:
+    ) -> None:
     """"""
 
     for _ in range(max_iter):
@@ -36,11 +38,13 @@ async def run_computer_use_loop(
         candidate: Candidate = response.candidates[0]
         session.add_model_candidate(candidate)
 
-        if is_final_response(candidate):
-            return extract_text(candidate)
-
-        results = await execute_function_calls(candidate, page)
-        function_responses = await get_function_responses(page, results)
+        results = await execute_function_calls(
+            candidate, 
+            page,
+            result_list
+        )
+        function_responses = await get_function_responses(
+            page, 
+            results, 
+        )
         session.add_function_responses(function_responses)
-
-    return None

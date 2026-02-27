@@ -14,8 +14,10 @@ from google.genai.types import (
     FunctionResponseBlob
 )
 
+from backend.backend_utils.computer_use.custom import save_product
 
-async def denormalize_x(
+
+def denormalize_x(
         x: int,
         screen_width: int
     ) -> int:
@@ -24,7 +26,7 @@ async def denormalize_x(
     return int(x / 1000 * screen_width)
 
 
-async def denormalize_y(
+def denormalize_y(
         y: int,
         screen_height: int
     ) -> int:
@@ -59,7 +61,8 @@ async def __scroll(
 
 async def execute_function_calls(
         candidate: Candidate,
-        page: Page
+        page: Page,
+        result_list: list[dict[str, str]]
     ) -> list[tuple[str, dict]]:
     """"""
 
@@ -88,24 +91,26 @@ async def execute_function_calls(
             match fname:
                 case "click_at":
                     if args:
-                        actual_x: int = await denormalize_x(
+                        actual_x: int = denormalize_x(
                             args["x"], 
                             page_viewport["width"]
                         )
-                        actual_y: int = await denormalize_y(
+                        actual_y: int = denormalize_y(
                             args["y"], 
                             page_viewport["height"]
                         )
 
                         await page.mouse.click(actual_x, actual_y)
 
+                        action_result = {"status": "ok"} 
+
                 case "type_text_at":
                     if args:
-                        actual_x = await denormalize_x(
+                        actual_x = denormalize_x(
                             args["x"], 
                             page_viewport["width"]
                         )
-                        actual_y = await denormalize_y(
+                        actual_y = denormalize_y(
                             args["y"], 
                             page_viewport["height"]
                         )
@@ -125,21 +130,29 @@ async def execute_function_calls(
                         if press_enter:
                             await page.keyboard.press("Enter")
 
+                        action_result = {"status": "ok"} 
+
                 case "wait_5_seconds":
                     await page.wait_for_load_state(
                         "networkidle",
                         timeout = 10000
                     )
 
+                    action_result = {"status": "ok"} 
+
                 case "go_back":
                     await page.go_back(
                         timeout = 10000
                     )
 
+                    action_result = {"status": "ok"} 
+
                 case "go_forward":
                     await page.go_forward(
                         timeout = 10000
                     )
+
+                    action_result = {"status": "ok"} 
 
                 case "scroll_document":
                     if args:
@@ -147,6 +160,8 @@ async def execute_function_calls(
                         magnitude: int = 200
 
                         await __scroll(page, direction, magnitude)
+
+                        action_result = {"status": "ok"} 
 
                 case "scroll_at":
                     if args:
@@ -159,24 +174,41 @@ async def execute_function_calls(
                         await page.mouse.move(x, y)
                         await __scroll(page, direction, magnitude)
 
+                        action_result = {"status": "ok"} 
+
                 case "navigate":
                     if args:
                         url: str = args.get("url", "https://google.com")
 
-                        print(f"Andiamo al seguente url: {url}")
-
                         await page.goto(url)
                         await asyncio.sleep(2)
+
+                        action_result = {"status": "ok"} 
 
                 case "search":
                     await page.goto(
                         "https://google.com",
                         timeout = 10000,
                         wait_until = "networkidle"
-                    )            
+                    )
+
+                    action_result = {"status": "ok"} 
+
+                case "save_product":
+                    if args:
+                        product_entry: dict[str, str] = save_product(
+                            name = args.get("name", "N/A"),
+                            availability = args.get("availability", "N/A"),
+                            price = args.get("price", "N/A"),
+                            link = args.get("link", "N/A")
+                        )
+
+                        result_list.append(product_entry)
+
+                        action_result = {"status": "saved"}  
 
                 case _:
-                    print("Non so fare questa azione ancora...")
+                    action_result = {"status": "error"}
 
             await page.wait_for_load_state("networkidle", timeout=10)
 

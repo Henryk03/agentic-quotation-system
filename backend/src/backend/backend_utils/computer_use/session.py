@@ -53,14 +53,14 @@ class ComputerUseSession:
 
 
     def add_function_responses(
-            self, 
+            self,
             responses: Iterable[FunctionResponse]
         ) -> None:
         """"""
         
         self._contents.append(
             Content(
-                role="user",
+                role="tool",
                 parts=[
                     Part(function_response=response) 
                     for response in responses
