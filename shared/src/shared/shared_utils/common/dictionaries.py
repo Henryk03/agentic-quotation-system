@@ -4,15 +4,16 @@ from typing import TypedDict
 
 class AvailabilityDict(TypedDict):
     """
-    Dictionary specifying the CSS selectors used to identify product
+    Dictionary defining CSS selectors used to determine product 
     availability on a provider's website.
 
-    Attributes:
-        available (list[str]):
-            List of selectors corresponding to products that are in stock.
+    Attributes
+    ----------
+    available : list[str]
+        List of CSS selectors that indicate a product is in stock.
 
-        not_available (list[str]):
-            List of selectors corresponding to products that are out of stock.
+    not_available : list[str]
+        List of CSS selectors that indicate a product is out of stock.
     """
 
     available: list[str]

@@ -1,14 +1,14 @@
 
-import sys
 import asyncio
-from pathlib import Path
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from dotenv import load_dotenv
 from alembic import context
+from dotenv import load_dotenv
 
 
 # =============================
@@ -54,7 +54,17 @@ target_metadata = Base.metadata
 # =============================
 
 def run_migrations_offline() -> None:
-    """"""
+    """
+    Run Alembic migrations in 'offline' mode.
+
+    This generates SQL statements without connecting to 
+    the database. Useful for producing migration scripts 
+    that can be reviewed or applied manually.
+
+    Returns
+    -------
+    None
+    """
 
     url = config.get_main_option("sqlalchemy.url")
 
@@ -72,7 +82,23 @@ def run_migrations_offline() -> None:
 def do_run_migrations(
         connection: Connection
     ) -> None:
-    """"""
+    """
+    Execute migrations on a given synchronous 
+    SQLAlchemy connection.
+
+    Configures the Alembic context to use the provided 
+    connection and runs all pending migrations.
+
+    Parameters
+    ----------
+    connection : Connection
+        A synchronous SQLAlchemy connection object to use 
+        for migrations.
+
+    Returns
+    -------
+    None
+    """
 
     context.configure(
         connection=connection,
@@ -86,7 +112,16 @@ def do_run_migrations(
 
 
 async def run_async_migrations() -> None:
-    """"""
+    """
+    Run Alembic migrations in 'online' asynchronous mode.
+
+    Establishes an asynchronous engine connection to the 
+    database and runs migrations in a transaction.
+
+    Returns
+    -------
+    None
+    """
     
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
@@ -101,7 +136,16 @@ async def run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    """"""
+    """
+    Run Alembic migrations in 'online' mode using asyncio.
+
+    This function runs the asynchronous migration function 
+    using `asyncio.run`.
+
+    Returns
+    -------
+    None
+    """
     
     asyncio.run(run_async_migrations())
 

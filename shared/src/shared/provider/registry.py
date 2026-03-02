@@ -1,19 +1,33 @@
 
+import importlib
+import pkgutil
 import re
 import types
-import pkgutil
-import importlib
 
 from shared.exceptions import ProviderNotSupportedException
-from shared.provider.base_provider import BaseProvider
 from shared.provider import providers as providers_pkg
+from shared.provider.base_provider import BaseProvider
 
 
 PROVIDER_REGISTRY: dict[str, BaseProvider] = {}
 
 
-def register_provider(provider_instance: BaseProvider) -> None:
-    """"""
+def register_provider(
+        provider_instance: BaseProvider
+    ) -> None:
+    """
+    Register a provider instance in the global registry.
+
+    Parameters
+    ----------
+    provider_instance : BaseProvider
+        An instance of a provider to register.
+
+    Raises
+    ------
+    RuntimeError
+        If a provider with the same name is already registered.
+    """
 
     name: str = provider_instance.name
 
@@ -27,10 +41,12 @@ def register_provider(provider_instance: BaseProvider) -> None:
 
 def autodiscover_providers() -> None:
     """
-    Automatically discover and register all provider instances
+    Automatically discover and register all provider instances 
     defined in the `shared.provider.providers` package.
 
-    Each provider module must expose a variable named `provider`
+    Notes
+    -----
+    Each provider module must expose a variable named `provider` 
     containing an instance of `BaseProvider`.
     """
 
@@ -49,25 +65,59 @@ autodiscover_providers()
 
 
 def all_providers() -> list[BaseProvider]:
-    """"""
+    """
+    Return a list of all registered provider instances.
+
+    Returns
+    -------
+    list[BaseProvider]
+        All provider instances in the registry.
+    """
 
     return list(PROVIDER_REGISTRY.values())
 
 
 def all_provider_names() -> list[str]:
-    """"""
+    """
+    Return the names of all registered providers.
+
+    Returns
+    -------
+    list[str]
+        Provider names as registered in the registry.
+    """
 
     return list(PROVIDER_REGISTRY.keys())
 
 
 def get_provider_registry() -> dict[str, BaseProvider]:
-    """"""
+    """
+    Return the complete provider registry.
+
+    Returns
+    -------
+    dict[str, BaseProvider]
+        A dictionary mapping provider names to provider instances.
+    """
 
     return PROVIDER_REGISTRY
 
 
 def support_autologin(provider: str) -> bool:
-    """"""
+    """
+    Check whether a provider supports automatic login.
+
+    Parameters
+    ----------
+    provider : str
+        Name of the provider.
+
+    Returns
+    -------
+    bool
+        `True` if the provider defines a custom `auto_login` method, 
+        `False` otherwise.
+    """
 
     if provider in PROVIDER_REGISTRY:
         instance: BaseProvider = PROVIDER_REGISTRY[provider]
@@ -78,7 +128,27 @@ def support_autologin(provider: str) -> bool:
 
 
 def get_provider(provider_name: str) -> BaseProvider:
-    """"""
+    """
+    Retrieve a provider instance from the registry by name.
+
+    The lookup is case-insensitive and allows optional spaces 
+    between words derived from camel case names.
+
+    Parameters
+    ----------
+    provider_name : str
+        Name of the provider to retrieve.
+
+    Returns
+    -------
+    BaseProvider
+        The provider instance matching the given name.
+
+    Raises
+    ------
+    ProviderNotSupportedException
+        If the provider name does not match any registered provider.
+    """
 
     normalized_input: str = provider_name.strip().lower()
 

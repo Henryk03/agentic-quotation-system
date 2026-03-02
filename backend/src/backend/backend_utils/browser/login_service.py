@@ -1,9 +1,9 @@
 
 from playwright.async_api import (
-    async_playwright,
+    BrowserContext,
+    Page,
     StorageState,
-    BrowserContext, 
-    Page
+    async_playwright,
 )
 
 from backend.backend_utils.browser import AsyncBrowserContextMaganer
@@ -17,7 +17,39 @@ async def execute_autologin(
         username: str,
         password: str
     ) -> tuple[bool, StorageState | None]:
-    """"""
+    """
+    Attempt automatic login for a provider and return its storage state.
+
+    A new browser context is created, the provider's login
+    routine is executed, and if successful, the authenticated
+    storage state is extracted from the context.
+
+    Parameters
+    ----------
+    store : str
+        Identifier of the provider to authenticate against.
+
+    username : str
+        Username used for authentication.
+
+    password : str
+        Password used for authentication.
+
+    Returns
+    -------
+    tuple of (bool, StorageState or None)
+        A tuple containing:
+
+        - A boolean indicating whether login succeeded.
+        - The authenticated ``StorageState`` if successful,
+          otherwise ``None``.
+
+    Raises
+    ------
+    Exception
+        Propagates any unexpected errors raised during
+        browser initialization or provider interaction.
+    """
 
     manager: AsyncBrowserContextMaganer
     page: Page
@@ -61,7 +93,42 @@ async def validate_credentials(
         username: str, 
         password: str
     ) -> tuple[bool, StorageState | None, str | None]:
-    """"""
+    """
+    Validate user credentials for a provider.
+
+    The function attempts automatic login using the provided
+    credentials. If authentication succeeds, the resulting
+    storage state is returned. Otherwise, an error message
+    is provided.
+
+    Parameters
+    ----------
+    store : str
+        Identifier of the provider to authenticate against.
+
+    username : str
+        Username used for authentication.
+
+    password : str
+        Password used for authentication.
+
+    Returns
+    -------
+    tuple of (bool, StorageState or None, str or None)
+        A tuple containing:
+
+        - A boolean indicating whether authentication succeeded.
+        - The authenticated `StorageState` if successful,
+          otherwise `None`.
+        - An error message if authentication fails,
+          otherwise `None`.
+
+    Raises
+    ------
+    Exception
+        Propagates unexpected errors during browser
+        initialization or login execution.
+    """
 
     manager: AsyncBrowserContextMaganer
 
@@ -104,7 +171,36 @@ async def validate_state(
         store: str,
         state: StorageState
     ) -> bool:
-    """"""
+    """
+    Validate whether a stored authentication state is 
+    still valid.
+
+    A new browser context is created using the provided
+    storage state. The provider-specific login check
+    is executed to determine whether the session is
+    still authenticated.
+
+    Parameters
+    ----------
+    store : str
+        Identifier of the provider whose state is being 
+        validated.
+
+    state : StorageState
+        Previously stored Playwright authentication state.
+
+    Returns
+    -------
+    bool
+        `True` if the session is still authenticated,
+        otherwise `False`.
+
+    Raises
+    ------
+    Exception
+        Propagates unexpected errors during browser
+        initialization or provider interaction.
+    """
 
     manager: AsyncBrowserContextMaganer
 

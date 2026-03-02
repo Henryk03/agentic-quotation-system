@@ -1,13 +1,46 @@
 
-from datetime import datetime, timezone
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from datetime import (
+    datetime, 
+    timezone
+)
+from sqlalchemy import (
+    DateTime, 
+    ForeignKey, 
+    String
+)
+from sqlalchemy.orm import (
+    Mapped, 
+    mapped_column, 
+    relationship
+)
 
 from backend.database.base import Base
 
 
 class Chat(Base):
-    """"""
+    """
+    Database model representing a chat session for 
+    a client.
+
+    Attributes
+    ----------
+    chat_id : str
+        Unique identifier for the chat (primary key).
+
+    client_id : str
+        Identifier of the client owning this chat 
+        (foreign key to `Client`).
+
+    created_at : datetime
+        Timestamp of when the chat was created (UTC).
+
+    client : Client
+        SQLAlchemy relationship to the owning client.
+        
+    messages : list[Message]
+        SQLAlchemy relationship to the messages in this chat, 
+        with cascading delete behavior.
+    """
 
     __tablename__ = "chats"
 

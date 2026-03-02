@@ -10,27 +10,26 @@ from streamlit.delta_generator import DeltaGenerator
 from frontend.config import settings
 from frontend.frontend_utils.rest.client import RESTClient
 
-from shared.events import Event
-from shared.events import ErrorEvent
-from shared.events.metadata import StoreMetadata, BaseMetadata
+from shared.events import Event, ErrorEvent
+from shared.events.metadata import BaseMetadata, StoreMetadata
 from shared.events.chat import ChatMessageEvent
 from shared.events.credentials import StoreCredentialsEvent
 from shared.events.login import (
-    StoreLoginResult, 
+    CheckLoginStatusEvent,
     CredentialsLoginResultEvent,
     LoginStatusResultEvent,
-    CheckLoginStatusEvent,
-    TriggerAutoLoginEvent
+    StoreLoginResult,
+    TriggerAutoLoginEvent,
+)
+from shared.events.clear import (
+    ClearChatMessagesEvent,
+    ClearChatMessagesResultEvent,
+    DeleteClientChatsEvent,
+    DeleteClientChatsResultEvent,
 )
 from shared.provider.registry import (
     all_provider_names,
-    support_autologin
-)
-from shared.events.clear import (
-    DeleteClientChatsEvent,
-    ClearChatMessagesEvent,
-    ClearChatMessagesResultEvent,
-    DeleteClientChatsResultEvent
+    support_autologin,
 )
 from shared.shared_utils.common import LoginStatus
 
@@ -42,7 +41,26 @@ from shared.shared_utils.common import LoginStatus
 def send_event(
         event: Event
     ) -> Event:
-    """"""
+    """
+    Send an event to the backend through the REST client 
+    and wait for a response.
+
+    Parameters
+    ----------
+    event : Event
+        The event instance to be sent to the backend.
+
+    Returns
+    -------
+    Event
+        The event returned by the backend after processing.
+
+    Notes
+    -----
+    This function delegates the call to the REST client 
+    stored in `st.session_state.rest_client` and blocks 
+    until a response is received.
+    """
 
     return st.session_state.rest_client.send_and_wait(
         event
@@ -52,7 +70,19 @@ def send_event(
 def close_dialog(
         flag_key: str
     ) -> None:
-    """"""
+    """
+    Close a dialog by updating the corresponding UI state flag.
+
+    Parameters
+    ----------
+    flag_key : str
+        The key in ``st.session_state.ui_state`` that controls 
+        the dialog visibility.
+
+    Returns
+    -------
+    None
+    """
 
     st.session_state.ui_state[flag_key] = False
 
@@ -61,7 +91,29 @@ def __move_to_next_store(
         store: str,
         state: dict[str, Any]
     ) -> None:
-    """"""
+    """
+    Advance the auto-login workflow to the next pending store.
+
+    Parameters
+    ----------
+    store : str
+        The store that has just been processed.
+
+    state : dict[str, Any]
+        The auto-login state dictionary containing:
+        - `pending_stores`
+        - `current_store`
+        - other workflow-related metadata.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    If no more stores remain, the auto-login dialog is automatically 
+    closed.
+    """
 
     state["pending_stores"].remove(store)
     state["current_store"] = (
@@ -76,7 +128,29 @@ def __move_to_next_store(
 def __next_phase(
         result: StoreLoginResult
     ) -> str:
-    """"""
+    """
+    Determine the next UI phase based on a store login result.
+
+    Parameters
+    ----------
+    result : StoreLoginResult
+        The result of a login attempt for a specific store.
+
+    Returns
+    -------
+    str
+        The next phase of the auto-login workflow. Possible values 
+        include:
+        - `"success"`
+        - `"input"`
+        - `"autologin_attempt"`
+        - `"failed"`
+        - `"result"`
+
+    Notes
+    -----
+    The phase is derived from ``result.status``.
+    """
 
     match result.status:
 
@@ -100,7 +174,26 @@ def stream_data(
         text: str,
         placeholder: DeltaGenerator
     ) -> None:
-    """"""
+    """
+    Stream text progressively into a Streamlit placeholder.
+
+    Parameters
+    ----------
+    text : str
+        The full text response to display.
+    placeholder : DeltaGenerator
+        The Streamlit container where the text will be rendered.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    The text is rendered word-by-word with a small delay to simulate
+    streaming output. A trailing cursor indicator (▌) is displayed
+    during streaming.
+    """
 
     full_response: str = ""
 
@@ -172,7 +265,37 @@ if "ui_state" not in st.session_state:
 def process_result(
         result: Event
     ) -> None:
-    """"""
+    """
+    Process a backend event and update the UI state accordingly.
+
+    Parameters
+    ----------
+    result : Event
+        The event returned by the backend.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    The function handles multiple event types using structural pattern
+    matching, including:
+
+    - `ErrorEvent`
+    - `ChatMessageEvent`
+    - `LoginStatusResultEvent`
+    - `CredentialsLoginResultEvent`
+    - `ClearChatMessagesResultEvent`
+    - `DeleteClientChatsResultEvent`
+
+    Depending on the event type, the function may:
+    - Update chat history
+    - Modify auto-login workflow state
+    - Reset chat sessions
+    - Display error messages
+    - Trigger a Streamlit rerun
+    """
 
     ephemeral: DeltaGenerator = st.session_state.ephemeral_container
     state: dict[str, Any] = st.session_state.ui_state["autologin"]
@@ -298,7 +421,7 @@ with st.sidebar:
 
     st.title("Chats")
 
-    if st.button("\u2795 New Chat", use_container_width=True):
+    if st.button("\u2795 New Chat", use_container_width = True):
         chats = st.session_state.ui_state["chats"]
         chat_number = len(chats) + 1
 
@@ -316,7 +439,7 @@ with st.sidebar:
 
         st.rerun()
 
-    if st.button("🧹 Clear Chat", use_container_width=True):
+    if st.button("🧹 Clear Chat", use_container_width = True):
         clear_messages_result_event: Event = send_event(
             ClearChatMessagesEvent(
                 metadata = BaseMetadata(
@@ -327,7 +450,7 @@ with st.sidebar:
 
         process_result(clear_messages_result_event)
 
-    if st.button("🗑️ Delete All Chats", use_container_width=True):
+    if st.button("🗑️ Delete All Chats", use_container_width = True):
         delete_chats_result_event: Event = send_event(
             DeleteClientChatsEvent()
         )
@@ -338,7 +461,9 @@ with st.sidebar:
 
 
     for chat_name, chat in st.session_state.ui_state["chats"].items():
-        is_active: bool = chat_name == st.session_state.ui_state["current_chat"]
+        is_active: bool = (
+            chat_name == st.session_state.ui_state["current_chat"]
+        )
 
         label: str = f"💬 {chat_name}"
 
@@ -365,7 +490,31 @@ with st.sidebar:
     )
 )
 def insert_autologin_credentials() -> None:
-    """"""
+    """
+    Render and manage the auto-login credentials dialog.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    This dialog drives the multi-phase auto-login workflow. 
+    The behavior depends on the current `phase` stored in
+    `st.session_state.ui_state["autologin"]`.
+
+    Possible phases include:
+
+    - `"checking"`
+    - `"autologin_attempt"`
+    - `"input"`
+    - `"manual_processing"`
+    - `"success"`
+    - `"failed"`
+
+    The function may trigger backend events and rerun the Streamlit app
+    to advance the workflow.
+    """
 
     state: dict[str, Any] = st.session_state.ui_state["autologin"]
     store: str = state["current_store"]
@@ -478,13 +627,30 @@ def insert_autologin_credentials() -> None:
 
 @st.dialog(
     "Select Store",
-    on_dismiss=partial(
+    on_dismiss = partial(
         close_dialog,
         "store_dialog_open"
     )
 )
 def store_selector_dialog() -> None:
-    """"""
+    """
+    Render the store selection dialog.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    Allows the user to:
+
+    - Select supported stores
+    - Provide custom store URLs
+    - Configure the number of items to retrieve per store
+
+    On confirmation, the function updates the global UI state and
+    initializes the auto-login workflow for stores that support it.
+    """
 
     base_options: list[str] = all_provider_names()
     current_selection: list[str] = st.session_state.ui_state[
@@ -544,7 +710,9 @@ def store_selector_dialog() -> None:
     with col1:
         if st.button("✅ Confirm"):
             selected_stores = st.session_state.store_multiselect
-            custom_store_urls = st.session_state.store_multiselect_computer_use
+            custom_store_urls = (
+                st.session_state.store_multiselect_computer_use
+            )
 
             st.session_state.ui_state["selected_stores"] = selected_stores
             st.session_state.ui_state["custom_store_urls"] = custom_store_urls
@@ -554,7 +722,9 @@ def store_selector_dialog() -> None:
                 s for s in selected_stores if support_autologin(s)
             ]
 
-            st.session_state.ui_state["autologin"]["pending_stores"] = autologin_stores
+            st.session_state.ui_state["autologin"]["pending_stores"] = (
+                autologin_stores
+            )
             st.session_state.ui_state["autologin"]["current_store"] = (
                 autologin_stores[0] if autologin_stores else None
             )
@@ -630,7 +800,9 @@ if prompt:
 
     metadata: StoreMetadata = StoreMetadata(
         selected_stores = st.session_state.ui_state["selected_stores"],
-        selected_external_store_urls = st.session_state.ui_state["custom_store_urls"],
+        selected_external_store_urls = (
+            st.session_state.ui_state["custom_store_urls"]
+        ),
         chat_id = st.session_state.chat_id,
         items_per_store = st.session_state.ui_state["results_per_item"]
     )

@@ -1,13 +1,13 @@
 
-import re
 import asyncio
+import re
 
 from playwright.async_api import (
-    Browser, 
-    BrowserContext, 
-    Page, 
+    Browser,
+    BrowserContext,
     ElementHandle,
-    Locator
+    Locator,
+    Page,
 )
 
 
@@ -18,63 +18,72 @@ async def find_elements_with_attr_pattern(
         early_end: bool | None = False
     ) -> list[ElementHandle]:
     """
-    Finds all attributes of the HTML tags given in the list that match
-    the pattern specified by the regular expression. Finally, it returns
-    a list containing all the tags that match the pattern.
+    Find all HTML elements whose attributes match a given 
+    regex pattern.
 
-    Args:
-        webpage (Page):
-            The webpage in which the html tag could be found.
+    Parameters
+    ----------
+    webpage : Page
+        The Playwright page object in which the HTML tags 
+        are searched.
 
-        html_tags (list[str]):
-            A list containing the html tags whose attributes could 
-            satisfy the pattern.
+    html_tags : list[str]
+        A list of HTML tag names to inspect.
 
-        regex (Pattern[str]):
-            The pattern used to filter the html tags.
+    regex : re.Pattern[str]
+        Regular expression pattern used to filter element 
+        attributes.
 
-        early_end (bool | None):
-            A boolean value that specifies whether the execution
-            must stop right after the first tag is inserted into
-            the result list. Default is `False`.
+    early_end : bool, optional
+        If `True`, return immediately after finding the 
+        first match. Default is `False` (collect all matching 
+        elements).
 
-            - `True` for the short execution.
-            - `False` for all the tags to be inserted into the result list.
-
-    Returns:
-        list[ElementHandle]
+    Returns
+    -------
+    list[ElementHandle]
+        A list of ElementHandle objects corresponding to matched elements.
     """
 
     async def check_tag(
             tag: str
         ) -> list[ElementHandle]:
         """
-        Check all the tags equal to the given tag and whose attribute(s) 
-        satisfy the regular expression.
+        Check all elements of a given tag for attributes 
+        matching the regex.
 
-        Args:
-            tag (str):
-                A HTML tag.
+        Parameters
+        ----------
+        tag : str
+            HTML tag name.
 
-        Returns:
-            list[ElementHandle]:
-                A list containing all the tags whose attribute(s)
-                satisfy the regex.
+        Returns
+        -------
+        list[ElementHandle]
+            List of elements whose attributes match the regex.
         """
 
         matches: list[ElementHandle] = []
-        elements: list[ElementHandle] = await webpage.query_selector_all(tag)
+        elements: list[ElementHandle] = (
+            await webpage.query_selector_all(tag)
+        )
 
         async def check_elem(
                 element: ElementHandle
             ) -> ElementHandle | None:
             """
-            Check if the given element contains any attribute that
-            satisfy the regular expression.
+            Check if a single element contains any attribute 
+            matching the regex.
 
-            Returns:
-                - `None` if the element's attribute(s) don't satisfy the regex.
-                - `ElementHandle` otherwise.
+            Parameters
+            ----------
+            element : ElementHandle
+                The element to inspect.
+
+            Returns
+            -------
+            ElementHandle | None
+                The element if it matches, None otherwise.
             """
 
             attributes: dict[str, str] = await element.evaluate(
@@ -94,7 +103,7 @@ async def find_elements_with_attr_pattern(
             return None
     
         if not early_end:
-            # long execution
+            # -------------------- long execution --------------------
             results: list[ElementHandle | None] = await asyncio.gather(
                 *(check_elem(e) for e in elements)
             )
@@ -104,8 +113,9 @@ async def find_elements_with_attr_pattern(
                     matches.append(r)
 
             return matches
+        
         else:
-            # short execution
+            # -------------------- short execution -------------------
             tasks: list[asyncio.Task[ElementHandle | None]] = [
                 asyncio.create_task(check_elem(e))
                 for e in elements
@@ -132,7 +142,10 @@ async def find_elements_with_attr_pattern(
                         for p in pending:
                             p.cancel()
 
-                        await asyncio.gather(*pending, return_exceptions=True)
+                        await asyncio.gather(
+                            *pending, 
+                            return_exceptions = True
+                        )
 
                         return matches
 
@@ -154,12 +167,15 @@ async def close_page_resources(
         page: Page
     ) -> None:
     """
-    Clean up Playwright resources associated with the given page.
+    Close Playwright resources associated with a page.
 
-    This function attempts to close the page, its browser context,
-    and the underlying browser instance. Any errors encountered during 
-    the cleanup process are silently ignored to ensure that resource 
-    disposal does not interrupt the caller's execution flow.
+    This includes the page itself, its browser context, and
+    the underlying browser. Errors during cleanup are ignored.
+
+    Parameters
+    ----------
+    page : Page
+        The Playwright page to close.
     """
 
     try:
@@ -179,18 +195,23 @@ async def close_popups(
         page: Page
     ) -> None:
     """
-    Close all pop-ups related to cookies and advertising in a webpage. 
-    By default all the cookies are rejected if possible, otherwise they are accepted.
+    Close pop-ups for cookies or ads on a webpage.
 
-    Args:
-        provider (BaseProvider):
-            A provider of professional items.
+    By default, attempts to reject cookies if possible; 
+    otherwise accepts them. Any pop-ups that cannot be 
+    processed are skipped silently.
 
-        page (Page):
-            A page at the given provider's website.
+    Parameters
+    ----------
+    popup_selectors : list[str]
+        A list of CSS selectors identifying potential pop-ups.
 
-    Returns:
-        None
+    page : Page
+        The Playwright page object to operate on.
+
+    Returns
+    -------
+    None
     """
 
     decline_texts: re.Pattern[str] = re.compile(
@@ -217,8 +238,6 @@ async def close_popups(
                 elem: Locator = elements.nth(i)
 
                 if await elem.is_visible():
-                    # we return the text content or an empty string, 
-                    # cause the if-statemente could fail with a NoneType
                     text: str = await elem.text_content() or ""
 
                     if re.search(decline_texts, text):
@@ -227,13 +246,14 @@ async def close_popups(
                     elif re.search(accept_texts, text):
                         accept_cookie = elem
 
-            # we click on accept when there is no reject button
-            if (accept_cookie is not None) and (await accept_cookie.is_visible()):
+            if (
+                (accept_cookie is not None) 
+                and 
+                (await accept_cookie.is_visible())
+            ):
                 await accept_cookie.click()
                 
         except:
             continue
 
-    # in order to get rid of those pop-ups that 
-    # do not contain ASCII safe characters
     await page.keyboard.press("Escape")

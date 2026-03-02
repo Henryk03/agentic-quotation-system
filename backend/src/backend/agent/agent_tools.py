@@ -1,18 +1,17 @@
 
 import asyncio
 import re
-from typing import Any, Coroutine, Callable
+from typing import Any, Callable, Coroutine
 
 from bs4 import BeautifulSoup, ResultSet, Tag
 from google import genai
 from langchain_core.runnables import RunnableConfig
 from playwright.async_api import (
+    async_playwright,
     BrowserContext,
     Page,
     TimeoutError as PlaywrightTimeoutError,
-    async_playwright,
 )
-
 from backend.agent.prompts import (
     COMPUTER_USE_SYSTEM_PROMPT,
     USER_PROMPT,
@@ -26,7 +25,7 @@ from backend.backend_utils.computer_use import (
     ComputerUseSession,
     generate_content_config,
     run_computer_use_loop,
-    save_product
+    save_product,
 )
 from backend.backend_utils.exceptions import LoginFailedException
 from backend.config import settings
@@ -42,24 +41,26 @@ async def search_products(
         products: list[str]
     ) -> str:
     """
-    Searches for multiple products across specified providers.
+    Searches for multiple products across the selected providers.
 
-    This function iterates through the list of products and retrieves details
-    from each provider, respecting a maximum number of results for each 
-    individual product search.
+    This function iterates through the list of products and retrieves 
+    details from each provider, respecting a maximum number of results 
+    for each individual product search.
 
-    Args:
-        config (RunnableConfig): 
-            Configuration for the LangChain runnable, containing callbacks, 
-            tags, and other execution metadata.
+    Parameters
+    ----------
+    config : langchain_core.runnables.RunnableConfig 
+        Configuration for the LangChain runnable, containing callbacks, 
+        tags, and other execution metadata.
 
-        products (list[str]): 
-            A list of product names, models, or keywords to investigate.
+    products : list[str] 
+        A list of product names, models, or keywords to investigate.
 
-    Returns:
-        str: 
-            A concatenated and formatted string containing the aggregated 
-            search results, structured for easy parsing or LLM consumption.
+    Returns
+    -------
+    str
+        A concatenated and formatted string containing the aggregated 
+        search results, structured for easy parsing or LLM consumption.
     """
     
     client_id: str | None
@@ -177,25 +178,55 @@ async def __search_in_website(
         limit_per_product: int = 1
     ) -> None:
     """
-    Perform web actions on the given provider's website to gather informations 
-    about the given products. These informations are then inserted into the given
-    `result_list`.
+    Search one or more products on a provider's website and append
+    formatted result blocks to a shared asynchronous result container.
 
-    Args:
-        provider (BaseProvider):
-            A provider for the products.
+    The function navigates to the provider homepage, performs a search
+    for each non-empty product string, waits for the results to load,
+    extracts up to `limit_per_product` matches, and formats the
+    collected data (title, availability, price, link) into structured
+    blocks.
 
-        page (Page):
-            A webpage used to search for the products.
+    Errors occurring during individual product searches are captured
+    and appended to `result_list` without interrupting the overall
+    execution flow.
 
-        products (list[str]):
-            A list containig all the products to be searched on the website.
-            
-        result_list (SafeAsyncList):
-            A list that will contain the scraping's results as strings.
+    Parameters
+    ----------
+    provider : BaseProvider
+        Concrete provider implementation responsible for defining
+        the target URL and all selectors required to perform
+        search and data extraction.
 
-    Returns:
-        None
+    page : playwright.async_api.Page
+        Initialized Playwright page instance used for navigation,
+        interaction, and HTML retrieval.
+
+    products : list of str
+        Collection of product names or search queries.
+        Leading and trailing whitespace is removed.
+        Empty strings are ignored.
+
+    result_list : SafeAsyncList
+        Asynchronous thread-safe container where formatted
+        result blocks (successes or errors) are appended.
+
+    limit_per_product : int, optional
+        Maximum number of result entries extracted for each
+        product query. Default is 1.
+
+    Returns
+    -------
+    None
+        The function does not return a value. It mutates
+        `result_list` by appending formatted entries.
+
+    Raises
+    ------
+    None
+        Exceptions are handled internally. Any error is
+        converted into a formatted message and appended
+        to `result_list`.s
     """
 
     try:
@@ -203,7 +234,6 @@ async def __search_in_website(
         await page.wait_for_load_state("load")
         
         for item in products:
-
             item: str = item.strip()
 
             if not item:
@@ -230,7 +260,6 @@ async def __search_in_website(
                     )
                     await result_list.add(formatted_block)
 
-                    # let's check the next item...
                     continue
             
                 _ = await __wait_for_any_selector(
@@ -331,7 +360,63 @@ async def __search_with_computer_use(
         result_list: SafeAsyncList,
         limit_per_product: int = 1
     ) -> None:
-    """"""
+    """
+    Search for products on a website using an AI-driven computer-use 
+    loop and append formatted results to a shared asynchronous container.
+
+    This function initializes a generative AI client configured for
+    browser-based interaction, builds a prompt describing the requested
+    products, and executes a computer-use session that interacts with
+    the provided Playwright page. Extracted product data is collected
+    into `products_data` and formatted before being appended to
+    `result_list`.
+
+    If no product information is gathered, a fallback message is added
+    instead. All exceptions are silently handled to prevent interruption
+    of the calling workflow.
+
+    Parameters
+    ----------
+    provider_url : str
+        Base URL of the target website. Used in the generated prompt
+        and in result formatting.
+
+    page : playwright.async_api.Page
+        Initialized Playwright page instance used as the execution
+        environment for the computer-use loop.
+
+    products : list of str
+        List of product names or search queries to be included
+        in the generated prompt.
+
+    result_list : SafeAsyncList
+        Asynchronous thread-safe list where formatted
+        result blocks are appended.
+
+    limit_per_product : int, optional
+        Maximum number of items requested per product in the
+        generated prompt. Default is 1.
+
+    Returns
+    -------
+    None
+        The function does not return a value. It appends
+        formatted results (or a fallback message) to `result_list`.
+
+    Raises
+    ------
+    None
+        All exceptions are suppressed internally. Failures
+        result in an empty `products_data` collection,
+        triggering a fallback message.
+
+    Notes
+    -----
+    The function relies on an AI-driven interaction loop rather than
+    deterministic DOM scraping. The quality and completeness of the
+    results depend on the model's ability to correctly interpret and
+    navigate the webpage.
+    """
 
     products_data: list[dict[str, str]] = []
 
@@ -408,14 +493,27 @@ async def __normalize_selectors(
         selectors: list[str] | dict
     ) -> list[str]:
     """
-    Normalize the input selectors into a single list.
+    Normalize a selector container into a flat list of CSS selectors.
 
-    If `selectors` is an `AvailabilityDict`, all values are flattened
-    into one list. If it is already a list, it is returned unchanged.
+    If `selectors` is a dictionary, all its values are flattened
+    into a single list. If it is already a list, it is returned
+    unchanged.
 
-    Examples:
-        {"a": [1, 2], "b": [3]} -> [1, 2, 3]
-        [1, 2, 3] -> [1, 2, 3]
+    Parameters
+    ----------
+    selectors : list of str or dict
+        Either a list of CSS selectors or a dictionary mapping
+        arbitrary keys to lists of selectors.
+
+    Returns
+    -------
+    list of str
+        A flat list containing all selectors.
+
+    Notes
+    -----
+    The function does not validate selector syntax. It only
+    normalizes the container structure.
     """
 
     if isinstance(selectors, dict):
@@ -430,23 +528,35 @@ async def __wait_for_any_selector(
         timeout: float = 2000
     ) -> str | None:
     """
-    Wait for the first selector to appear on the page.
+    Wait until at least one selector becomes visible on the page.
 
-    Args:
-        page (Page):
-            The Playwright page to search on.
+    Selectors are normalized into a flat list and tested sequentially.
+    The first selector that reaches the `visible` state within
+    the given timeout is returned.
 
-        selectors (list[str] | AvailabilityDict):
-            CSS selectors or an AvailabilityDict of selectors.
+    Parameters
+    ----------
+    page : playwright.async_api.Page
+        Playwright page instance used for DOM querying.
 
-        timeout (float, optional):
-            Maximum time to wait for each selector in milliseconds.
-            Default is 2000 ms.
+    selectors : list of str or dict
+        CSS selectors or a dictionary whose values are lists
+        of CSS selectors.
 
-    Returns:
-        str | None:
-            The first selector that becomes visible, or None if
-            none are found within the timeout.
+    timeout : float, optional
+        Maximum time (in milliseconds) to wait for each
+        selector. Default is 2000.
+
+    Returns
+    -------
+    str or None
+        The first selector that becomes visible, or `None`
+        if none are found within the timeout.
+
+    Raises
+    ------
+    None
+        Timeout errors are handled internally.
     """
 
     selectors = await __normalize_selectors(selectors)
@@ -454,9 +564,9 @@ async def __wait_for_any_selector(
     for sel in selectors:
         try:
             await page.wait_for_selector(
-                selector=sel,
-                state="visible",
-                timeout=timeout
+                selector = sel,
+                state = "visible",
+                timeout = timeout
             )
             return sel
         
@@ -473,33 +583,47 @@ async def __wait_for_all_selectors(
         timeout: float = 2000
     ) -> bool:
     """
-    Wait for all specified selectors to appear on the page.
+    Wait until all provided selectors become visible.
 
-    Args:
-        page (Page):
-            The Playwright page to search on.
+    Selectors are normalized into a flat list and awaited
+    concurrently using `asyncio.gather`.
 
-        selectors (list[str] | AvailabilityDict):
-            CSS selectors or an AvailabilityDict of selectors.
+    Parameters
+    ----------
+    page : playwright.async_api.Page
+        Playwright page instance used for DOM querying.
 
-        timeout (float, optional):
-            Maximum time to wait for each selector in milliseconds.
-            Default is 2000 ms.
+    selectors : list of str or dict
+        CSS selectors or a dictionary whose values are lists
+        of CSS selectors.
 
-    Returns:
-        bool:
-            True if all selectors became visible within the timeout,
-            False otherwise.
+    timeout : float, optional
+        Maximum time (in milliseconds) to wait for each
+        selector. Default is 2000.
+
+    Returns
+    -------
+    bool
+        `True` if all selectors become visible within
+        the timeout, `False` if at least one times out.
+
+    Raises
+    ------
+    None
+        Timeout errors are captured and converted into
+        a `False` return value.
     """
 
-    selectors = await __normalize_selectors(selectors)
+    norm_selectors: list[str] = await __normalize_selectors(
+        selectors
+    )
 
     try:
         await asyncio.gather(
             *(page.wait_for_selector(
-                selector=sel,
-                state="visible",
-                timeout=timeout) for sel in selectors
+                selector = sel,
+                state = "visible",
+                timeout = timeout) for sel in norm_selectors
             )
         )
         return True
@@ -513,21 +637,35 @@ async def __select_text(
         selectors: list[str] | dict
     ) -> list[str]:
     """
-    Extract text content from the first element matching any of the
-    provided selectors.
+    Extract HTML string representations from tags using 
+    selectors.
 
-    Args:
-        tag (ResultSet[Tag]):
-            The BeautifulSoup tag to search within.
+    For each normalized selector and each tag in `tags`,
+    the function searches for the first matching element.
+    If found, the string representation of the element
+    is appended to the result list. Otherwise, `"N/A"`
+    is appended.
 
-        selectors (list[str] | AvailabilityDict):
-            A list of CSS selectors or an `AvailabilityDict` containing
-            'available' and 'not_available' lists of selectors.
+    Parameters
+    ----------
+    tags : bs4.element.ResultSet[bs4.element.Tag]
+        Collection of BeautifulSoup tags representing
+        product containers.
 
-    Returns:
-        str:
-            The text of the first matching element, stripped of whitespace,
-            or "N/A" if no element matches.
+    selectors : list of str or dict
+        CSS selectors or a dictionary whose values are lists
+        of CSS selectors.
+
+    Returns
+    -------
+    list of str
+        A list containing extracted element strings or
+        `"N/A"` placeholders.
+
+    Notes
+    -----
+    The function returns the raw string representation
+    of matched elements, not their stripped text content.
     """
 
     results: list[str] = []
@@ -552,7 +690,38 @@ async def __select_all_text(
         selectors: list[str] | dict,
         availability_alt_texts: re.Pattern[str] | None
     ) -> list[str]:
-    """"""
+    """
+    Extract and aggregate text content from tags using selectors.
+
+    For each tag, all matching elements for the given selectors
+    are collected. Extracted text values are stripped and joined
+    into a comma-separated string. If no text is found for a tag,
+    `"N/A"` is returned for that entry.
+
+    If `selectors` is a dictionary, each key represents a
+    semantic state (e.g., availability category). When
+    `availability_alt_texts` is provided and the state is
+    `"available"`, matching text can be normalized to
+    `"Available"`.
+
+    Parameters
+    ----------
+    tags : list of bs4.element.Tag
+        List of BeautifulSoup tags representing product containers.
+
+    selectors : list of str or dict
+        CSS selectors or a dictionary mapping state labels
+        to lists of selectors.
+
+    availability_alt_texts : re.Pattern[str] or None
+        Optional regular expression used to normalize
+        availability text.
+
+    Returns
+    -------
+    list of str
+        One aggregated string per input tag.
+    """
 
     results: list[str] = []
 
@@ -574,7 +743,7 @@ async def __select_all_text(
         else:
             for sel in selectors:
                 for elem in tag.select(sel):
-                    text = elem.get_text(strip=True)
+                    text = elem.get_text(strip = True)
 
                     if text:
                         texts.append(text)
@@ -589,7 +758,40 @@ async def __extract_attribute_from_selectors(
         selectors: list[str] | None,
         priority_attributes: list[str]
     ) -> list[str]:
-    """"""
+    """
+    Extract prioritized attribute values from nested selectors.
+
+    For each tag, selectors are evaluated in order. The first
+    matching container is searched (including all its descendants)
+    for the first available attribute listed in
+    `priority_attributes`.
+
+    Parameters
+    ----------
+    tags : bs4.element.ResultSet[bs4.element.Tag]
+        Collection of BeautifulSoup tags representing
+        product containers.
+
+    selectors : list of str or None
+        CSS selectors used to locate candidate elements.
+        If `None` or empty, `"N/A"` is returned for all tags.
+
+    priority_attributes : list of str
+        Ordered list of attribute names to search for
+        (e.g., `["href", "data-url"]`).
+
+    Returns
+    -------
+    list of str
+        Extracted attribute values or `"N/A"` if none
+        are found for a given tag.
+
+    Notes
+    -----
+    Selectors and attributes are evaluated in priority order.
+    The first valid value found terminates the search
+    for that tag.
+    """
 
     results: list[str] = []
 
@@ -630,21 +832,31 @@ async def __format_block(
         products: list[dict[str, str]] | str
     ) -> str:
     """
-    Format a block of text with the provider name followed by
-    formatted product details.
+    Format product data into a provider-prefixed text block.
 
-    Args:
-        provider_name (str):
-            The name of the provider.
+    If `products` is a list of dictionaries, each entry
+    is formatted as a single line with fields separated
+    by `" | "` and prefixed by the uppercased provider name.
 
-        products (list[dict[str, str]]):
-            A list of dictionaries, each containing product info
-            (e.g., 'name', 'price', 'availability').
+    If `products` is a string, it is treated as a message
+    and formatted as a single provider-prefixed line.
 
-    Returns:
-        str:
-            A single string with the provider name in uppercase,
-            followed by the product details joined with " | ".
+    Parameters
+    ----------
+    provider_name : str
+        Name of the provider. It is converted to uppercase
+        in the output.
+
+    products : list of dict[str, str] or str
+        Either a list of product dictionaries containing
+        keys such as `"name"`, `"availability"`,
+        `"price"`, and `"link"`, or a plain message string.
+
+    Returns
+    -------
+    str
+        A formatted string containing one or more lines
+        ready for aggregation or display.
     """
     
     if isinstance(products, list):

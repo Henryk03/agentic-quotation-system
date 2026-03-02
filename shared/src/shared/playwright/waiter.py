@@ -12,37 +12,37 @@ async def wait_until_logged_in(
         interval: float = 500
     ) -> bool:
     """
-    Wait until the user is logged-in into the given
-    provider's website.
+    Wait until the user is logged in on a webpage.
 
-    Args:
-        provider (BaseProvider):
-            A provider for whom a login is required.
+    The function repeatedly calls `check_func` on the given
+    Playwright page until it returns True or the timeout expires.
 
-        page (Page):
-            A page at the given provider's website.
+    Parameters
+    ----------
+    page : Page
+        A Playwright page representing the website where login occurs.
 
-        check_func (Callable[[BaseProvider, Page], bool]):
-            A function used to check if the user is logged-in
-            into the website.
+    check_func : Callable[[Page], Awaitable[bool]]
+        An async function that checks if the user is logged in.
+        Should return True when login is detected, False otherwise.
 
-        timeout (float | None):
-            The time given (in milliseconds) to the user to 
-            fulfill the login. Default is 15000 ms.
+    timeout : float, optional
+        Maximum time to wait for login in milliseconds. Default is 15000 ms.
 
-        interval (float | None):
-            The time (in milliseconds) between one check
-            and another. Default is 500 ms.
+    interval : float, optional
+        Interval between checks in milliseconds. Default is 500 ms.
 
-    Returns:
-        bool:
-        - `True` if the login has been successfully fulfilled 
-            within the timeout.
-        - `False` otherwise.
+    Returns
+    -------
+    bool
+        True if login was detected within the timeout, False otherwise.
+
+    Notes
+    -----
+    - The function uses asyncio sleep to wait between checks.
+    - Time measurement is based on asyncio event loop's internal clock.
     """
 
-    # we start to record the time passed
-    # since the beginning of the `while` loop
     loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
     start: float = loop.time()
 
@@ -53,5 +53,4 @@ async def wait_until_logged_in(
         if (loop.time() - start) * 1000 > timeout:
             return False
         
-        # sleep accepts seconds as parameter
         await asyncio.sleep(interval / 1000)

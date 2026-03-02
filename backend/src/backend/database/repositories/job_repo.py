@@ -10,7 +10,9 @@ from shared.shared_utils.common import JobStatus
 
 
 class JobRepository:
-    """"""
+    """
+    Repository class for managing jobs for clients and chats.
+    """
 
 
     @staticmethod
@@ -19,7 +21,25 @@ class JobRepository:
             client_id: str,
             chat_id: str | None
         ) -> str:
-        """"""
+        """
+        Create a new job entry in the database.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for database access.
+
+        client_id : str
+            The unique identifier of the client creating the job.
+
+        chat_id : str | None
+            The ID of the chat associated with the job, if any.
+
+        Returns
+        -------
+        str
+            The unique ID of the newly created job.
+        """
 
         job_id: str = str(uuid.uuid4())
 
@@ -42,7 +62,22 @@ class JobRepository:
             db: AsyncSession, 
             job_id: str
         ) -> None:
-        """"""
+        """
+        Mark a job as running.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for 
+            database access.
+
+        job_id : str
+            The ID of the job to update.
+
+        Returns
+        -------
+        None
+        """
 
         job: Job | None = await db.get(Job, job_id)
 
@@ -58,7 +93,24 @@ class JobRepository:
             job_id: str, 
             result: dict
         ) -> None:
-        """"""
+        """
+        Set the result of a completed job and mark it as completed.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for database access.
+
+        job_id : str
+            The ID of the job to update.
+
+        result : dict
+            The result data produced by the job.
+
+        Returns
+        -------
+        None
+        """
 
         job: Job | None = await db.get(Job, job_id)
 
@@ -75,7 +127,24 @@ class JobRepository:
             job_id: str, 
             error: str
         ) -> None:
-        """"""
+        """
+        Mark a job as failed and store the associated error message.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for database access.
+
+        job_id : str
+            The ID of the job to update.
+
+        error : str
+            The error message describing the failure.
+
+        Returns
+        -------
+        None
+        """
 
         job: Job | None = await db.get(Job, job_id)
 
@@ -91,7 +160,23 @@ class JobRepository:
             db: AsyncSession, 
             job_id: str
         ) -> dict[str, Any] | None:
-        """"""
+        """
+        Retrieve a job's details by its ID.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for database access.
+            
+        job_id : str
+            The ID of the job to retrieve.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            A dictionary containing job details (status, result, 
+            error, timestamps) if the job exists, otherwise None.
+        """
 
         job: Job | None = await db.get(Job, job_id)
 

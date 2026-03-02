@@ -3,85 +3,77 @@ from re import Pattern
 
 import requests
 from playwright.async_api import (
-    Page,
-    ElementHandle
+    ElementHandle,
+    Page
 )
 
 from shared.playwright.captcha_detection import detect_captcha
-from shared.shared_utils.common.dictionaries import AvailabilityDict
 from shared.playwright.page_utilities import (
     find_elements_with_attr_pattern,
     close_popups
 )
+from shared.shared_utils.common.dictionaries import AvailabilityDict
 
 
 class BaseProvider:
     """
     Base class representing a provider and its optional login logic.
 
-    Provider instances are registered explicitly through a central
-    registry. Each provider defines how products are searched, how
-    results are parsed, and whether authentication is required to
-    access the website.
+    Attributes
+    ----------
+    availability_classes : AvailabilityDict
+        CSS classes or selectors used to detect product availability.
 
-    [UNIQUENESS REQUIREMENT]
-        To ensure data accuracy, selectors provided for links and 
-        other fields must be as specific as possible.
+    availability_texts : Pattern[str] | None
+        Regular expression used to identify availability based 
+        on specific text. If `None`, availability is determined 
+        only via CSS classes.
 
-    Attributes:
-        availability_classes (AvailabilityDict):
-            CSS classes or selectors used to detect product availability.
+    login_required : bool
+        Indicates whether authentication is required to browse 
+        the provider's site.
 
-        availability_texts (Pattern[str] | None):
-            Regular expression used to identify availability based on specific 
-            actionable text (e.g., "Add to cart"). If `None`, availability is 
-            determined solely via CSS classes.
+    logout_selectors : list[str] | None
+        HTML selectors for logout buttons or links. `None` if not 
+        needed.
 
-        login_required (bool):
-            Indicates whether authentication is required to browse
-            the provider's site.
+    logout_texts : Pattern[str] | None
+        Regex to match logout-related visible text elements. 
+        `None` if not needed.
 
-        logout_selectors (list[str] | None):
-            HTML selectors for buttons or links used to perform logout.
-            Can be `None` if the provider doesn't require a specific selector 
-            logic.
+    name : str
+        The provider's display name.
 
-        logout_texts (Pattern[str] | None):
-            Regular expression used to match visible text elements
-            associated with logout actions on the provider's website.
-            Can be `None` if logout is handled exclusively via selectors
-            or is not required.
+    popup_selectors : list[str]
+        HTML selectors for popups to be closed.
 
-        name (str):
-            The provider's display name.
+    price_classes : list[str]
+        CSS classes used to extract product price.
 
-        popup_selectors (list[str]):
-            HTML selectors used to detect and close popup elements.
+    product_link_selectors : list[str]
+        HTML selectors to locate product links or parent containers.
 
-        price_classes (list[str]):
-            CSS classes used to extract the product's price.
+    result_container : list[str]
+        HTML selectors identifying the search result container.
 
-        product_link_selectors (list[str]):
-            HTML selectors used to locate the product's detail page link. 
-            Can point directly to an 'a' tag or to a parent container.
+    search_texts : Pattern[str]
+        Regex to match search-related text elements on the provider's site.
 
-        result_container (list[str]):
-            HTML selectors identifying the container of search results.
+    title_classes : list[str]
+        CSS classes specifying the title element within a search result.
 
-        search_texts (Pattern[str]):
-            Regular expression used to match search-related text
-            elements (e.g. placeholders, aria-labels, buttons) on the
-            provider's website.
+    url : str
+        URL of the provider's website.
 
-        title_classes (list[str]):
-            CSS classes specifying the title element within a search result.
+    Raises
+    ------
+    ValueError
+        If the provider's URL is not valid or unreachable.
 
-        url (str):
-            The URL of the provider's website.
-
-    Raises:
-        ValueError:
-            If the provider's website URL is not valid or not reachable.
+    Notes
+    -----
+    To ensure data accuracy, selectors provided for links and 
+    other fields must be as specific as possible.
     """
 
 
@@ -125,20 +117,22 @@ class BaseProvider:
         
 
     @staticmethod
-    def __is_valid_url(url: str) -> bool:
+    def __is_valid_url(
+            url: str
+        ) -> bool:
         """
         Check whether the given URL is reachable.
 
-        The URL is considered valid if:
+        Parameters
+        ----------
+        url : str
+            The URL to validate.
 
-        - An HTTP HEAD request responds with a status code < 400.
-        - The request fails due to an SSL error (e.g. expired certificate),
-          which is interpreted as “reachable but with SSL issues”.
-
-        Returns:
-            bool:
-                - `True` if the URL is reachable or returns an SSL-related error.
-                - `False` if the URL is invalid or unreachable.
+        Returns
+        -------
+        bool
+            `True` if reachable (status < 400) or SSL error occurs.
+            `False` otherwise.
         """
 
         try:
@@ -151,15 +145,12 @@ class BaseProvider:
         
     def has_auto_login(self) -> bool:
         """
-        Determine whether the current `BaseProvider` instance provides
-        its own implementation of the `auto_login` method. This is true
-        only if the subclass overrides the default `BaseProvider.auto_login`
-        implementation.
+        Determine if the provider defines a custom auto-login method.
 
-        Returns:
-            bool:
-                - `True` if the provider defines a custom `auto_login` method.
-                - `False` otherwise.
+        Returns
+        -------
+        bool
+            `True` if `auto_login` is overridden, `False` otherwise.
         """
 
         return self.auto_login.__func__ is not BaseProvider.auto_login
@@ -172,19 +163,26 @@ class BaseProvider:
             password: str
         ) -> bool:
         """
-        Default automatic login implementation, which performs no action.
-        Subclasses of `BaseProvider` should override this method to
-        implement provider-specific authentication logic.
+        Default auto-login implementation.
 
-        Args:
-            page (Page):
-                The page instance already navigated to the provider's
-                login area.
+        Subclasses should override to implement provider-specific 
+        login logic.
 
-        Returns:
-            bool:
-                - `True` if the login procedure succeeds,
-                - `False` otherwise.
+        Parameters
+        ----------
+        page : Page
+            Playwright page already navigated to the login area.
+
+        username : str
+            User's login username.
+
+        password : str
+            User's login password.
+
+        Returns
+        -------
+        bool
+            `True` if login succeeds, `False` otherwise.
         """
 
         return False
@@ -195,17 +193,17 @@ class BaseProvider:
             page: Page
         ) -> bool:
         """
-        Check if the user is logged-in into the website in
-        the given webpage.
+        Check if the user is logged in on the website.
 
-        Args:
-            page (Page):
-                A page at the given provider's website.
+        Parameters
+        ----------
+        page : Page
+            Playwright page at the provider's website.
 
-        Returns:
-            bool
-            - `True` if the user is logged-in.
-            - `False` otherwise.
+        Returns
+        -------
+        bool
+            `True` if logged in, `False` otherwise.
         """
 
         try:
@@ -235,7 +233,19 @@ class BaseProvider:
             self,
             page: Page
         ) -> bool:
-        """"""
+        """
+        Detect if a captcha is present on the page.
+
+        Parameters
+        ----------
+        page : Page
+            Playwright page to inspect.
+
+        Returns
+        -------
+        bool
+            `True` if captcha is detected, `False` otherwise.
+        """
 
         return await detect_captcha(page)  
     
@@ -244,7 +254,19 @@ class BaseProvider:
             self,
             page: Page
         ) -> None:
-        """"""
+        """
+        Close all popups on the provider's page using registered 
+        selectors.
+
+        Parameters
+        ----------
+        page : Page
+            Playwright page on which popups should be closed.
+
+        Returns
+        -------
+        None
+        """
 
         await close_popups(
             self.popup_selectors,

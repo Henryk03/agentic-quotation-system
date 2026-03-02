@@ -1,57 +1,71 @@
-
-import sys
 import asyncio
+import logging
+import sys
 
 from backend.config import settings
+from backend.server.rest_server import start_server
 
 
-async def async_main():
-    print("🔧 Initializing Agentic Backend Server...\n")
+logging.basicConfig(
+    level = settings.LOG_LEVEL,
+    format = "%(levelname)s | %(asctime)s | %(message)s",
+    datefmt = "%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("agent-server")
 
-    is_valid: bool
-    errors: list[str]
-    
+
+async def main() -> int:
+    """
+    Validate configuration and start the asynchronous backend server.
+
+    Reads settings from environment variables, validates them, and 
+    starts the FastAPI server using host and port from the .env file.
+
+    Returns
+    -------
+    int
+        Exit code. 0 if successful, 1 if configuration errors or server
+        startup errors occur.
+    """
+
+    logger.info("initializing Agentic Backend Server...")
+
+    is_valid: bool = False
+    errors: list[str] = []
+
     is_valid, errors = settings.validate()
-    
+
     if not is_valid:
-        print("❌ Configuration errors found:")
+        logger.error("configuration errors found:")
 
-        for error in errors:
-            print(f"   - {error}")
+        for err in errors:
+            logger.error(f"   - {err}")
 
-        print("\n💡 Please edit your .env file to fix these issues.")
+        logger.info("please edit your .env file to fix these issues.")
         return 1
-    
-    print(f"✅ Configuration validated.")
-    print(f"✅ Configuration loaded from .env\n")
 
-    print(f"🔧 Settings: ")
-    print(f"   Host={settings.HOST}")
-    print(f"   Port={settings.PORT}")
-    print(f"   Headless={settings.HEADLESS}")
-    
-    print(f"\n🚀 Starting server on {settings.HOST}:{settings.PORT}...")
+    logger.info("configuration validated and loaded")
+    logger.info(
+        f"starting server on {settings.HOST}:{settings.PORT} "
+        f"(Headless={settings.HEADLESS})"
+    )
 
-    from backend.server.rest_server import start_server
-    
     try:
-        await start_server(host=settings.HOST, port=settings.PORT)
+        await start_server(host = settings.HOST, port = settings.PORT)
 
     except Exception as e:
-        print(f"\n❌ Server error: {e}")
+        logger.exception(f"server error: {e}")
         return 1
-    
+
     return 0
 
 
-def main():
-    try:
-        return asyncio.run(async_main())
-        
-    except KeyboardInterrupt:
-        print("\n👋 Shutdown requested")
-        return 0
-
-
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        exit_code = asyncio.run(main())
+
+    except KeyboardInterrupt:
+        logger.info("shutdown requested by user")
+        exit_code = 0
+
+    sys.exit(exit_code)

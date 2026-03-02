@@ -2,13 +2,18 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.backend_utils.security.db_security import decrypt, encrypt
+from backend.backend_utils.security.db_security import (
+    decrypt, 
+    encrypt
+)
 from backend.database.actions.client_touch import touch_client
 from backend.database.models.credential import Credential
 
 
 class CredentialsRepository:
-    """"""
+    """
+    Repository class for managing store credentials for clients.
+    """
     
 
     @staticmethod
@@ -19,7 +24,30 @@ class CredentialsRepository:
             username: str,
             password: str
         ) -> None:
-        """"""
+        """
+        Insert or update the credentials for a given client and store.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for database access.
+
+        client_id : str
+            The unique identifier of the client.
+
+        store : str
+            The name of the store for which credentials are being stored.
+
+        username : str
+            The username for the store (will be encrypted before storage).
+
+        password : str
+            The password for the store (will be encrypted before storage).
+
+        Returns
+        -------
+        None
+        """
 
         stmt = (
             select(Credential)
@@ -58,7 +86,26 @@ class CredentialsRepository:
             client_id: str,
             store: str
         ) -> tuple[str | None, str | None]:
-        """"""
+        """
+        Retrieve and decrypt the credentials for a given client and store.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for database access.
+
+        client_id : str
+            The unique identifier of the client.
+            
+        store : str
+            The name of the store for which credentials are being retrieved.
+
+        Returns
+        -------
+        tuple[str | None, str | None]
+            A tuple containing the decrypted username and password. 
+            Returns (None, None) if no credentials are found.
+        """
 
         stmt = (
             select(Credential)

@@ -1,5 +1,9 @@
 
-from datetime import datetime, timedelta, timezone
+from datetime import (
+    datetime, 
+    timedelta, 
+    timezone
+)
 from sqlalchemy import delete
 from sqlalchemy.engine import Result
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +14,10 @@ from backend.database.models.client import Client
 
 
 class ClientRepository:
-    """"""
+    """
+    Repository class for performing database operations 
+    on Client objects.
+    """
     
 
     @staticmethod
@@ -18,7 +25,23 @@ class ClientRepository:
             db: AsyncSession,
             client_id: str
         ) -> Client:
-        """"""
+        """
+        Retrieve a client by ID or create a new one if it does not exist.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for database access.
+
+        client_id : str
+            The unique identifier of the client to retrieve or create.
+
+        Returns
+        -------
+        Client
+            The retrieved or newly created Client object.
+        """
+
 
         client: Client | None = await db.get(Client, client_id)
 
@@ -37,7 +60,23 @@ class ClientRepository:
             db: AsyncSession,
             inactive_for: timedelta
         ) -> Any | None:
-        """"""
+        """
+        Delete clients that have been inactive for a specified duration.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            The asynchronous SQLAlchemy session for database access.
+            
+        inactive_for : timedelta
+            The inactivity period threshold. Clients inactive longer 
+            than this duration will be deleted.
+
+        Returns
+        -------
+        int | None
+            The number of clients deleted, or None if not available.
+        """
 
         threshold: datetime = datetime.now(timezone.utc) - inactive_for
 

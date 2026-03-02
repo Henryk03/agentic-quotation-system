@@ -16,18 +16,18 @@ def save_product(
 
     Parameters
     ----------
-    name (str):
+    name : str
         The name or title of the product.
 
-    availability (str):
+    availability : str
         The availability status of the product (e.g., "In stock",
         "Out of stock", "Pre-order").
 
-    price (str):
+    price : str
         The product price as a string, including currency symbol
         if applicable (e.g., "€999", "$499.00").
 
-    link (str)
+    link : str
         The URL linking to the product detail page.
 
     Returns

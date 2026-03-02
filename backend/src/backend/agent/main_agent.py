@@ -1,10 +1,19 @@
 
 import asyncio
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AnyMessage,
+    HumanMessage, 
+    SystemMessage
+)
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.graph import END, START, MessagesState, StateGraph
+from langgraph.graph import (
+    END, 
+    START, 
+    MessagesState, 
+    StateGraph
+)
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from backend.agent.agent_tools import search_products
@@ -12,26 +21,60 @@ from backend.agent.prompts import SYSTEM_PROMPT
 from backend.config import settings
 
 
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",
-    temperature=0.3
+llm: ChatGoogleGenerativeAI = ChatGoogleGenerativeAI(
+    model = "gemini-2.5-flash",
+    temperature = 0.3
 )
 
 
-async def agent_node(state: MessagesState):
+async def agent_node(
+        state: MessagesState
+    ) -> dict:
     """
-    Call the model to generate a response based on the current state.
-    Given the request, it will decide to scrape the asked products
-    using the scraping tool, or simply respond to the user. If the
-    tool is used, then the agent could:
+    Execute the agent node responsible for model invocation 
+    and tool selection.
 
-    * Answer the user's question using the tool's returned informations.
-    * Simply return the results from the tool as they are.
+    The function prepends a system-level instruction to the 
+    current conversation state and invokes the language model 
+    with the `search_products` tool bound. The model may decide to:
+
+    - Produce a direct response to the user.
+    - Call the scraping tool.
+    - Call the tool and then synthesize a response using its output.
+
+    The returned value is structured to be compatible with the
+    LangGraph state format.
+
+    Parameters
+    ----------
+    state : MessagesState
+        The current graph state containing a `"messages"` key
+        with the ongoing conversation history.
+
+    Returns
+    -------
+    dict
+        A dictionary with a single `"messages"` key containing
+        the model's response message.
+
+    Raises
+    ------
+    None
+        Exceptions are propagated to the caller unless handled
+        externally by the graph runtime.
+
+    Notes
+    -----
+    The language model instance must already be configured
+    with the appropriate provider, temperature, and credentials.
+    Tool binding occurs dynamically at invocation time.
     """
 
-    system_message = SystemMessage(content = SYSTEM_PROMPT)
+    system_message: SystemMessage = SystemMessage(
+        content = SYSTEM_PROMPT
+    )
 
-    messages = [system_message] + state["messages"]
+    messages: list[AnyMessage] = [system_message] + state["messages"]
 
     response = await llm.bind_tools(
         [search_products]
@@ -75,16 +118,19 @@ async def main():
     """
     Entry point used only for local testing and debugging.
 
-    This function allows running the agent interactively from the terminal,
-    without starting the full backend or frontend services. It is intended
-    to quickly test the agent's behavior, prompts, and tool execution in an
-    isolated environment.
+    This function allows running the agent interactively 
+    from the terminal, without starting the full backend 
+    or frontend services. It is intended to quickly test 
+    the agent's behavior, prompts, and tool execution in 
+    an isolated environment.
 
-    The function is meant to be executed as a module, for example:
+    The function is meant to be executed as a module, for 
+    example:
 
         python3 -m src.main_agent
 
-    and should not be used in production or as part of the deployed system.
+    and should not be used in production or as part of 
+    the deployed system.
     """
 
     while True:
@@ -101,7 +147,7 @@ async def main():
 
         async for chunk in graph.astream(
             {
-                "messages": [HumanMessage(content=user_input)]
+                "messages": [HumanMessage(content = user_input)]
             },
             {
                 "configurable": {"thread_id": 1}

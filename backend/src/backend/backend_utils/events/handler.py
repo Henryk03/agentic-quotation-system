@@ -24,25 +24,34 @@ from backend.database.repositories import (
 from shared.events import Event
 from shared.events.chat import ChatMessageEvent
 from shared.events.clear import (
-    ClearChatMessagesResultEvent, 
     ClearChatMessagesEvent, 
+    ClearChatMessagesResultEvent,
+    DeleteClientChatsEvent,
     DeleteClientChatsResultEvent,
-    DeleteClientChatsEvent
 )
 from shared.events.credentials import StoreCredentialsEvent
 from shared.events.login import (
-    CredentialsLoginResultEvent, 
-    StoreLoginResult,
     CheckLoginStatusEvent,
-    LoginStatusResultEvent,
-    TriggerAutoLoginEvent,
+    CredentialsLoginResultEvent,
+    LoginStatusResultEvent, 
+    StoreLoginResult,
+    TriggerAutoLoginEvent
 )
-from shared.events.metadata import StoreMetadata, BaseMetadata
+from shared.events.metadata import (
+    BaseMetadata, 
+    StoreMetadata
+)
 from shared.shared_utils.common import LoginStatus
 
 
 class EventHandler:
-    """"""
+    """
+    Central handler for managing different types of client events.
+
+    Handles credentials updates, chat messages, login checks, and 
+    clearing/deleting chat messages. Interfaces with the database 
+    repositories and backend utilities.
+    """
 
 
     @staticmethod
@@ -50,7 +59,22 @@ class EventHandler:
             db: AsyncSession,
             client_id: str
         ) -> Client:
-        """"""
+        """
+        Ensure a client exists in the database, creating it if necessary.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        client_id : str
+            The identifier of the client.
+
+        Returns
+        -------
+        Client
+            The retrieved or newly created client instance.
+        """
 
         client: Client = (
             await ClientRepository.get_or_create_client(
@@ -69,7 +93,25 @@ class EventHandler:
             chat_id: str,
             client_id: str
         ) -> Chat:
-        """"""
+        """
+        Ensure a chat exists for a client, creating it if necessary.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        chat_id : str
+            The chat session identifier.
+
+        client_id : str
+            The client identifier.
+
+        Returns
+        -------
+        Chat
+            The retrieved or newly created chat instance.
+        """
 
         chat: Chat = (
             await ChatRepository.get_or_create_chat(
@@ -90,7 +132,28 @@ class EventHandler:
             store: str,
             force_validate_state: bool = True
         ) -> tuple[LoginStatus, str | None]:
-        """"""
+        """
+        Determine the current login status for a client and store.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        client_id : str
+            The client identifier.
+
+        store : str
+            Store identifier.
+
+        force_validate_state : bool, optional
+            If `True`, validate the stored session state.
+
+        Returns
+        -------
+        Tuple of (LoginStatus, str or None)
+            Login status and optional error message.
+        """
 
         context: LoginContext = (
             await LoginContextRepository.get_or_create_context(
@@ -155,7 +218,25 @@ class EventHandler:
             event: Event,
             client_id: str
         ) -> dict[str, Any]:
-        """"""
+        """
+        Dispatch an incoming event to the appropriate handler.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        event : Event
+            The event to handle.
+
+        client_id : str
+            Identifier of the client that triggered the event.
+
+        Returns
+        -------
+        dict[str, Any]
+            The result of event processing as a dictionary.
+        """
 
         _ = await EventHandler.__ensure_client(db, client_id)
 
@@ -211,7 +292,26 @@ class EventHandler:
             event: StoreCredentialsEvent,
             client_id: str,
         ) -> dict:
-        """"""
+        """
+        Process credential updates for stores and save them.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        event : StoreCredentialsEvent
+            Event containing store credentials to update.
+
+        client_id : str
+            Identifier of the client.
+
+        Returns
+        -------
+        dict[str, Any]
+            Result event model dump summarizing success/failure 
+            per store.
+        """
 
         results: list[StoreLoginResult] = []
 
@@ -279,7 +379,27 @@ class EventHandler:
             event: ChatMessageEvent,
             client_id: str
         ) -> dict[str, Any]:
-        """"""
+        """
+        Handle a chat message event by saving user message, 
+        invoking the agent, and saving the assistant response.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        event : ChatMessageEvent
+            Incoming chat message event from the client.
+
+        client_id : str
+            Client identifier.
+
+        Returns
+        -------
+        dict[str, Any]
+            Resulting event model dump containing assistant 
+            response.
+        """
 
         ai_response: str | None = None
 
@@ -353,7 +473,26 @@ class EventHandler:
             event: ClearChatMessagesEvent,
             client_id: str
         ) -> dict[str, Any]:
-        """"""
+        """
+        Delete all messages for a given chat.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        event : ClearChatMessagesEvent
+            Event specifying which chat to clear.
+
+        client_id : str
+            Client identifier.
+
+        Returns
+        -------
+        dict[str, Any]
+            Resulting event model dump indicating success 
+            or failure.
+        """
 
         metadata: BaseMetadata = event.metadata
         chat_id: str = getattr(metadata, "chat_id")
@@ -385,7 +524,23 @@ class EventHandler:
             db: AsyncSession,
             client_id: str
         ) -> dict[str, Any]:
-        """"""
+        """
+        Delete all chats for a client.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        client_id : str
+            Identifier of the client.
+
+        Returns
+        -------
+        dict[str, Any]
+            Resulting event model dump indicating 
+            success or failure.
+        """
 
         success: bool = False
 
@@ -413,7 +568,25 @@ class EventHandler:
             event: CheckLoginStatusEvent,
             client_id: str,
         ) -> dict[str, Any]:
-        """"""
+        """
+        Check the login status of a client for a specific store.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        event : CheckLoginStatusEvent
+            Event containing the store to check.
+
+        client_id : str
+            Client identifier.
+
+        Returns
+        -------
+        dict[str, Any]
+            Event model dump containing store login status.
+        """
 
         store: str = event.store
 
@@ -440,13 +613,30 @@ class EventHandler:
     
 
     @staticmethod
-    @staticmethod
     async def __handle_autologin(
             db: AsyncSession,
             event: TriggerAutoLoginEvent,
             client_id: str,
         ) -> dict[str, Any]:
-        """"""
+        """
+        Trigger auto-login for a client on a specific store.
+
+        Parameters
+        ----------
+        db : AsyncSession
+            Database session.
+
+        event : TriggerAutoLoginEvent
+            Event specifying the store for auto-login.
+            
+        client_id : str
+            Client identifier.
+
+        Returns
+        -------
+        dict[str, Any]
+            Event model dump with the result of the auto-login attempt.
+        """
 
         store: str = event.store
 

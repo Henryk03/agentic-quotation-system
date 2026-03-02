@@ -22,9 +22,9 @@ from backend.database.repositories import (
 )
 
 from shared.events import Event
-from shared.events.metadata import BaseMetadata
 from shared.events.error import ErrorEvent
 from shared.events.job_status import JobStatusEvent
+from shared.events.metadata import BaseMetadata
 from shared.events.transport import EventEnvelope
 from shared.events.utils import extract_chat_id
 from shared.shared_utils.common import JobStatus
@@ -38,12 +38,27 @@ LOGGER_FORMAT = "%(levelname)s | %(asctime)s | %(message)s"
 async def lifespan(
         app: FastAPI
     ):
-    """"""
+    """
+    Async context manager for the FastAPI application lifespan.
+
+    Initializes logging, sets the server timezone, and starts 
+    the background task for cleaning up inactive clients. 
+    Ensures graceful shutdown by cancelling the background task.
+
+    Parameters
+    ----------
+    app : FastAPI
+        The FastAPI application instance.
+
+    Yields
+    ------
+    None
+    """
 
     basicConfig(
-        level=settings.LOG_LEVEL, 
-        format=LOGGER_FORMAT,
-        datefmt="%Y-%m-%d %H:%M:%S"
+        level = settings.LOG_LEVEL, 
+        format = LOGGER_FORMAT,
+        datefmt = "%Y-%m-%d %H:%M:%S"
     )
 
     logger.info("server started")
@@ -83,7 +98,23 @@ app: FastAPI = FastAPI(lifespan = lifespan)
 async def create_event_job(
         envelope: EventEnvelope
     ) -> dict[str, str]:
-    """"""
+    """
+    Endpoint to create a new job for an incoming event.
+
+    The function stores or ensures the existence of the client 
+    and chat, creates a job record, and triggers asynchronous 
+    processing of the event.
+
+    Parameters
+    ----------
+    envelope : EventEnvelope
+        The wrapper containing the client ID and the event to process.
+
+    Returns
+    -------
+    dict[str, str]
+        Dictionary containing the job status with job ID.
+    """
 
     client_id: str = envelope.client_id
     event: Event = envelope.event
@@ -140,7 +171,29 @@ async def run_event_job(
         client_id: str,
         event: Event
     ) -> None:
-    """"""
+    """
+    Execute the event asynchronously and update job status in 
+    the database.
+
+    Processes the event via the EventHandler, sets job status to 
+    RUNNING, COMPLETED, or FAILED, and records the results or errors. 
+    Commits all changes to the database.
+
+    Parameters
+    ----------
+    job_id : str
+        ID of the job to update.
+
+    client_id : str
+        ID of the client associated with the job.
+
+    event : Event
+        The event to process.
+
+    Returns
+    -------
+    None
+    """
 
     async with AsyncSessionLocal() as db:
         try:
@@ -195,7 +248,24 @@ async def run_event_job(
 async def get_event_result(
         event_id: str
     ) -> dict:
-    """"""
+    """
+    Retrieve the result of a previously created job/event.
+
+    Queries the database for the job by ID and returns its 
+    current status, result, or error information. Raises 
+    HTTP 404 if the job is not found.
+
+    Parameters
+    ----------
+    event_id : str
+        The ID of the event/job to retrieve.
+
+    Returns
+    -------
+    dict
+        Dictionary containing job details including status, 
+        result, and timestamps.
+    """
 
     job: dict | None = None
 
@@ -218,18 +288,33 @@ async def start_server(
         host: str,
         port: int
     ) -> None:
-    """"""
+    """
+    Start the FastAPI server using Uvicorn programmatically.
+
+    Configures host, port, logging, and lifespan handling, 
+    then starts the server asynchronously.
+
+    Parameters
+    ----------
+    host : str
+        Hostname or IP address to bind the server.
+        
+    port : int
+        Port number to bind the server.
+
+    Returns
+    -------
+    None
+    """
     
     config: Config = Config(
-        app="backend.server.rest_server:app",
-        host=host,
-        port=port,
-        log_config=None,
-        log_level="critical",
-        lifespan="on"
+        app = "backend.server.rest_server:app",
+        host = host,
+        port = port,
+        log_config = None,
+        log_level = "critical",
+        lifespan = "on"
     )
-
-    print("📣 Ready for connections (Press Ctrl+C to stop)\n")
 
     server: Server = Server(config)
     await server.serve()

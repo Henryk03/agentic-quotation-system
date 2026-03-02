@@ -17,7 +17,44 @@ USER_DATA_DIR.mkdir(0o700, exist_ok = True)
 def launch_chrome_os(
         headless: bool
     ) -> None:
-    """"""
+    """
+    Launch a Chrome-compatible browser with remote debugging enabled.
+
+    The function detects the current operating system and attempts
+    to start a Chrome (or Chromium) instance configured with:
+
+    - Remote debugging port 9222
+    - A dedicated user data directory
+    - Optional headless mode
+    - Suppressed first-run and default-browser prompts
+
+    The browser process is started asynchronously using
+    `subprocess.Popen` and is not awaited.
+
+    Parameters
+    ----------
+    headless : bool
+        If `True`, launches the browser in headless mode.
+        On Windows, GPU acceleration is explicitly disabled
+        when headless is enabled.
+
+    Returns
+    -------
+    None
+        The function starts a browser process but does not
+        return a handle to it.
+
+    Raises
+    ------
+    None
+        All exceptions are caught internally.
+
+    Notes
+    -----
+    The function assumes that Chrome or a compatible
+    Chromium-based browser is available on the system.
+    The remote debugging port is hardcoded to 9222.
+    """
 
     system: str = platform.system().lower()
     full_command: list[str] = []
@@ -43,13 +80,16 @@ def launch_chrome_os(
             case "windows":
                 paths: list[str] = [
                     os.path.expandvars(
-                        r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+                        r"%ProgramFiles%\Google\Chrome\Application"
+                        r"\chrome.exe"
                     ),
                     os.path.expandvars(
-                        r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+                        r"%ProgramFiles(x86)%\Google\Chrome\Application"
+                        r"\chrome.exe"
                     ),
                     os.path.expandvars(
-                        r"%LocalAppData%\Google\Chrome\Application\chrome.exe"
+                        r"%LocalAppData%\Google\Chrome\Application"
+                        r"\chrome.exe"
                     )
                 ]
 
@@ -61,7 +101,9 @@ def launch_chrome_os(
                 full_command = [chrome_path] + args
 
             case "darwin":
-                full_command = ["open", "-a", "Google Chrome", "--args"] + args
+                full_command = (
+                    ["open", "-a", "Google Chrome", "--args"] + args
+                )
                 
             case "linux":
                 paths: list[str] = [
@@ -87,15 +129,50 @@ def launch_chrome_os(
             stderr = subprocess.DEVNULL
         )
 
-    except Exception as e:
-        print(f"Errore durante il lancio di Chrome: {e}")
+    except:
+        pass
 
 
 async def init_chrome_page(
         async_playwright: Playwright,
         headless: bool,
     ) -> Page:
-    """"""
+    """
+    Initialize and return a Playwright page connected to a
+    locally launched Chrome instance via CDP.
+
+    The function launches a Chrome process with remote
+    debugging enabled, waits briefly for it to become
+    available, then connects to it using Playwright's
+    `connect_over_cdp` method. A new page is created
+    from the first available browser context.
+
+    Parameters
+    ----------
+    async_playwright : playwright.async_api.Playwright
+        Initialized Playwright instance used to connect
+        to the running Chrome process.
+
+    headless : bool
+        Whether to launch Chrome in headless mode.
+
+    Returns
+    -------
+    playwright.async_api.Page
+        A newly created page within the connected
+        browser context.
+
+    Raises
+    ------
+    playwright.async_api.Error
+        Raised if the connection to the CDP endpoint
+        fails.
+
+    Notes
+    -----
+    The function assumes that the remote debugging port
+    (9222) is available and not already in use.
+    """
 
     launch_chrome_os(headless = headless)
 

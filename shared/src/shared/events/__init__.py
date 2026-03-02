@@ -3,20 +3,23 @@ from typing import Union
 
 from shared.events.chat import ChatMessageEvent
 from shared.events.clear import (
-    ClearChatMessagesEvent, 
-    DeleteClientChatsEvent, 
+    ClearChatMessagesEvent,
+    ClearChatMessagesResultEvent,
+    DeleteClientChatsEvent,
     DeleteClientChatsResultEvent,
-    ClearChatMessagesResultEvent
 )
-from shared.events.credentials import CredentialEntry, StoreCredentialsEvent
+from shared.events.credentials import (
+    CredentialEntry, 
+    StoreCredentialsEvent
+)
 from shared.events.error import ErrorEvent
 from shared.events.job_status import JobStatusEvent
 from shared.events.login import (
-    StoreLoginResult, 
-    CredentialsLoginResultEvent,
     CheckLoginStatusEvent,
+    CredentialsLoginResultEvent,
     LoginStatusResultEvent,
-    TriggerAutoLoginEvent
+    StoreLoginResult,
+    TriggerAutoLoginEvent,
 )
 
 
@@ -24,7 +27,7 @@ Event = Union[
     TriggerAutoLoginEvent,
     CheckLoginStatusEvent,
     LoginStatusResultEvent,
-    StoreLoginResult, 
+    StoreLoginResult,
     CredentialsLoginResultEvent,
     ChatMessageEvent,
     ClearChatMessagesEvent,
@@ -34,5 +37,5 @@ Event = Union[
     JobStatusEvent,
     StoreCredentialsEvent,
     DeleteClientChatsResultEvent,
-    ClearChatMessagesResultEvent
+    ClearChatMessagesResultEvent,
 ]

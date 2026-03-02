@@ -1,8 +1,7 @@
 
-
 import os
-from pathlib import Path
 from dotenv import load_dotenv
+from pathlib import Path
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -13,7 +12,34 @@ if ENV_PATH.exists():
 
 
 class Settings:
-    """"""
+    """
+    Application configuration loaded from environment 
+    variables.
+
+    The configuration values are retrieved from the operating 
+    system environment. If a `.env` file exists at the backend 
+    root directory, it is automatically loaded before reading 
+    variables.
+
+    Attributes
+    ----------
+    HOST : str
+        Host address used by the backend server. Defaults to `"0.0.0.0"`.
+
+    PORT : int
+        Port used by the backend server. Defaults to `8080`.
+
+    STREAMLIT_HOST : str or None
+        Host address used by the Streamlit frontend.
+
+    STREAMLIT_PORT : str or None
+        Port used by the Streamlit frontend.
+
+    Notes
+    -----
+    This class does not perform validation beyond basic type casting.
+    Environment variables are expected to be correctly formatted.
+    """
     
     def __init__(self):
         # Server Connection

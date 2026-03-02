@@ -11,9 +11,21 @@ class LoginFailedException(Exception):
     and the caller should either retry the operation or switch
     to a fallback mechanism if available.
 
-    Attributes:
-        provider (BaseProvider):
-            The provider for which the login failed.
+    Parameters
+    ----------
+    provider : BaseProvider
+        The provider for which the login failed.
+
+    reason : str, optional
+        Additional explanation for the failure, by default None.
+
+    Attributes
+    ----------
+    provider : BaseProvider
+        The provider for which the login failed.
+
+    reason : str or None, optional
+        The reason for the login failure.
     """
 
 
@@ -26,7 +38,9 @@ class LoginFailedException(Exception):
         self.provider = provider
         self.reason = reason
 
-        base_message = f"Login failed while logging into {provider.name}."
+        base_message: str = (
+            f"Login failed while logging into {provider.name}."
+        )
 
         if reason:
             full_message = f"{base_message} Reason: {reason}."

@@ -12,7 +12,49 @@ if ENV_PATH.exists():
 
 
 class Settings:
-    """"""
+    """
+    Configuration holder for the backend application.
+
+    Loads environment variables from a `.env` file if present 
+    and exposes them as attributes. Handles settings for:
+
+        - Development mode and logging
+        - Google Gemini API
+        - Server host and port
+        - Database connection
+        - Playwright / Browser automation
+        - Login behavior
+        - Secret key for encryption
+
+    Attributes
+    ----------
+    CLI_MODE : bool
+        If True, the backend is running in CLI mode.
+
+    LOG_LEVEL : str
+        Logging level (e.g., "INFO", "DEBUG").
+
+    GOOGLE_API_KEY : str
+        API key for accessing Google Gemini services.
+
+    HOST : str
+        Server host to bind.
+
+    PORT : int
+        Server port to bind.
+
+    DATABASE_URL : str
+        Connection string for the database.
+
+    HEADLESS : bool
+        Whether Playwright runs in headless mode.
+
+    AUTO_LOGIN_ONLY : bool
+        If True, only automatic logins are allowed.
+
+    SECRET_KEY : str | None
+        Secret key used for encryption.
+    """
     
     def __init__(self):
         # Development and logs
@@ -45,11 +87,27 @@ class Settings:
 
 
     def validate(self) -> tuple[bool, list[str]]:
-        """"""
+        """
+        Validate the critical environment settings.
+
+        Checks that required configuration values are present 
+        and not set to placeholder defaults.
+
+        Returns
+        -------
+        tuple[bool, list[str]]
+            A tuple where the first element is True if all settings 
+            are valid, False otherwise. The second element is a list 
+            of error messages describing missing or invalid settings.
+        """
 
         errors: list[str] = []
 
-        if not self.GOOGLE_API_KEY or self.GOOGLE_API_KEY == "your_api_key_here":
+        if (
+            not self.GOOGLE_API_KEY 
+            or 
+            self.GOOGLE_API_KEY == "your_api_key_here"
+        ):
             errors.append("GOOGLE_API_KEY is missing or set to default.")
         
         if "protocol://" in self.DATABASE_URL:

@@ -9,7 +9,27 @@ from shared.events.metadata import (
 def extract_chat_id(
         event: Event
     ) -> str | None:
-    """"""
+    """
+    Extract the chat ID from an event or its metadata.
+
+    Parameters
+    ----------
+    event : Event
+        The event object from which to extract the chat ID. The 
+        chat ID can be present either directly on the event or 
+        within its metadata.
+
+    Returns
+    -------
+    str or None
+        The extracted chat ID if present, otherwise `None`.
+
+    Notes
+    -----
+    This function handles events where `chat_id` is an attribute 
+    of the event, or stored inside a `BaseMetadata` or `StoreMetadata` 
+    object. It also supports cases where metadata is a dictionary.
+    """
 
     if hasattr(event, "chat_id"):
         return getattr(event, "chat_id", None)

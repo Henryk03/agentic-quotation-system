@@ -2,8 +2,8 @@
 import re
 
 from playwright.async_api import (
-    Page, 
     ElementHandle,
+    Page, 
     TimeoutError as PlaywrightTimeoutError
 )
 
@@ -14,16 +14,26 @@ async def detect_captcha(
         page: Page
     ) -> bool:
     """
-    Detect the presence of captchas in the given webpage.
+    Detect the presence of captchas on a webpage.
 
-    Args:
-        page (Page):
-            The webpage in which the detection is performed.
+    This function searches for captchas by inspecting iframe URLs and 
+    specific HTML elements that may indicate captcha challenges.
 
-    Returns:
-        bool | str
-        - `True` if at least a captcha is detected.
-        - `False` if no captcha was detected.
+    Parameters
+    ----------
+    page : Page
+        The Playwright page object representing the webpage to inspect.
+
+    Returns
+    -------
+    bool
+        - `True` if a captcha is detected.
+        - `False` if no captcha is found.
+
+    Notes
+    -----
+    Detection is heuristic and may produce false positives or negatives.
+    Some captchas embedded in non-standard HTML may not be detected.
     """
 
     captcha_text: re.Pattern[str] = re.compile(
@@ -32,15 +42,11 @@ async def detect_captcha(
     )
 
     try:
-        # we firstly check all the iframes that
-        # could refer to a captcha
-        #
-        # note that the following chunk of code
-        # could not catch all the iframes
         await page.wait_for_selector("iframe", timeout=1000)
         for frame in page.frames:
             if frame is not page.main_frame:
                 url: str = frame.url or ""
+
                 if re.search(captcha_text, url):
                     return True
                 
@@ -51,8 +57,6 @@ async def detect_captcha(
         return True
 
     try:
-        # some captchas may be hidden
-        # into other html tags
         tag_texts: list[str] = [
             "div",
             "img",

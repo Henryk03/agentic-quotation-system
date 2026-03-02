@@ -30,16 +30,29 @@ if settings.CLI_MODE:
     BACKEND_ROOT = Path(__file__).resolve().parents[4]
 
     LOG_IN_STATES_DIR = BACKEND_ROOT / ".logins"
-    LOG_IN_STATES_DIR.mkdir(0o700, exist_ok=True)
+    LOG_IN_STATES_DIR.mkdir(0o700, exist_ok = True)
 
 
 class AsyncBrowserContextMaganer:
     """
-    Class to manage asynchronous login actions in websites
-    
-    Attributes:
-        async_playwright (Playwright):
-            An asynchronous playwright context manager.
+    Manage authenticated Playwright browser contexts for providers.
+
+    The class handles authentication workflows across different
+    execution modes (CLI and non-CLI), supporting:
+
+    - Persistent storage state reuse
+    - Automatic login using stored credentials
+    - Manual login fallback when required
+    - Safe concurrent manual login handling
+
+    Parameters
+    ----------
+    playwright : Playwright
+        Initialized asynchronous Playwright instance.
+
+    client_id : str or None, optional
+        Identifier used to retrieve and persist user-specific
+        authentication state and credentials.
     """
 
 
@@ -59,14 +72,30 @@ class AsyncBrowserContextMaganer:
 
     @staticmethod
     def is_cli_mode() -> bool:
-        """"""
+        """
+        Return whether the application is running in CLI mode.
+
+        Returns
+        -------
+        bool
+            `True` if CLI mode is enabled in the configuration,
+            otherwise `False`.
+        """
 
         return settings.CLI_MODE
     
 
     @staticmethod
     def is_headless_mode() -> bool:
-        """"""
+        """
+        Return whether headless browser execution is enabled.
+
+        Returns
+        -------
+        bool
+            `True` if headless mode is enabled in the configuration,
+            otherwise `False`.
+        """
 
         return settings.HEADLESS
 
@@ -76,14 +105,17 @@ class AsyncBrowserContextMaganer:
             provider: BaseProvider
         ) -> Path:
         """
-        Return the `Path` to the given provider's state file.
+        Build the filesystem path for a provider's stored login state.
 
-        Args:
-            provider (Providers):
-                A provider of professional items.
+        Parameters
+        ----------
+        provider : BaseProvider
+            Provider whose authentication state file is requested.
 
-        Returns:
-            Path
+        Returns
+        -------
+        pathlib.Path
+            Path pointing to the provider-specific JSON storage file.
         """
 
         return LOG_IN_STATES_DIR / f"{provider.name.lower()}_state.json"
@@ -94,7 +126,30 @@ class AsyncBrowserContextMaganer:
             client_id: str | None,
             provider: BaseProvider
         ) -> Path | StorageState | None:
-        """"""
+        """
+        Retrieve the persisted authentication state for a provider.
+
+        Depending on the execution mode:
+
+        - In CLI mode, the state is loaded from a local file path.
+        - In non-CLI mode, the state is retrieved from the database.
+
+        Parameters
+        ----------
+        client_id : str or None
+            Identifier used to fetch user-specific stored state
+            when running in non-CLI mode.
+
+        provider : BaseProvider
+            Provider whose authentication state is requested.
+
+        Returns
+        -------
+        Path or StorageState or None
+            A filesystem path to a stored state (CLI mode),
+            a Playwright `StorageState` object (database mode),
+            or `None` if no state is available.
+        """
 
         if AsyncBrowserContextMaganer.is_cli_mode():
             path: Path = AsyncBrowserContextMaganer.__state_path(provider)
@@ -124,7 +179,33 @@ class AsyncBrowserContextMaganer:
             provider: BaseProvider,
             context: BrowserContext
         ) -> None:
-        """"""
+        """"
+        Persist the current browser context authentication state.
+
+        Depending on the execution mode:
+
+        - In CLI mode, state persistence can be implemented
+        using filesystem storage.
+        - In non-CLI mode, the state is stored in the database
+        and committed.
+
+        Parameters
+        ----------
+        client_id : str or None
+            Identifier used to associate the state with a user
+            in non-CLI mode.
+
+        provider : BaseProvider
+            Provider for which the state is being saved.
+
+        context : BrowserContext
+            Playwright browser context whose storage state
+            should be persisted.
+
+        Returns
+        -------
+        None
+        """
 
         state: StorageState = await context.storage_state()
 
@@ -150,7 +231,29 @@ class AsyncBrowserContextMaganer:
             client_id: str | None,
             provider: BaseProvider
         ) -> tuple[str | None, str | None]:
-        """"""
+        """
+        Retrieve stored credentials for a provider.
+
+        Depending on the execution mode:
+
+        - In non-CLI mode, credentials are fetched from the database.
+        - In CLI mode, credential retrieval must be implemented
+        externally.
+
+        Parameters
+        ----------
+        client_id : str or None
+            Identifier used to retrieve user-specific credentials.
+
+        provider : BaseProvider
+            Provider whose credentials are requested.
+
+        Returns
+        -------
+        tuple of (str or None, str or None)
+            A tuple containing `(username, password)`.
+            Returns `(None, None)` if no credentials are found.
+        """
 
         username: str | None = None
         password: str | None = None
@@ -179,21 +282,30 @@ class AsyncBrowserContextMaganer:
             headless: bool = True
         ) -> tuple[Browser, BrowserContext, Page]:
         """
-        Create a new browser, context, and page.
+        Create a new browser instance, context, and page.
 
-        Args:
-            headless (bool):
-                Whether to launch the browser in headless mode.
+        If a valid storage state is provided, it is applied
+        to the new browser context.
 
-            storage_state (Path | None):
-                Path to existing storage state to load.
+        Parameters
+        ----------
+        state : Path or StorageState or None, optional
+            Existing authentication state to load into the
+            browser context. If a `Path` is provided, it must
+            exist to be used.
 
-            start_url (str | None):
-                URL to navigate to immediately after page creation.
+        start_url : str or None, optional
+            URL to navigate to immediately after page creation.
 
-        Returns:
-            tuple[Browser, BrowserContext, Page]:
-                The browser, its context, and the page.
+        headless : bool, optional
+            Whether to launch the browser in headless mode.
+            The effective value may depend on configuration.
+
+        Returns
+        -------
+        tuple of (Browser, BrowserContext, Page)
+            The launched browser instance, its context,
+            and the newly created page.
         """
 
         browser: Browser
@@ -236,26 +348,29 @@ class AsyncBrowserContextMaganer:
             headless: bool
         ) -> tuple[Browser, BrowserContext, Page]:
         """
-        Create and initialize a new browser context for the given provider.
+        Initialize a browser context for a specific provider.
 
-        This method launches a new Chromium browser instance, loads the
-        provider's website, applies an existing authentication state if
-        available, and saves the state for future sessions if it does not
-        already exist. It also automatically closes any initial pop-ups
-        that may appear after navigation.
+        The method launches a browser, applies any available
+        authentication state, navigates to the provider's URL,
+        and closes initial pop-ups if present.
 
-        Args:
-            provider (BaseProvider):
-                The provider whose website should be opened.
+        Parameters
+        ----------
+        provider : BaseProvider
+            Provider whose website should be opened.
 
-            state_path (Path):
-                Path to the file containing the stored browser state
-                (cookies, local storage, etc.).
+        state : Path or StorageState or None
+            Existing authentication state to load into the
+            browser context.
 
-        Returns:
-            tuple[Browser, BrowserContext, Page]:
-                A tuple containing the created browser instance,
-                the initialized browser context, and the opened page.
+        headless : bool
+            Whether to launch the browser in headless mode.
+
+        Returns
+        -------
+        tuple of (Browser, BrowserContext, Page)
+            The browser instance, initialized context,
+            and active page.
         """
 
         browser: Browser
@@ -275,10 +390,42 @@ class AsyncBrowserContextMaganer:
 
     async def __ensure_autologin_context(
             self,
-            client_id: str | None,
+            client_id: str,
             provider: BaseProvider
         ) -> BrowserContext | None:
-        """"""
+        """
+        Ensure a valid authenticated browser context using automatic 
+        login.
+
+        The method attempts to:
+
+        1. Load an existing stored authentication state.
+        2. Verify whether the user is already logged in.
+        3. Perform automatic login using stored credentials if necessary.
+        4. Persist the updated authentication state.
+
+        If login is required but unsupported or blocked (e.g., CAPTCHA),
+        a `LoginFailedException` is raised.
+
+        Parameters
+        ----------
+        client_id : str
+            Identifier used to retrieve stored credentials
+            and authentication state.
+
+        provider : BaseProvider
+            Provider requiring authentication.
+
+        Returns
+        -------
+        BrowserContext or None
+            An authenticated browser context ready for use.
+
+        Raises
+        ------
+        LoginFailedException
+            If automatic authentication fails or is not supported.
+        """
 
         if (
             not provider.has_auto_login() 
@@ -321,8 +468,9 @@ class AsyncBrowserContextMaganer:
                 raise LoginFailedException(
                     provider, 
                     (
-                        "Authentication blocked by CAPTCHA: automated access "
-                        "is restricted by the provider's security policies."
+                        "Authentication blocked by CAPTCHA: automated "
+                        "access is restricted by the provider's security "
+                        "policies."
                     )
                 )
 
@@ -337,8 +485,8 @@ class AsyncBrowserContextMaganer:
                 raise LoginFailedException(
                     provider, 
                     (
-                        "No valid credentials found for the selected store. "
-                        "Please verify your settings and try again."
+                        "No valid credentials found for the selected "
+                        "store. Please verify your settings and try again."
                     )
                 )
 
@@ -346,8 +494,9 @@ class AsyncBrowserContextMaganer:
                 raise LoginFailedException(
                     provider, 
                     (
-                        "Autologin process failed. This may be due to incorrect "
-                        "credentials or unexpected UI changes on the provider's website."
+                        "Autologin process failed. This may be due "
+                        "to incorrect credentials or unexpected UI "
+                        "changes on the provider's website."
                     )
                 )
 
@@ -406,9 +555,11 @@ class AsyncBrowserContextMaganer:
                 if await provider.has_captcha(page):
                     raise ManualFallbackException(provider)
 
-                username, password = await AsyncBrowserContextMaganer.__get_creds_by_mode(
-                    client_id,
-                    provider
+                username, password = (
+                    await AsyncBrowserContextMaganer.__get_creds_by_mode(
+                        client_id,
+                        provider
+                    )
                 )
 
                 if await provider.auto_login(page, username, password):
@@ -448,20 +599,37 @@ class AsyncBrowserContextMaganer:
             provider: BaseProvider
         ) -> BrowserContext | None:
         """
-        Return an instanse of `BrowserContext` to be used to navigate the 
-        given provider's website. It may require the user to manual logging-in
-        into the website for various reasons:
-         
-        - There is not an existing state for the website.
-        - The already existing state is expired.
-        - The given provider does not have an auto login function.
+        Ensure and return an authenticated browser context
+        for the specified provider.
 
-        Args:
-            provider (Providers):
-                The provider for whom a login is required.
+        The authentication strategy depends on the execution mode:
 
-        Returns:
-            BrowserContext | None
+        - In non-CLI mode, automatic login is attempted.
+        - In CLI mode, standard initialization with manual
+        fallback is used.
+
+        Manual login may be required when no valid stored state
+        exists, the state has expired, or automatic login
+        is unsupported.
+
+        Parameters
+        ----------
+        client_id : str or None
+            Identifier used to retrieve stored credentials
+            and authentication state.
+
+        provider : BaseProvider
+            Provider whose website requires an authenticated context.
+
+        Returns
+        -------
+        BrowserContext or None
+            Authenticated browser context ready for navigation.
+
+        Raises
+        ------
+        LoginFailedException
+            If authentication cannot be completed successfully.
         """
 
         if not settings.CLI_MODE:
@@ -481,43 +649,51 @@ class AsyncBrowserContextMaganer:
             provider: BaseProvider
         ) -> None:
         """
-        Open a non-headless browser so the user can manually perform
-        the authentication on the provider's website. When the login is
-        completed, the method ensures that a valid browser context is
-        created and ready to be used for navigating the provider's site,
-        storing its authenticated state in the given path.
+        Perform manual authentication for a provider.
 
-        Args:
-            provider (Provider):
-                The provider whose website requires manual authentication.
+        A non-headless browser is opened to allow the user
+        to authenticate interactively. Upon successful login,
+        the authenticated storage state is persisted.
 
-        Returns:
-            None
-        
-        Raises:
-            LoginFailedException:
-                Raised if the login cannot be completed or the context
-                cannot be initialized correctly.
+        A mutex lock ensures that only one manual login
+        process can run concurrently.
+
+        Parameters
+        ----------
+        provider : BaseProvider
+            Provider requiring manual authentication.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        LoginFailedException
+            If authentication is not completed successfully
+            within the allowed timeout.
         """
 
-        state_path: Path = AsyncBrowserContextMaganer.__state_path(provider)
+        state_path: Path = (
+            AsyncBrowserContextMaganer.__state_path(provider)
+        )
 
         context: BrowserContext | None = None
         page: Page | None = None
 
         async with self._manual_login_lock:
             _, context, page = await self.__prepare_provider_context(
-                provider=provider,
-                state=state_path,
-                headless=False
+                provider = provider,
+                state = state_path,
+                headless = False
             )
 
             if await wait_until_logged_in(
-                page=page,
-                check_func=provider.is_logged_in,
-                timeout=30000
+                page = page,
+                check_func = provider.is_logged_in,
+                timeout = 30000
             ):
-                await context.storage_state(path=state_path)
+                await context.storage_state(path = state_path)
                 await close_page_resources(page)
 
             else:

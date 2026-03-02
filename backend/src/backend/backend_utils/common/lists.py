@@ -5,40 +5,72 @@ from typing import Any
 
 class SafeAsyncList:
     """
-    ADT for a thread-safe asynchronous list.
+    Thread-safe asynchronous list abstraction.
+
+    This class provides a list-like container that can be safely
+    accessed and modified concurrently from multiple coroutines
+    without causing race conditions.
     """
 
 
-    def __init__(self):
+    def __init__(
+            self
+        ):
+        """
+        Initialize an empty SafeAsyncList.
+
+        Attributes
+        ----------
+        _list : list
+            Internal list storing the items.
+
+        _lock : asyncio.Lock
+            Asynchronous lock to ensure thread-safe access.
+        """
+
         self._list = []
         self._lock = asyncio.Lock()
 
 
-    async def add(self, item: Any) -> None:
+    async def add(
+            self, 
+            item: Any
+        ) -> None:
         """
-        Safely append an item to the list.
+        Append an item to the list safely.
 
-        This method ensures that only one coroutine at a 
-        time can modify the underlying list, preventing race
-        conditions or data corruption.
+        Ensures that only one coroutine at a time can modify
+        the underlying list, preventing race conditions or
+        data corruption.
 
-        Args:
-            item (Any):
-                A generic item of any type to be inserted into
-                the underlying list.
+        Parameters
+        ----------
+        item : Any
+            The item to append to the list.
+
+        Returns
+        -------
+        None
         """
 
         async with self._lock:
             self._list.append(item)
 
 
-    async def get_all(self) -> list:
+    async def get_all(
+            self
+        ) -> list:
         """
-        Return a deep copy of the list.
+        Return a snapshot of all items in the list.
 
-        The returned list represents the current state of the 
-        internal data. Since it is a copy, modifications to the
-        returned list do not affect the internal storage.
+        The returned list is a shallow copy of the internal
+        storage, so modifying it does not affect the original
+        data.
+
+        Returns
+        -------
+        list
+            A copy of all items currently stored in the list.
         """
 
         return list(self._list)
