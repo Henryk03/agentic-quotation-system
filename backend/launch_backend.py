@@ -36,7 +36,7 @@ def main() -> Literal[1, 0]:
     venv_python: Path = get_venv_python()
     
     if not venv_python.exists():
-        print("❌ Virtual environment not found!")
+        print("virtual environment not found!")
         print("   Please run 'python setup_backend.py' first")
 
         return 1
