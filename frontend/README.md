@@ -118,3 +118,13 @@ python -m frontend
 This starts the Streamlit interface and connects to the configured backend instance.
 
 Ensure that the backend is running before starting the frontend.
+
+## Known Limitations
+
+### Streamlit Interaction Model
+
+Due to Streamlit’s execution model, the UI supports only one active interaction at a time. This means that while an action is being processed (e.g., sending a message or executing a product search), other interactions are temporarily unavailable.
+
+If parallel actions are triggered before the current one completes, the UI displays an error message and the result of the previously submitted action (i.e., the associated event) may be lost.
+
+This is a framework-level limitation and does not affect backend concurrency or agent orchestration.
