@@ -107,7 +107,7 @@ Edit the file according to the provided comments.
 
 ## Running the Frontend
 
-Before running the application, move into the src directory.
+Before running the application, move into the `src` directory.
 
 ### Production mode
 
