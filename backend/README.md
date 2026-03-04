@@ -146,6 +146,27 @@ Before installing [Chromium](https://www.chromium.org/chromium-projects/) via [P
 python -m playwright install chromium
 ```
 
+## Environment Configuration
+
+Copy the example file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` following the comments inside the file.
+
+Make sure the **most important** variables are set:
+
+- Get your **Gemini API key** from https://aistudio.google.com
+- Generate a secure **encryption key** for sensitive data:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Copy the output and paste it as `SECRET_KEY=...` in your `.env` file.
+
 ## Database Setup
 
 ### Initialize Migrations Folder (only needed once)
@@ -171,27 +192,6 @@ python -m alembic revision --autogenerate -m "added new column"
 # 2. Apply it
 python -m alembic upgrade head
 ```
-
-## Environment Configuration
-
-Copy the example file:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` following the comments inside the file.
-
-Make sure the **most important** variables are set:
-
-- Get your **Gemini API key** from https://aistudio.google.com
-- Generate a secure **encryption key** for sensitive data:
-
-```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-Copy the output and paste it as `SECRET_KEY=...` in your `.env` file.
 
 ## Running the Backend
 
