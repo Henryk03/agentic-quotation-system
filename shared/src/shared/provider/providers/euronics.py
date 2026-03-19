@@ -34,7 +34,7 @@ class Euronics(BaseProvider):
                 "div.product"
             ],
             search_texts = re.compile(
-                "cosa stai cercando", 
+                "inserisci parola chiave o numero articolo", 
                 re.IGNORECASE
             ),
             title_classes = [
