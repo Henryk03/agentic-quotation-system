@@ -231,6 +231,7 @@ async def __search_in_website(
 
     try:
         await page.goto(provider.url)
+        await provider.close_all_popups(page)
         await page.wait_for_load_state("load")
         
         for item in products:
@@ -240,13 +241,20 @@ async def __search_in_website(
                 continue
 
             try:
-                await page.get_by_role(
-                    "textbox", 
-                    name = provider.search_texts
-                ).fill(
-                    item
-                )
-                await page.keyboard.press("Enter")
+                for inputbox in ["textbox", "combobox", "searchbox"]:
+                    try:
+                        await page.get_by_role(
+                            inputbox, 
+                            name = provider.search_texts
+                        ).fill(
+                            item,
+                            timeout = 500
+                        )
+                        await page.keyboard.press("Enter")
+                        break
+
+                    except PlaywrightTimeoutError:
+                        continue
 
                 found: str | None = await __wait_for_any_selector(
                     page, 
@@ -274,6 +282,8 @@ async def __search_in_website(
                     page, 
                     provider.price_classes
                 )
+
+                await page.wait_for_load_state("load")
 
                 html: str = await page.content()
                 soup: BeautifulSoup = BeautifulSoup(html, "html.parser")
@@ -322,6 +332,9 @@ async def __search_in_website(
                     prices,
                     links
                 ):
+                    if link[0] == "/":
+                        link = provider.url + link
+
                     products_data.append({
                         "name": name,
                         "availability": avail,
@@ -676,11 +689,11 @@ async def __select_text(
         for tag in tags:
             elem: Tag | None = tag.select_one(sel)
 
-            if elem:
-                results.append(str(elem))
-
-            else: 
-                results.append("N/A")
+            results.append(
+                elem.text.strip() 
+                if elem 
+                else "N/A"
+            )
         
     return results
 
@@ -732,7 +745,7 @@ async def __select_all_text(
             for state, sel_list in selectors.items():
                 for sel in sel_list:
                     for elem in tag.select(sel):
-                        text: str = elem.get_text(strip=True)
+                        text: str = elem.get_text(strip = True)
 
                         if availability_alt_texts and state == "available":
                             if re.search(availability_alt_texts, text):
