@@ -10,7 +10,7 @@ class MediaWorld(BaseProvider):
         super().__init__(
             availability_classes = {
                 "available": [".sc-663022ae-0"], 
-                "not_available": [".sc-59b6826e-0 jJIqay"]
+                "not_available": [".sc-59b6826e-0.jJIqay"]
             },
             availability_texts = re.compile(
                 r"aggiungi al carrello", 
@@ -20,7 +20,7 @@ class MediaWorld(BaseProvider):
             logout_selectors = None,
             logout_texts = None,
             popup_selectors = [
-                "button.sc-74ef8087-1"
+                "button#pwa-consent-layer-accept-all-button"
             ],
             price_classes = [
                 ".mms-ui-sr_true"
@@ -38,7 +38,7 @@ class MediaWorld(BaseProvider):
                 re.IGNORECASE
             ),
             title_classes = [
-                ".sc-59b6826e-0"
+                ".sc-59b6826e-0.dhStGl"
             ]         
         )
 
