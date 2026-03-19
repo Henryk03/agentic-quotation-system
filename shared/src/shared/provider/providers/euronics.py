@@ -4,43 +4,42 @@ import re
 from shared.provider.base_provider import BaseProvider
 
 
-class MediaWorld(BaseProvider):
+class Euronics(BaseProvider):
 
     def __init__(self):
         super().__init__(
             availability_classes = {
-                "available": [".sc-74ef8087-1.gmxyJD"], 
-                "not_available": [".sc-74ef8087-1.gmxyJD"]
+                "available": [".addToCart"], 
+                "not_available": [".btn-eur-outline-sm"]
             },
             availability_texts = re.compile(
-                r"aggiungi al carrello", 
+                r"aggiungi", 
                 re.IGNORECASE
             ),
             login_required = False,
             logout_selectors = None,
             logout_texts = None,
             popup_selectors = [
-                "button[data-test='pwa-consent-layer-deny-all']",
-                "button#pwa-consent-layer-accept-all-button"
+                "button.onetrust-close-btn-handler"
             ],
             price_classes = [
-                ".sc-59b6826e-0.clIvFR.sc-442d4f02-2.hKPIXT"
+                ".price-formatted"
             ],
             product_link_selectors = [
-                "a.sc-66506eb5-1.cevLqa"
+                "a.text-dark"
             ],
-            provider_name = "MediaWorld",
-            provider_url = "https://mediaworld.it",
+            provider_name = "Euronics",
+            provider_url = "https://euronics.it",
             result_container = [
-                "article.mms-ui-color-palette_base"
+                "div.product"
             ],
             search_texts = re.compile(
                 "cosa stai cercando", 
                 re.IGNORECASE
             ),
             title_classes = [
-                ".sc-59b6826e-0.dhStGl"
+                ".tile-name"
             ]         
         )
 
-provider: BaseProvider = MediaWorld()
+provider: BaseProvider = Euronics()
