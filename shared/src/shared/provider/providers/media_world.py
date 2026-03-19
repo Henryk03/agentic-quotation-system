@@ -10,7 +10,7 @@ class MediaWorld(BaseProvider):
         super().__init__(
             availability_classes = {
                 "available": [".sc-74ef8087-1.gmxyJD"], 
-                "not_available": [""]
+                "not_available": [".sc-74ef8087-1.gmxyJD"]
             },
             availability_texts = re.compile(
                 r"aggiungi al carrello", 
