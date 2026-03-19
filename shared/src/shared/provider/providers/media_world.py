@@ -20,7 +20,8 @@ class MediaWorld(BaseProvider):
             logout_selectors = None,
             logout_texts = None,
             popup_selectors = [
-                "button#pwa-consent-layer-accept-all-button"
+                "button#pwa-consent-layer-accept-all-button",
+                "button[data-test='pwa-consent-layer-deny-all']"
             ],
             price_classes = [
                 ".mms-ui-sr_true"
