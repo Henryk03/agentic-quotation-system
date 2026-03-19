@@ -9,8 +9,8 @@ class MediaWorld(BaseProvider):
     def __init__(self):
         super().__init__(
             availability_classes = {
-                "available": [".sc-663022ae-0"], 
-                "not_available": [".sc-59b6826e-0.jJIqay"]
+                "available": [".sc-74ef8087-1.gmxyJD"], 
+                "not_available": [""]
             },
             availability_texts = re.compile(
                 r"aggiungi al carrello", 
@@ -20,14 +20,14 @@ class MediaWorld(BaseProvider):
             logout_selectors = None,
             logout_texts = None,
             popup_selectors = [
-                "button#pwa-consent-layer-accept-all-button",
-                "button[data-test='pwa-consent-layer-deny-all']"
+                "button[data-test='pwa-consent-layer-deny-all']",
+                "button#pwa-consent-layer-accept-all-button"
             ],
             price_classes = [
-                ".mms-ui-sr_true"
+                "span.mms-ui-sr_true"
             ],
             product_link_selectors = [
-                "a.sc-66506eb5-1"
+                "a.sc-66506eb5-1.cevLqa"
             ],
             provider_name = "MediaWorld",
             provider_url = "https://mediaworld.it",
