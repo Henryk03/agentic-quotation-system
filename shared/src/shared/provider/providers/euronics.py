@@ -35,7 +35,7 @@ class Euronics(BaseProvider):
             provider_name = "Euronics",
             provider_url = "https://euronics.it",
             result_container = [
-                "div.product-layou.grid-mode"
+                "div.product-layout.grid-mode"
             ],
             search_texts = re.compile(
                 "inserisci parola chiave o numero articolo", 
