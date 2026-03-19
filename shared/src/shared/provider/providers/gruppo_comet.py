@@ -39,7 +39,7 @@ class GruppoComet(BaseProvider):
                 ".result-block-v2"
             ],
             search_texts = re.compile(
-                "cerca per attributo", 
+                "cerca per attributo, descrizione, marca o codice", 
                 re.IGNORECASE
             ),
             title_classes = [
