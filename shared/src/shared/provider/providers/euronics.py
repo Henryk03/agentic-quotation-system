@@ -9,8 +9,12 @@ class Euronics(BaseProvider):
     def __init__(self):
         super().__init__(
             availability_classes = {
-                "available": [".addToCart"], 
-                "not_available": [".btn-eur-outline-sm"]
+                "available": [
+                    ".addToCart.btn-eur.add-to-cart-global.yellow.w-100"
+                ], 
+                "not_available": [
+                    ".mw-100.w-100.btn-eur-outline-sm.blue"
+                ]
             },
             availability_texts = re.compile(
                 r"aggiungi", 
