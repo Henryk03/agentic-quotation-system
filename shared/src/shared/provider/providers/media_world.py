@@ -24,7 +24,7 @@ class MediaWorld(BaseProvider):
                 "button#pwa-consent-layer-accept-all-button"
             ],
             price_classes = [
-                ".sc-59b6826e-0.clIvFR.sc-442d4f02-2.hKPIXT"
+                ".mms-ui-sr_true"
             ],
             product_link_selectors = [
                 "a.sc-66506eb5-1.cevLqa"
