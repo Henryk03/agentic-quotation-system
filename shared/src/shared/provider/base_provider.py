@@ -136,7 +136,7 @@ class BaseProvider:
         """
 
         try:
-            response = requests.head(url)
+            response = requests.get(url, stream = True)
             return response.status_code < 400 
              
         except requests.RequestException:
