@@ -33,7 +33,7 @@ class Euronics(BaseProvider):
                 "a.text-dark"
             ],
             provider_name = "Euronics",
-            provider_url = "https://euronics.it",
+            provider_url = "https://www.euronics.it",
             result_container = [
                 "div.product-layout.grid-mode"
             ],
