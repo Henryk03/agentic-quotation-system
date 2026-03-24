@@ -46,4 +46,4 @@ class Euronics(BaseProvider):
             ]         
         )
 
-provider: BaseProvider = Euronics()
+# provider: BaseProvider = Euronics()
