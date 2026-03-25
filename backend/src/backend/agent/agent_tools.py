@@ -455,7 +455,7 @@ async def __search_with_computer_use(
         )
 
         initial_screenshot: bytes = await page.screenshot(
-            type="png"
+            type = "png"
         )
 
         formatted_products: str = "\n".join(

@@ -1,0 +1,121 @@
+id,esecutore,metodo_reperimento_dati,sito_web,complessita_messaggio,n_codici_in_input,tempo_totale_sec,costo_euro,n_codici_estratti_correttamente,codici_non_estratti,campi_totali,campi_corretti_valori,campi_corretti_lingua,accuratezza,note
+T001,IA,automazione custom,euronics,facile,1,13,"0,0009",1,,4,4,3,"92,5%",
+T002,IA,automazione custom,euronics,facile,1,10,"0,0005",1,,4,4,4,100%,
+T003,IA,automazione custom,euronics,facile,1,12,"0,0009",1,,4,4,4,100%,
+T004,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,4,100%,
+T005,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,4,100%,
+T006,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,4,100%,Il risultato riportato non è quello corretto a causa della mappatura nel sito web.
+T007,IA,automazione custom,euronics,facile,1,12,"0,0008",1,,4,4,4,100%,
+T008,IA,automazione custom,euronics,facile,1,15,"0,0008",1,,4,4,4,100%,
+T009,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,3,"92,5%",
+T010,IA,automazione custom,euronics,facile,1,12,"0,0008",1,,4,4,3,"92,5%",
+T011,IA,automazione custom,euronics,facile,1,13,"0,0013",1,,4,4,4,100%,
+T012,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,4,100%,
+T013,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,4,100%,
+T014,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,3,"92,5%",
+T015,IA,automazione custom,euronics,facile,1,9,"0,0007",1,,4,4,4,100%,
+T016,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,4,100%,
+T017,IA,automazione custom,euronics,facile,1,9,"0,0007",1,,4,4,3,"92,5%",Il prodotto estratto non è quello richiesto a causa del sito web.
+T018,IA,automazione custom,euronics,facile,1,11,"0,0007",1,,4,4,4,100%,
+T019,IA,automazione custom,euronics,facile,1,11,"0,0007",1,,4,4,4,100%,
+T020,IA,automazione custom,euronics,facile,1,11,"0,0008",1,,4,4,3,"92,5%",
+T021,IA,automazione custom,euronics,media,5,40,"0,0019",2,"Mac mini m4 16gb 512gb, HomePod Mtjt3sm/a, Macbook air m5",20,8,8,40%,Il sistema ha confuso vari articoli.
+T022,IA,automazione custom,euronics,media,5,31,"0,0019",5,,20,20,16,94%,
+T023,IA,automazione custom,euronics,media,5,31,"0,002",5,,20,20,20,100%,
+T024,IA,automazione custom,euronics,media,5,35,"0,0039",5,,20,20,20,100%,Lo spazzolino Oral b iO 9s nero non è il primo risultato.
+T025,IA,automazione custom,euronics,media,5,28,"0,0016",3,"HomePod Mtjt3sm/a, G213 920-008085",20,12,12,60%,
+T026,IA,automazione custom,euronics,media,5,29,"0,0021",5,,20,20,20,100%,
+T027,IA,automazione custom,euronics,media,5,31,"0,0033",4,Oral b iO 9s nero,20,16,16,80%,
+T028,IA,automazione custom,euronics,media,5,33,"0,0019",4,HomePod Mtjt3sm/a,20,16,16,80%,
+T029,IA,automazione custom,euronics,media,5,30,"0,0021",5,,20,20,20,100%,
+T030,IA,automazione custom,euronics,media,5,35,"0,004",5,,20,20,20,100%,Lo spazzolino Oral b iO 9s nero non è il primo risultato.
+T031,IA,automazione custom,euronics,media,5,29,"0,002",5,,20,20,20,100%,
+T032,IA,automazione custom,euronics,media,5,29,"0,0019",5,,20,20,20,100%,L'iPhone non è quello corretto a causa della mappatura del sito web.
+T033,IA,automazione custom,euronics,media,5,28,"0,0018",5,,20,20,20,100%,L'iPhone non è quello corretto a causa della mappatura del sito web.
+T034,IA,automazione custom,euronics,media,5,29,"0,0019",5,,20,20,20,100%,
+T035,IA,automazione custom,euronics,media,5,32,"0,0038",5,,20,20,20,100%,
+T036,IA,automazione custom,euronics,media,5,31,"0,002",5,,20,20,20,100%,
+T037,IA,automazione custom,euronics,media,5,30,"0,002",5,,20,20,20,100%,
+T038,IA,automazione custom,euronics,media,5,27,"0,0019",5,,20,20,20,100%,
+T039,IA,automazione custom,euronics,media,5,28,"0,0018",5,,20,20,15,"92,5%",
+T040,IA,automazione custom,euronics,media,5,28,"0,002",5,,20,20,20,100%,
+T041,IA,automazione custom,euronics,difficile,10,54,"0,004",9,HomePod Mtjt3sm/a,40,36,36,90%,
+T042,IA,automazione custom,euronics,difficile,10,53,"0,0032",9,HomePod Mtjt3sm/a,40,36,36,90%,
+T043,IA,automazione custom,euronics,difficile,10,55,"0,0035",10,,40,40,40,100%,
+T044,IA,automazione custom,euronics,difficile,10,52,"0,0032",8,"HomePod Mtjt3sm/a, G213 920-008085",40,32,32,80%,
+T045,IA,automazione custom,euronics,difficile,10,54,"0,0036",10,,40,40,36,97%,
+T046,IA,automazione custom,euronics,molto difficile,11,57,"0,006",8,"cubo di tungsteno, HomePod Mtjt3sm/a, G213 920-008085",44,32,32,"72,72727273%","L'agente si rifiuta di cercare il cubo di tungsteno, in quanto oggetto insolito."
+T047,IA,automazione custom,euronics,molto difficile,11,65,"0,0039",10,HomePod Mtjt3sm/a,44,40,40,"90,90909091%","Il cubo di tungsteno ha prodotto un risultato, il quale considero corretto."
+T048,IA,automazione custom,euronics,molto difficile,11,60,"0,0038",11,,44,44,40,"97,27272727%",
+T049,IA,automazione custom,euronics,molto difficile,11,63,"0,0037",10,HomePod Mtjt3sm/a,44,40,40,"90,90909091%",
+T050,IA,automazione custom,euronics,molto difficile,11,59,"0,0038",11,,44,44,0,70%,Tutti i risultati erano in inglese.
+T051,IA,automazione custom,euronics,difficile,10,60,"0,0065",10,,40,40,40,100%,"Alcuni link davano un problema di ""request header too large"", ma alla fine funzionavano."
+T052,IA,automazione custom,euronics,difficile,10,57,"0,0067",10,,40,40,40,100%,
+T053,IA,automazione custom,euronics,difficile,10,53,"0,0036",10,,40,40,40,100%,
+T054,IA,automazione custom,euronics,difficile,10,53,"0,0035",10,,40,40,40,100%,
+T055,IA,automazione custom,euronics,difficile,10,54,"0,0035",10,,40,40,40,100%,
+T056,IA,automazione custom,euronics,molto difficile,11,61,"0,0053",11,,44,44,44,100%,"Questa volta il cubo di tungsteno ha dato ""nessun risultato trovato"" il che va bene."
+T057,IA,automazione custom,euronics,molto difficile,11,57,"0,0042",11,,44,44,44,100%,
+T058,IA,automazione custom,euronics,molto difficile,11,59,"0,0037",11,,44,44,44,100%,
+T059,IA,automazione custom,euronics,molto difficile,11,57,"0,0038",11,,44,44,44,100%,
+T060,IA,automazione custom,euronics,molto difficile,11,56,"0,0037",11,,44,44,44,100%,
+T061,IA,computer use,euronics,facile,1,61,"0,015",1,,4,4,4,100%,
+T062,IA,computer use,euronics,facile,1,82,"0,024",0,,4,0,0,0%,L'agente ha ritornato una scheda prodotto per un'articolo che non esiste nel sito web.
+T063,IA,computer use,euronics,facile,1,51,"0,0113",1,,4,3,4,"82,5%","L'agente ha specificato che la disponibilità è limitata al sito online, per questo 3 punti nei campi."
+T064,IA,computer use,euronics,facile,1,49,"0,0171",1,,4,4,3,"92,5%",
+T065,IA,computer use,euronics,facile,1,50,"0,0109",1,,4,3,3,75%,
+T066,IA,computer use,euronics,facile,1,68,"0,0236",1,,4,3,3,75%,"Il campo disponibilità dovrebbe essere ""non disponibile""."
+T067,IA,computer use,euronics,facile,1,50,"0,011",1,,4,4,4,100%,
+T068,IA,computer use,euronics,facile,1,63,"0,0147",1,,4,4,3,"92,5%",
+T069,IA,computer use,euronics,facile,1,53,"0,0112",1,,4,3,4,"82,5%",
+T070,IA,computer use,euronics,facile,1,68,"0,0111",1,,4,3,4,"82,5%",
+T071,IA,computer use,euronics,facile,1,57,"0,0148",1,,4,3,3,75%,
+T072,IA,computer use,euronics,facile,1,46,"0,0082",1,,4,4,3,"92,5%",
+T073,IA,computer use,euronics,facile,1,61,"0,0081",1,,4,4,4,100%,
+T074,IA,computer use,euronics,facile,1,46,"0,008",1,,4,3,4,"82,5%",
+T075,IA,computer use,euronics,facile,1,52,"0,0108",1,,4,3,4,"82,5%",
+T076,IA,computer use,euronics,facile,1,70,"0,0146",1,,4,3,4,"82,5%",
+T077,IA,computer use,euronics,facile,1,112,"0,0293",0,,4,0,0,0%,L'agente non ha trovato nulla.
+T078,IA,computer use,euronics,facile,1,56,"0,0143",1,,4,3,4,"82,5%",
+T079,IA,computer use,euronics,facile,1,50,"0,0725",1,,4,4,3,"92,5%",
+T080,IA,computer use,euronics,facile,1,47,"0,0087",1,,4,4,4,100%,
+T081,IA,computer use,euronics,media,5,104,"0,0306",5,,20,8,6,37%,"L'agente ha ritornato ""nessun risultato disponibile"" per articoli per cui invece c'è qualcosa."
+T082,IA,computer use,euronics,media,5,60,"0,0121",4,robot aspirapolvere rs20 pro,20,3,4,"16,5%","L'agente non ha ritornato ""nessun risultato disponibile"" e ha sbagliato a catturare il nome."
+T083,IA,computer use,euronics,media,5,118,"0,0485",4,G213 920-008085,20,8,6,37%,
+T084,IA,computer use,euronics,media,5,117,"0,0367",5,,20,8,6,37%,
+T085,IA,computer use,euronics,media,5,112,"0,0361",5,,20,6,8,33%,
+T086,IA,computer use,euronics,media,5,113,"0,0474",5,,20,8,6,37%,
+T087,IA,computer use,euronics,media,5,93,"0,0317",4,robot aspirapolvere rs20 pro,20,12,12,60%,
+T088,IA,computer use,euronics,media,5,87,"0,0266",5,,20,8,8,40%,
+T089,IA,computer use,euronics,media,5,106,"0,0327",4,G213 920-008085,20,7,8,"36,5%",L'agente ha specificato i pezzi disponibili per un risultato.
+T090,IA,computer use,euronics,media,5,54,"0,0133",5,,20,4,4,20%,"L'agente ha ritornato un solo risultato, gli altri ""nessun risultato trovato""."
+T091,IA,computer use,euronics,media,5,83,"0,0306",5,,20,8,8,40%,
+T092,IA,computer use,euronics,media,5,46,"0,0746",5,,20,4,3,"18,5%",
+T093,IA,computer use,euronics,media,5,44,"0,0083",1,tutti tranne la playstation 5 pro,20,4,3,"18,5%",
+T094,IA,computer use,euronics,media,5,152,,0,tutti,20,0,0,0%,Timeout scattato
+T095,IA,computer use,euronics,media,5,152,"0,0358",5,,20,4,4,20%,
+T096,IA,computer use,euronics,media,5,59,"0,0116",5,,20,4,4,20%,
+T097,IA,computer use,euronics,media,5,119,"0,0366",5,,20,8,8,40%,
+T098,IA,computer use,euronics,media,5,76,"0,0195",5,,20,3,4,"16,5%",
+T099,IA,computer use,euronics,media,5,92,"0,0308",5,,20,6,8,33%,
+T100,IA,computer use,euronics,media,5,98,"0,0253",5,,20,8,8,40%,
+T101,IA,computer use,euronics,difficile,10,152,,0,tutti,40,0,0,0%,"Timeout scattato, inoltre, computer use stava continuando ad andare avanti."
+T102,IA,computer use,euronics,difficile,10,57,"0,0096",1,,40,4,4,10%,
+T103,IA,computer use,euronics,difficile,10,95,"0,0277",9,robot aspirapolvere rs20 pro,40,6,8,"16,5%",In 8 casi ha omesso il nome del negozio e lo ha sostituito con quello del prodotto.
+T104,IA,computer use,euronics,difficile,10,83,"0,0209",10,,40,6,8,"16,5%",Ha trovato solo per i primi 2 prodotti.
+T105,IA,computer use,euronics,difficile,10,112,"0,0387",10,,40,12,12,30%,
+T106,IA,computer use,euronics,molto difficile,11,71,"0,0127",9,"HomePod Mtjt3sm/a, G213 920-008085",44,8,7,"17,5%",
+T107,IA,computer use,euronics,molto difficile,11,82,"0,0168",9,"HomePod Mtjt3sm/a, robot aspirapolvere rs20 pro",44,3,4,"7,5%","Tranne i primi 2 prodotti, l'agente ha riportato che gli altri non danno risultati."
+T108,IA,computer use,euronics,molto difficile,11,108,"0,0382",10,robot aspirapolvere rs20 pro,44,12,12,"27,27272727%",
+T109,IA,computer use,euronics,molto difficile,11,83,"0,0216",10,HomePod Mtjt3sm/a,44,6,8,15%,
+T110,IA,computer use,euronics,molto difficile,11,77,"0,0173",10,robot aspirapolvere rs20 pro,44,4,4,"9,090909091%",Il frigo WHDP29SM1EB0 me lo segna come prodotto con campi N/A.
+T111,IA,computer use,euronics,difficile,10,119,"0,0374",10,,40,6,8,"16,5%",
+T112,IA,computer use,euronics,difficile,10,131,"0,0374",10,,40,8,8,20%,
+T113,IA,computer use,euronics,difficile,10,151,,0,,40,0,0,0%,Timeout scattato
+T114,IA,computer use,euronics,difficile,10,128,"0,0368",10,,40,6,8,"16,5%",
+T115,IA,computer use,euronics,difficile,10,27,"0,0019",10,,40,0,0,0%,L'agente ha riportato che nessun risultato è stato trovato per tutti gli articoli.
+T116,IA,computer use,euronics,molto difficile,11,112,"0,0375",11,,44,12,12,"27,27272727%",
+T117,IA,computer use,euronics,molto difficile,11,74,"0,0193",1,tutti tranne le galaxy buds3 pro,44,3,4,"7,5%",
+T118,IA,computer use,euronics,molto difficile,11,151,,0,,44,0,0,0%,Timeout scattato
+T119,IA,computer use,euronics,molto difficile,11,127,"0,0366",10,iPhone 17 256gb azzurro,44,4,3,"8,409090909%",Computer Use ha ritornato un altro modello di telefono.
+T120,IA,computer use,euronics,molto difficile,11,116,"0,0378",11,,44,8,6,"16,81818182%",
